@@ -38,3 +38,4 @@ htmlcov/
 .tox/
 .coverage
 .cache/
+credentials.json
