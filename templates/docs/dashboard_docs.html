@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Documenti{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header della Dashboard Documenti -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-gradient-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0">📊 Dashboard Documenti</h2>
+                            <p class="mb-0">Gestione completa dei documenti aziendali con analisi AI e controllo versioni</p>
+                        </div>
+                        <div class="text-end">
+                            <button class="btn btn-light btn-upload" data-jack-event="upload_document">
+                                <i class="fas fa-upload"></i> Carica Documento
+                            </button>
+                            <button class="btn btn-outline-light ms-2" onclick="refreshDashboard()">
+                                <i class="fas fa-sync-alt"></i> Aggiorna
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche Rapide -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.total_documents }}</h4>
+                            <p class="mb-0">Documenti Totali</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-file-alt fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.pending_review }}</h4>
+                            <p class="mb-0">In Revisione</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.signed_documents }}</h4>
+                            <p class="mb-0">Documenti Firmati</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-signature fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.expiring_soon }}</h4>
+                            <p class="mb-0">In Scadenza</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri e Ricerca -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 Filtri e Ricerca</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="searchInput" class="form-label">Ricerca</label>
+                            <input type="text" class="form-control" id="searchInput" placeholder="Cerca documenti...">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="categoryFilter" class="form-label">Categoria</label>
+                            <select class="form-select" id="categoryFilter">
+                                <option value="">Tutte</option>
+                                <option value="amministrativo">Amministrativo</option>
+                                <option value="tecnico">Tecnico</option>
+                                <option value="legale">Legale</option>
+                                <option value="hr">Risorse Umane</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="statusFilter" class="form-label">Stato</label>
+                            <select class="form-select" id="statusFilter">
+                                <option value="">Tutti</option>
+                                <option value="attivo">Attivo</option>
+                                <option value="in_revisione">In Revisione</option>
+                                <option value="firmato">Firmato</option>
+                                <option value="scaduto">Scaduto</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="companyFilter" class="form-label">Azienda</label>
+                            <select class="form-select" id="companyFilter">
+                                <option value="">Tutte</option>
+                                {% for company in companies %}
+                                <option value="{{ company.id }}">{{ company.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button class="btn btn-primary" onclick="applyFilters()">
+                                    <i class="fas fa-filter"></i> Applica Filtri
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista Documenti -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📄 Documenti</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="exportToCSV()">
+                            <i class="fas fa-download"></i> Esporta CSV
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportToPDF()">
+                            <i class="fas fa-file-pdf"></i> Esporta PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="documentsTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>📄 Nome</th>
+                                    <th>🏢 Azienda</th>
+                                    <th>📂 Categoria</th>
+                                    <th>📅 Data Creazione</th>
+                                    <th>⏰ Scadenza</th>
+                                    <th>✅ Stato</th>
+                                    <th>🤖 AI Status</th>
+                                    <th>🔧 Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in documents %}
+                                <tr data-jack-tooltip>
+                                    <td>
+                                        <strong>{{ doc.title or doc.original_filename }}</strong>
+                                        {% if doc.version %}
+                                        <small class="text-muted">v{{ doc.version }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ doc.company.name if doc.company else 'N/A' }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ doc.categoria or 'Non specificata' }}</span>
+                                    </td>
+                                    <td>{{ doc.created_at.strftime('%d/%m/%Y') if doc.created_at else 'N/A' }}</td>
+                                    <td>
+                                        {% if doc.expiry_date %}
+                                            {% if doc.expiry_date < today %}
+                                                <span class="text-danger">{{ doc.expiry_date.strftime('%d/%m/%Y') }}</span>
+                                            {% else %}
+                                                {{ doc.expiry_date.strftime('%d/%m/%Y') }}
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if doc.signed %}
+                                            <span class="badge bg-success">✅ Firmato</span>
+                                        {% elif doc.in_revision %}
+                                            <span class="badge bg-warning">⏳ In Revisione</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">📝 Bozza</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if doc.ai_status %}
+                                            <span class="badge bg-info">🤖 {{ doc.ai_status.title() }}</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark">❓ Non Analizzato</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('docs.view_document', id=doc.id) }}" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               title="Visualizza">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{{ url_for('docs.download_document', id=doc.id) }}" 
+                                               class="btn btn-sm btn-outline-success btn-download"
+                                               data-jack-event="download_document"
+                                               title="Scarica">
+                                                <i class="fas fa-download"></i>
+                                            </a>
+                                            {% if not doc.signed %}
+                                            <button class="btn btn-sm btn-outline-warning btn-sign"
+                                                    data-jack-event="sign_document"
+                                                    onclick="signDocument({{ doc.id }})"
+                                                    title="Firma">
+                                                <i class="fas fa-signature"></i>
+                                            </button>
+                                            {% endif %}
+                                            <button class="btn btn-sm btn-outline-info btn-analyze"
+                                                    onclick="analyzeDocument({{ doc.id }})"
+                                                    title="Analizza con AI">
+                                                <i class="fas fa-brain"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Onboarding Jack (messaggi guida) -->
+{% include 'components/onboarding_docs.html' %}
+
+<!-- JS Onboarding sequenziale -->
+<script src="{{ url_for('static', filename='js/jack_onboarding.js') }}"></script>
+
+<!-- 📁 Prompt 096 – Box AI "Chiedi a Jack" -->
+{% include 'components/jack_ai_chat.html' %}
+
+<!-- Script per la dashboard -->
+<script>
+function refreshDashboard() {
+    location.reload();
+}
+
+function applyFilters() {
+    const search = document.getElementById('searchInput').value;
+    const category = document.getElementById('categoryFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    const company = document.getElementById('companyFilter').value;
+    
+    // Implementa la logica di filtro
+    console.log('Applicando filtri:', { search, category, status, company });
+    
+    // Per ora ricarica la pagina con i parametri
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (category) params.append('category', category);
+    if (status) params.append('status', status);
+    if (company) params.append('company', company);
+    
+    window.location.href = window.location.pathname + '?' + params.toString();
+}
+
+function signDocument(docId) {
+    if (confirm('Confermi di voler firmare questo documento?')) {
+        // Implementa la logica di firma
+        console.log('Firmando documento:', docId);
+        
+        // Trigger evento Jack
+        document.dispatchEvent(new CustomEvent('jack-event', {
+            detail: { type: 'sign_document', data: { docId: docId } }
+        }));
+    }
+}
+
+function analyzeDocument(docId) {
+    // Implementa la logica di analisi AI
+    console.log('Analizzando documento:', docId);
+    
+    // Trigger evento Jack
+    document.dispatchEvent(new CustomEvent('jack-event', {
+        detail: { type: 'analyze_document', data: { docId: docId } }
+    }));
+}
+
+function exportToCSV() {
+    // Implementa l'esportazione CSV
+    console.log('Esportando in CSV...');
+}
+
+function exportToPDF() {
+    // Implementa l'esportazione PDF
+    console.log('Esportando in PDF...');
+}
+
+// Funzionalità Chat Jack AI
+document.getElementById("jackSendBtn").onclick = async function () {
+  const input = document.getElementById("jackUserInput").value;
+  if (!input.trim()) return;
+
+  const chatBox = document.getElementById("jackChatBox");
+  chatBox.innerHTML += `<div class="mb-2"><strong>Tu:</strong> ${input}</div>`;
+  document.getElementById("jackUserInput").value = "";
+
+  try {
+    const res = await fetch("/api/jack/docs/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domanda: input })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      chatBox.innerHTML += `<div class="mb-2"><strong>🤖 Jack:</strong> ${data.risposta}</div>`;
+    } else {
+      chatBox.innerHTML += `<div class="mb-2 text-danger"><strong>❌ Errore:</strong> ${data.error || 'Errore nella comunicazione con Jack'}</div>`;
+    }
+  } catch (error) {
+    chatBox.innerHTML += `<div class="mb-2 text-danger"><strong>❌ Errore:</strong> Impossibile comunicare con Jack. Riprova più tardi.</div>`;
+  }
+  
+  chatBox.scrollTop = chatBox.scrollHeight;
+};
+
+
+
+// Inizializzazione quando il DOM è pronto
+document.addEventListener('DOMContentLoaded', function() {
+    // Configurazione per Jack Onboarding
+    if (window.JackOnboarding) {
+        // Personalizza messaggi per questa dashboard
+        const dashboardMessages = [
+            {
+                text: "Ciao {{nome}}! 👋 Benvenuto nella Dashboard Documenti!",
+                action: null,
+                highlight: null
+            },
+            {
+                text: "Qui puoi vedere tutti i documenti aziendali organizzati.",
+                action: null,
+                highlight: '#documentsTable'
+            },
+            {
+                text: "Usa i filtri per trovare rapidamente quello che cerchi!",
+                action: null,
+                highlight: '.card-header'
+            },
+            {
+                text: "Clicca su 'Carica Documento' per aggiungere nuovi file.",
+                action: null,
+                highlight: '.btn-upload'
+            },
+            {
+                text: "Ogni documento può essere firmato, scaricato o analizzato con AI.",
+                action: null,
+                highlight: '.btn-group'
+            },
+            {
+                text: "Perfetto! Ora sei pronto per gestire i documenti! 🎯",
+                action: null,
+                highlight: null
+            }
+        ];
+        
+        // Aggiorna i messaggi se l'onboarding è disponibile
+        if (window.JackOnboarding.updateMessages) {
+            window.JackOnboarding.updateMessages(dashboardMessages);
+        }
+    }
+});
+</script>
+{% endblock %} 

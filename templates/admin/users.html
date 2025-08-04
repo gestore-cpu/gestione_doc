@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestione Utenti</title>
+</head>
+<body>
+    <h1>Utenti registrati</h1>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Email</th>
+          <th>Ruolo</th>
+          <th>Aziende</th>
+          <th>Reparti</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>{{ user.username }}</td>
+          <td>{{ user.email }}</td>
+          <td>{{ user.role }}</td>
+          <td>{{ user.companies|map(attribute='name')|join(', ') }}</td>
+          <td>{{ user.departments|map(attribute='name')|join(', ') }}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editUserModal{{ user.id }}">
+              ✏️ Modifica
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% for user in users %}
+<!-- �� MODALE MODIFICA UTENTE -->
+<div class="modal fade" id="editUserModal{{ user.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <form method="POST" action="{{ url_for('admin.update_user', user_id=user.id) }}">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title">Modifica Utente: {{ user.username }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <!-- 🔤 Dati base -->
+          <div class="mb-3">
+            <label>Username</label>
+            <input type="text" name="username" class="form-control" value="{{ user.username }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label>Email</label>
+            <input type="email" name="email" class="form-control" value="{{ user.email }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label>Ruolo</label>
+            <select name="role" class="form-select role-selector" data-user-id="{{ user.id }}">
+              <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+              <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
+              <option value="guest" {% if user.role == 'guest' %}selected{% endif %}>Guest</option>
+            </select>
+          </div>
+
+          <!-- 👤 Solo Guest -->
+          <div class="guest-section" id="guest-section-{{ user.id }}" {% if user.role != 'guest' %}style="display:none"{% endif %}>
+            <div class="mb-3">
+              <label>Data di Scadenza Accesso</label>
+              <input type="date" name="access_expiration" class="form-control" value="{{ user.access_expiration|default('', true)[:10] }}">
+            </div>
+
+            <div class="form-check mb-3">
+              <input type="checkbox" class="form-check-input" name="can_download" {% if user.can_download %}checked{% endif %}>
+              <label class="form-check-label">Autorizzato al Download</label>
+            </div>
+
+            <label class="mb-2">Documenti Attualmente Visibili</label>
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>📄 Nome</th>
+                  <th>Azienda</th>
+                  <th>Reparto</th>
+                  <th>Revoca</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for doc in user.documents %}
+                <tr>
+                  <td>{{ doc.title }}</td>
+                  <td>{{ doc.company.name }}</td>
+                  <td>{{ doc.department.name }}</td>
+                  <td><input type="checkbox" name="revoke_docs" value="{{ doc.id }}"></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 🏢 Solo User/Admin -->
+          <div class="non-guest-section" id="non-guest-section-{{ user.id }}" {% if user.role == 'guest' %}style="display:none"{% endif %}>
+            <div class="mb-3">
+              <label>Aziende associate</label>
+              <select name="company_ids" multiple class="form-select">
+                {% for company in companies %}
+                  <option value="{{ company.id }}" {% if company.id in [c.id for c in user.companies] %}selected{% endif %}>{{ company.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label>Reparti associati</label>
+              <select name="department_ids" multiple class="form-select">
+                {% for dept in departments %}
+                  <option value="{{ dept.id }}" {% if dept.id in [d.id for d in user.departments] %}selected{% endif %}>{{ dept.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">💾 Salva</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+    {% endfor %}
+
+<!-- 🧠 SCRIPT JS per mostrare/nascondere sezioni -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.role-selector').forEach(function(select) {
+    select.addEventListener('change', function () {
+      const userId = this.dataset.userId;
+      const role = this.value;
+      document.getElementById(`guest-section-${userId}`).style.display = (role === 'guest') ? 'block' : 'none';
+      document.getElementById(`non-guest-section-${userId}`).style.display = (role === 'guest') ? 'none' : 'block';
+    });
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Report Danni Aziendali</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      color: #333;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #dc3545;
+      padding-bottom: 10px;
+      margin-bottom: 30px;
+    }
+    .header h1 {
+      color: #dc3545;
+      margin: 0;
+    }
+    .header p {
+      margin: 5px 0;
+      color: #666;
+    }
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 30px;
+    }
+    .stat-box {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+      width: 23%;
+    }
+    .stat-box h3 {
+      margin: 0;
+      color: #dc3545;
+    }
+    .stat-box p {
+      margin: 5px 0;
+      font-size: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f8f9fa;
+      font-weight: bold;
+    }
+    .category-section {
+      margin-bottom: 30px;
+    }
+    .category-section h3 {
+      color: #dc3545;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 5px;
+    }
+    .footer {
+      margin-top: 30px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+      border-top: 1px solid #ddd;
+      padding-top: 10px;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <h1>🚨 REPORT DANNI AZIENDALI</h1>
+    <p>Generato il: {{ data_export }}</p>
+    <p>Sistema di Gestione Documenti</p>
+  </div>
+
+  <!-- Statistiche principali -->
+  <div class="stats">
+    <div class="stat-box">
+      <h3>{{ totale }}</h3>
+      <p>Documenti Totali</p>
+    </div>
+    <div class="stat-box">
+      <h3>{{ per_categoria|length }}</h3>
+      <p>Categorie Danni</p>
+    </div>
+    <div class="stat-box">
+      <h3>{{ per_utente|length }}</h3>
+      <p>Responsabili Coinvolti</p>
+    </div>
+    <div class="stat-box">
+      <h3>{{ data_export[:10] }}</h3>
+      <p>Data Report</p>
+    </div>
+  </div>
+
+  <!-- Danni per Categoria -->
+  <div class="category-section">
+    <h3>📊 Danni per Categoria</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Categoria</th>
+          <th>Numero Danni</th>
+          <th>Percentuale</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for categoria, count in per_categoria.items() %}
+        <tr>
+          <td>{{ categoria }}</td>
+          <td>{{ count }}</td>
+          <td>{{ "%.1f"|format(count / totale * 100) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Danni per Responsabile -->
+  <div class="category-section">
+    <h3>👤 Danni per Responsabile</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Responsabile</th>
+          <th>Numero Danni</th>
+          <th>Percentuale</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for responsabile, count in per_utente.items() %}
+        <tr>
+          <td>{{ responsabile }}</td>
+          <td>{{ count }}</td>
+          <td>{{ "%.1f"|format(count / totale * 100) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Lista dettagliata documenti -->
+  <div class="page-break"></div>
+  
+  <div class="category-section">
+    <h3>📄 Lista Dettagliata Documenti Danni</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Nome File</th>
+          <th>Tipo</th>
+          <th>Responsabile</th>
+          <th>Asset</th>
+          <th>Data Caricamento</th>
+          <th>Uploader</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in documenti %}
+        <tr>
+          <td>{{ doc.filename }}</td>
+          <td>{{ doc.categoria_ai or "Non Specificato" }}</td>
+          <td>{{ doc.responsabile.username if doc.responsabile else "Non Assegnato" }}</td>
+          <td>{{ doc.asset.nome if doc.asset else "Non Specificato" }}</td>
+          <td>{{ doc.created_at.strftime('%d/%m/%Y %H:%M') if doc.created_at else "N/A" }}</td>
+          <td>{{ doc.uploader_email }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Note e raccomandazioni -->
+  <div class="category-section">
+    <h3>💡 Note e Raccomandazioni</h3>
+    <ul>
+      <li><strong>Monitoraggio:</strong> Continuare il monitoraggio dei danni per identificare pattern ricorrenti</li>
+      <li><strong>Prevenzione:</strong> Implementare misure preventive basate sui dati raccolti</li>
+      <li><strong>Formazione:</strong> Considerare programmi di formazione per i responsabili più coinvolti</li>
+      <li><strong>Asset:</strong> Valutare la necessità di manutenzione preventiva per gli asset più danneggiati</li>
+    </ul>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>Report generato automaticamente dal Sistema di Gestione Documenti</p>
+    <p>Per informazioni contattare l'amministratore di sistema</p>
+  </div>
+</body>
+</html> 

@@ -1,0 +1,1215 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3>📄 Dettagli Documento</h3>
+                <div>
+                    <a href="{{ url_for('admin.visualizza_versioni', doc_id=document.id) }}" class="btn btn-info">
+                        📋 Versioni
+                    </a>
+                    <a href="{{ url_for('admin.document_approval_flow', doc_id=document.id) }}" class="btn btn-warning ms-2">
+                        📋 Flusso Approvazione
+                    </a>
+                    <a href="{{ url_for('admin.document_approvals', doc_id=document.id) }}" class="btn btn-outline-warning ms-2">
+                        📝 Checklist Approvazione
+                    </h5>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">
+                                <i class="fas fa-history text-info"></i> 
+                                Versioni Documento
+                            </h6>
+                            <a href="{{ url_for('docs.visualizza_versioni_documento', document_id=document.id) }}" 
+                               class="btn btn-outline-info btn-sm">
+                                <i class="fas fa-list"></i> Visualizza Versioni
+                            </a>
+                        </div>
+                        {% if document.versioni %}
+                            <div class="alert alert-info">
+                                <strong>📄 Versioni disponibili:</strong> {{ document.versioni|length }}
+                                <br><small class="text-muted">
+                                    Ultima modifica: {{ document.versioni[0].uploaded_at.strftime('%d/%m/%Y %H:%M') if document.versioni else 'N/A' }}
+                                </small>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Nessuna versione storica disponibile
+                            </div>
+                        {% endif %}
+                    </a>
+                    <a href="{{ url_for('admin.export_document_summary', doc_id=document.id) }}" class="btn btn-outline-primary ms-2">
+                        📄 Esporta Riepilogo PDF
+                    </a>
+                    <a href="{{ url_for('admin.export_versions_csv', document_id=document.id) }}" class="btn btn-sm btn-outline-secondary ms-2">
+                        📄 Esporta CSV
+                    </a>
+                    <a href="{{ url_for('docs.firma_grafica', doc_id=document.id) }}" class="btn btn-outline-info ms-2">
+                        <i class="fas fa-pen"></i> Firma Grafica
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Stato approvazione -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔄 Stato Approvazione</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="me-2">Admin:</span>
+                                {% if document.validazione_admin %}
+                                    <span class="badge bg-success">🟢 Approvato</span>
+                                {% else %}
+                                    <span class="badge bg-warning">🟡 In attesa</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="me-2">CEO:</span>
+                                {% if document.validazione_ceo %}
+                                    <span class="badge bg-success">🟢 Approvato</span>
+                                {% else %}
+                                    <span class="badge bg-warning">🟡 In attesa</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Pulsante approvazione Admin -->
+                    {% if not document.validazione_admin %}
+                    <div class="mt-3">
+                        <form method="post" action="{{ url_for('admin.approva_documento_admin', doc_id=document.id) }}">
+                            <button type="submit" class="btn btn-success">
+                                ✅ Approva come Admin
+                            </button>
+                            <small class="form-text text-muted d-block mt-1">
+                                Approva questo documento per permettere l'approvazione CEO.
+                            </small>
+                        </form>
+                    </div>
+                    {% elif document.validazione_admin and not document.validazione_ceo %}
+                    <div class="alert alert-info mt-3">
+                        <h6>✅ Approvato da Admin</h6>
+                        <p>Il documento è stato approvato dall'Admin ed è ora in attesa di approvazione CEO.</p>
+                    </div>
+                    {% elif document.validazione_admin and document.validazione_ceo %}
+                    <div class="alert alert-success mt-3">
+                        <h6>🎉 Completamente approvato</h6>
+                        <p>Il documento è stato approvato sia dall'Admin che dal CEO ed è ora disponibile per l'uso.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Stato Google Drive -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">☁️ Google Drive</h5>
+                </div>
+                <div class="card-body">
+                    {% if document.drive_uploaded_at %}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-success me-2">✅ Caricato</span>
+                                <span class="text-muted">
+                                    Caricato il {{ document.drive_uploaded_at.strftime('%d/%m/%Y alle %H:%M') }}
+                                </span>
+                                {% if document.drive_status_note %}
+                                    <br><small class="text-muted">{{ document.drive_status_note }}</small>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <form method="POST" action="{{ url_for('drive.reupload_drive', id=document.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                        🔁 Reupload
+                                    </button>
+                                </form>
+                                {% if current_user.is_ceo %}
+                                <a href="{{ url_for('ceo.dashboard_drive_ai') }}" class="btn btn-sm btn-outline-info ms-2">
+                                    🧠 Dashboard AI
+                                </a>
+                                {% endif %}
+                                <form method="POST" action="{{ url_for('drive.delete_from_drive', id=document.id) }}" class="d-inline ms-2">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                            onclick="return confirm('Sei sicuro di voler eliminare il file da Google Drive?')">
+                                        🗑️ Elimina da Drive
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% if document.drive_file_id %}
+                        <small class="text-muted d-block mt-2">
+                            <i class="fas fa-info-circle"></i> ID File Drive: {{ document.drive_file_id }}
+                        </small>
+                        {% endif %}
+                    {% else %}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-warning me-2">❌ Non caricato</span>
+                                <span class="text-muted">Documento non ancora caricato su Google Drive</span>
+                                {% if document.drive_status_note %}
+                                    <br><small class="text-danger">{{ document.drive_status_note }}</small>
+                                {% endif %}
+                            </div>
+                            {% if document.validazione_ceo %}
+                            <div>
+                                <form method="POST" action="{{ url_for('drive.reupload_drive', id=document.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        ☁️ Carica su Drive
+                                    </button>
+                                </form>
+                            </div>
+                            {% else %}
+                            <div>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i> 
+                                    Il documento deve essere approvato dal CEO per essere caricato automaticamente
+                                </small>
+                            </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Firme del documento -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">✍️ Firme Documento</h5>
+                    {% if current_user.is_admin %}
+                        <a href="{{ url_for('docs.visualizza_firme_documento', doc_id=document.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i> Visualizza Tutte le Firme
+                        </a>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if document.firme %}
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6>Firme raccolte ({{ document.firme|length }}):</h6>
+                                <ul class="list-group list-group-flush">
+                                    {% for firma in document.firme[:5] %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>{{ firma.nome_firma }}</strong>
+                                                <br><small class="text-muted">{{ firma.user.username }} - {{ firma.data_firma_formatted }}</small>
+                                                {% if firma.firma_immagine %}
+                                                    <br><img src="{{ url_for('static', filename=firma.firma_immagine.replace('uploads/', '')) }}" 
+                                                             alt="Firma grafica" style="max-width: 150px; border: 1px solid #ddd; margin-top: 5px;">
+                                                {% endif %}
+                                            </div>
+                                            <span class="badge bg-success">✅ Firmato</span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                                {% if document.firme|length > 5 %}
+                                    <p class="text-muted mt-2">
+                                        <small>... e altre {{ document.firme|length - 5 }} firme</small>
+                                    </p>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <h6>📊 Statistiche</h6>
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar bg-success" style="width: {{ (document.firme|length / 10 * 100)|round }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ document.firme|length }} firme su ~10 utenti attesi</small>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <h6>📋 Nessuna firma registrata</h6>
+                            <p class="mb-0">Questo documento non ha ancora ricevuto firme. Gli utenti possono firmare dalla sezione "Documenti da Firmare".</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Flusso di approvazione multilivello -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🧾 Flusso di Approvazione Multilivello</h5>
+                </div>
+                <div class="card-body">
+                    {% if not document.approvazioni %}
+                        <!-- Flusso non inizializzato -->
+                        <div class="alert alert-info">
+                            <h6>📋 Flusso non inizializzato</h6>
+                            <p>Questo documento non ha ancora un flusso di approvazione multilivello attivo.</p>
+                            {% if current_user.is_admin or current_user.id == document.user_id %}
+                            <form method="POST" action="{{ url_for('docs.inizializza_approvazione_documento', document_id=document.id) }}" class="mt-3">
+                                <button type="submit" class="btn btn-primary">
+                                    🚀 Inizializza Flusso Approvazione
+                                </button>
+                                <small class="form-text text-muted d-block mt-1">
+                                    Crea il flusso di approvazione a 3 livelli: Revisore → Responsabile → CEO
+                                </small>
+                            </form>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <!-- Progresso flusso -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span><strong>Progresso:</strong></span>
+                                <span class="badge bg-info">{{ document.get_progresso_approvazione() }}%</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" 
+                                     style="width: {{ document.get_progresso_approvazione() }}%"
+                                     aria-valuenow="{{ document.get_progresso_approvazione() }}" 
+                                     aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lista livelli di approvazione -->
+                        <div class="list-group">
+                            {% for step in document.get_approvazioni_ordinate() %}
+                            <div class="list-group-item {% if step.stato == 'approvato' %}list-group-item-success{% elif step.stato == 'rifiutato' %}list-group-item-danger{% endif %}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>Livello {{ step.livello }} – {{ step.ruolo_richiesto|title }}</strong>
+                                        <br>
+                                        <span class="badge bg-{{ 'success' if step.stato=='approvato' else 'danger' if step.stato=='rifiutato' else 'secondary' }}">
+                                            {{ step.stato|title }}
+                                        </span>
+                                        {% if step.utente %}
+                                            <br><small class="text-muted">👤 {{ step.utente }} – {{ step.data.strftime('%d/%m/%Y %H:%M') if step.data }}</small>
+                                        {% endif %}
+                                        {% if step.commento %}
+                                            <br><small class="text-muted">📝 {{ step.commento }}</small>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Pulsanti azione -->
+                                    {% if step.stato == 'in_attesa' %}
+                                        {% set puo_approvare, livello_richiesto, messaggio = document.can_be_approved_by(current_user) %}
+                                        {% if puo_approvare and livello_richiesto == step.livello %}
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-sm btn-success" 
+                                                    onclick="showApprovalForm({{ step.livello }}, 'approva')">
+                                                ✅ Approva
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-danger" 
+                                                    onclick="showApprovalForm({{ step.livello }}, 'rifiuta')">
+                                                ❌ Rifiuta
+                                            </button>
+                                        </div>
+                                        {% elif not puo_approvare %}
+                                        <small class="text-muted">{{ messaggio }}</small>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Form approvazione/rifiuto (nascosto) -->
+                                <div id="approval-form-{{ step.livello }}" class="mt-3" style="display: none;">
+                                    <form method="POST" id="form-{{ step.livello }}">
+                                        <div class="mb-3">
+                                            <label for="commento-{{ step.livello }}" class="form-label">Commento (opzionale):</label>
+                                            <textarea class="form-control" id="commento-{{ step.livello }}" name="commento" rows="2" 
+                                                      placeholder="Inserisci un commento..."></textarea>
+                                        </div>
+                                        <div class="btn-group" role="group">
+                                            <button type="submit" class="btn btn-sm btn-success" id="approva-btn-{{ step.livello }}">
+                                                ✅ Conferma Approvazione
+                                            </button>
+                                            <button type="submit" class="btn btn-sm btn-danger" id="rifiuta-btn-{{ step.livello }}">
+                                                ❌ Conferma Rifiuto
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-secondary" 
+                                                    onclick="hideApprovalForm({{ step.livello }})">
+                                                ✖️ Annulla
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Stato finale -->
+                        {% set stato_flusso = document.get_stato_flusso() %}
+                        {% if stato_flusso == 'completato' %}
+                        <div class="alert alert-success mt-3">
+                            <h6>🎉 Flusso completato!</h6>
+                            <p>Il documento è stato approvato da tutti i livelli richiesti.</p>
+                        </div>
+                        {% elif stato_flusso == 'bloccato' %}
+                        <div class="alert alert-danger mt-3">
+                            <h6>⛔ Flusso bloccato!</h6>
+                            <p>Il flusso di approvazione è stato bloccato da un rifiuto.</p>
+                            {% if current_user.is_admin %}
+                            <form method="POST" action="{{ url_for('docs.reset_approvazione_documento', document_id=document.id) }}" class="mt-2">
+                                <button type="submit" class="btn btn-warning btn-sm">
+                                    🔄 Reset Flusso
+                                </button>
+                                <small class="form-text text-muted d-block mt-1">
+                                    Resetta il flusso per permettere nuove approvazioni
+                                </small>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informazioni documento -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Informazioni Documento</h5>
+                </div>
+                <div class="card-body">
+                    {% if document.archiviato %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-archive"></i> <strong>📦 Documento Archiviato</strong>
+                        <br><small class="text-muted">Questo documento è stato archiviato e non è più attivo.</small>
+                    </div>
+                    {% endif %}
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <strong>Titolo:</strong> {{ document.title or document.original_filename }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Uploader:</strong> {{ document.uploader_email }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Azienda:</strong> {{ document.company.name }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Reparto:</strong> {{ document.department.name }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Descrizione:</strong> {{ document.description or 'Nessuna descrizione' }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Note:</strong> {{ document.note or 'Nessuna nota' }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Visibilità:</strong> {{ document.visibility }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Data creazione:</strong> {{ document.created_at.strftime('%d/%m/%Y %H:%M') }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Data scadenza:</strong> 
+                            {{ document.expiry_date.strftime('%d/%m/%Y') if document.expiry_date else 'N/D' }}
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Lettura:</strong> 
+                            {% if current_user.is_authenticated %}
+                                {% set has_read = has_user_read_document(current_user, document) %}
+                                <span class="badge bg-{{ 'success' if has_read else 'warning' }}">
+                                    {{ '✅ Letto' if has_read else '⚠️ Non letto' }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">N/A</span>
+                            {% endif %}
+                        </li>
+                        {% if document.validazione_admin and document.validazione_ceo %}
+                        <li class="list-group-item">
+                            <strong>Download:</strong>
+                            <a href="{{ url_for('download_file', filename=document.filename) }}" 
+                               class="btn btn-sm btn-primary">
+                                📥 Scarica Documento
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Sezione Audit Log -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🕵️ Log Audit Documento</h5>
+                </div>
+                <div class="card-body">
+                    {% if document.audit_logs %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Utente</th>
+                                    <th>Evento</th>
+                                    <th>Note AI</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in document.audit_logs[:5] %}
+                                <tr>
+                                    <td>{{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        {% if log.user %}
+                                            <span class="badge bg-primary">{{ log.user.email }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Sistema</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ log.evento }}</td>
+                                    <td>
+                                        {% if log.note_ai %}
+                                            <small class="text-muted">{{ log.note_ai }}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% if document.audit_logs|length > 5 %}
+                        <div class="text-center mt-3">
+                            <a href="{{ url_for('docs.audit_summary', id=document.id) }}" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-eye"></i> Visualizza Tutti i Log ({{ document.audit_logs|length }})
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-info-circle text-info"></i>
+                        <p class="text-muted mb-0">Nessun evento di audit registrato</p>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-3">
+                        <a href="{{ url_for('docs.audit_summary', id=document.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-search"></i> 🕵️ Riepilogo Completo
+                        </a>
+                        {% if document.audit_logs %}
+                        <a href="{{ url_for('docs.export_audit_csv', id=document.id) }}" class="btn btn-sm btn-outline-success">
+                            <i class="fas fa-file-csv"></i> 📊 Export CSV
+                        </a>
+                        <a href="{{ url_for('docs.export_audit_pdf', id=document.id) }}" class="btn btn-sm btn-outline-danger">
+                            <i class="fas fa-file-pdf"></i> 📄 Export PDF
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sezione Firma Digitale -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🖋️ Firma Digitale</h5>
+                </div>
+                <div class="card-body">
+                    {% if document.stato_approvazione == 'approvato' %}
+                        {% if not document.is_signed %}
+                            <div class="alert alert-info">
+                                <h6>📄 Documento approvato e pronto per la firma</h6>
+                                <p>Questo documento è stato approvato e può essere firmato digitalmente.</p>
+                                
+                                <!-- Suggerimenti AI -->
+                                <div id="ai-suggestions" class="mt-3">
+                                    <div class="alert alert-warning">
+                                        <h6>🧠 Analisi AI in corso...</h6>
+                                        <p>Caricamento suggerimenti per firma automatica...</p>
+                                    </div>
+                                </div>
+                                
+                                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#firmaModal">
+                                    🖋️ Firma Documento
+                                </button>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-success">
+                                <h6>✅ Documento firmato</h6>
+                                <p><strong>Firmato da:</strong> {{ document.signed_by }}</p>
+                                <p><strong>Data firma:</strong> {{ document.signed_at.strftime('%d/%m/%Y %H:%M') if document.signed_at else 'N/D' }}</p>
+                                {% if document.firma_commento %}
+                                    <p><strong>Commento:</strong> {{ document.firma_commento }}</p>
+                                {% endif %}
+                                {% if document.signed_by_ai %}
+                                    <span class="badge bg-info text-dark">🧠 Firmato automaticamente da AI</span>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <h6>⚠️ Documento non ancora approvato</h6>
+                            <p>Il documento deve essere prima approvato prima di poter essere firmato.</p>
+                            <p><strong>Stato attuale:</strong> 
+                                <span class="badge bg-{{ 'secondary' if document.stato_approvazione == 'bozza' else 'warning' if document.stato_approvazione == 'in_attesa' else 'danger' }}">
+                                    {{ document.stato_approvazione.capitalize() }}
+                                </span>
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Sezione Firme Gerarchiche -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Firme Gerarchiche</h5>
+                </div>
+                <div class="card-body">
+                    {% if document.firme %}
+                        {% for firma in document.firme %}
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">
+                                        <span class="badge {{ firma.badge_class_stato }}">{{ firma.stato_firma_display }}</span>
+                                        - {{ firma.user.full_name if firma.user else 'Utente sconosciuto' }}
+                                    </h6>
+                                    <small class="text-muted">{{ firma.data_firma.strftime('%d/%m/%Y %H:%M') }}</small>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>✍️ Utente: {{ firma.nome_firma }}</span>
+                                        <span class="text-success">✅ {{ firma.data_firma.strftime('%d/%m/%Y') }}</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>🧑‍💼 Admin:</span>
+                                        {% if firma.firma_admin %}
+                                            <span class="text-success">✅ {{ firma.data_firma_admin.strftime('%d/%m/%Y') }}</span>
+                                        {% else %}
+                                            <span class="text-warning">❌ Da approvare</span>
+                                        {% endif %}
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>👨‍💼 CEO:</span>
+                                        {% if firma.approvato_dal_ceo %}
+                                            <span class="text-success">✅ {{ firma.data_firma_ceo.strftime('%d/%m/%Y') }}</span>
+                                        {% else %}
+                                            <span class="text-warning">❌ In attesa</span>
+                                        {% endif %}
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>📧 Invio Automatico:</span>
+                                        <span class="badge {{ firma.badge_class_invio }}">{{ firma.stato_invio_display }}</span>
+                                    </li>
+                                    {% if firma.inviato_auto and firma.data_invio_auto %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>📅 Data Invio:</span>
+                                        <span class="text-info">{{ firma.data_invio_auto.strftime('%d/%m/%Y %H:%M') }}</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>📮 Destinatario:</span>
+                                        <span class="text-info">{{ firma.email_inviata_a }}</span>
+                                    </li>
+                                    {% endif %}
+                                    {% if firma.errore_invio %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>⚠️ Errore Invio:</span>
+                                        <span class="text-danger">{{ firma.errore_invio }}</span>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                                
+                                <!-- Azioni per Admin -->
+                                {% if current_user.is_admin %}
+                                <div class="mt-3">
+                                    {% if not firma.firma_admin %}
+                                    <form method="POST" action="{{ url_for('admin.approva_firma_admin', doc_id=document.id, firma_id=firma.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-success btn-sm">
+                                            ✅ Approva come Admin
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <form method="POST" action="{{ url_for('admin.rifiuta_firma_admin', doc_id=document.id, firma_id=firma.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-warning btn-sm">
+                                            ⚠️ Revoca Approvazione
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Azioni per CEO -->
+                                {% if current_user.is_ceo and firma.firma_admin and not firma.approvato_dal_ceo %}
+                                <div class="mt-3">
+                                    <form method="POST" action="{{ url_for('ceo.approva_firma_ceo', doc_id=document.id, firma_id=firma.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-success btn-sm">
+                                            ✅ Approva come CEO
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('ceo.rifiuta_firma_ceo', doc_id=document.id, firma_id=firma.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-danger btn-sm">
+                                            ❌ Rifiuta
+                                        </button>
+                                    </form>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Azioni per reinvio email -->
+                                {% if current_user.is_ceo and firma.approvato_dal_ceo %}
+                                <div class="mt-3">
+                                    {% if firma.errore_invio or not firma.inviato_auto %}
+                                    <form method="POST" action="{{ url_for('ceo.reinvia_email_documento', doc_id=document.id, firma_id=firma.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-warning btn-sm">
+                                            📧 Reinvia Email
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% if firma.inviato_auto and not firma.errore_invio %}
+                                    <span class="badge bg-success">✅ Email inviata</span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Firma grafica se presente -->
+                                {% if firma.firma_immagine %}
+                                <div class="mt-3">
+                                    <img src="{{ url_for('static', filename=firma.firma_immagine.replace('uploads/', '')) }}"
+                                         alt="Firma grafica" style="max-width: 150px; border: 1px solid #ddd;">
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-info">
+                            <h6>📝 Nessuna firma presente</h6>
+                            <p>Questo documento non ha ancora firme registrate.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Modale per firma -->
+            {% if document.stato_approvazione == 'approvato' and not document.is_signed %}
+            <div class="modal fade" id="firmaModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <form method="POST" action="{{ url_for('admin.sign_document', doc_id=document.id) }}">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">🖋️ Firma Documento</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Stai per firmare il documento <strong>{{ document.title }}</strong>.</p>
+                                <p class="text-muted">La firma digitale conferma che hai letto e approvato il contenuto del documento.</p>
+                                <div class="mb-3">
+                                    <label for="firma_commento" class="form-label">Commento (facoltativo)</label>
+                                    <textarea class="form-control" name="firma_commento" rows="3" placeholder="Inserisci un commento per la firma..."></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="submit" class="btn btn-success">✅ Firma</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="mt-3">
+                <a href="{{ url_for('admin.documents_overview') }}" class="btn btn-secondary">
+                    ← Torna alla panoramica documenti
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Funzioni per gestire i form di approvazione multilivello
+function showApprovalForm(livello, action) {
+    const formDiv = document.getElementById(`approval-form-${livello}`);
+    const form = document.getElementById(`form-${livello}`);
+    const approvaBtn = document.getElementById(`approva-btn-${livello}`);
+    const rifiutaBtn = document.getElementById(`rifiuta-btn-${livello}`);
+    
+    // Mostra il form
+    formDiv.style.display = 'block';
+    
+    // Imposta l'azione del form
+    if (action === 'approva') {
+        form.action = "{{ url_for('docs.approva_step', document_id=document.id, livello=0) }}".replace('/0/', `/${livello}/`);
+        approvaBtn.style.display = 'inline-block';
+        rifiutaBtn.style.display = 'none';
+    } else {
+        form.action = "{{ url_for('docs.rifiuta_step', document_id=document.id, livello=0) }}".replace('/0/', `/${livello}/`);
+        approvaBtn.style.display = 'none';
+        rifiutaBtn.style.display = 'inline-block';
+    }
+}
+
+function hideApprovalForm(livello) {
+    const formDiv = document.getElementById(`approval-form-${livello}`);
+    formDiv.style.display = 'none';
+}
+
+// Funzione per aggiornare i suggerimenti AI
+function updateAISuggestions() {
+    const suggestionsDiv = document.getElementById('ai-suggestions');
+    if (suggestionsDiv) {
+        // Simula caricamento suggerimenti AI
+        setTimeout(() => {
+            suggestionsDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <h6>🧠 Suggerimenti AI</h6>
+                    <ul class="mb-0">
+                        <li>✅ Documento conforme alle policy aziendali</li>
+                        <li>✅ Nessun rischio di sicurezza rilevato</li>
+                        <li>✅ Contenuto appropriato per la firma</li>
+                    </ul>
+                </div>
+            `;
+        }, 2000);
+    }
+}
+
+// Inizializza quando la pagina è caricata
+document.addEventListener('DOMContentLoaded', function() {
+    updateAISuggestions();
+});
+// Carica suggerimenti AI per documenti approvati e non firmati
+document.addEventListener('DOMContentLoaded', function() {
+    {% if document.stato_approvazione == 'approvato' and not document.is_signed %}
+    loadAISuggestions();
+    {% endif %}
+});
+
+function loadAISuggestions() {
+    fetch('/admin/documents/{{ document.id }}/ai-suggestions')
+        .then(response => response.json())
+        .then(data => {
+            const suggestionsDiv = document.getElementById('ai-suggestions');
+            
+            if (data.suggestion) {
+                suggestionsDiv.innerHTML = `
+                    <div class="alert alert-info">
+                        <h6>🧠 Suggerimento AI</h6>
+                        <p>${data.suggestion}</p>
+                        ${data.eligible_for_auto_sign ? 
+                            '<small class="text-muted">Questo documento potrebbe essere idoneo per la firma automatica AI.</small>' : 
+                            '<small class="text-muted">Documento richiede revisione manuale.</small>'
+                        }
+                    </div>
+                `;
+            } else {
+                suggestionsDiv.innerHTML = `
+                    <div class="alert alert-secondary">
+                        <h6>📋 Nessun suggerimento AI</h6>
+                        <p>Il documento richiede firma manuale.</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento suggerimenti AI:', error);
+            document.getElementById('ai-suggestions').innerHTML = `
+                <div class="alert alert-warning">
+                    <h6>⚠️ Errore AI</h6>
+                    <p>Impossibile caricare i suggerimenti AI.</p>
+                </div>
+            `;
+        });
+}
+
+// === CHECKLIST COMPLIANCE SECTION ===
+document.addEventListener('DOMContentLoaded', function() {
+    loadChecklistCompliance();
+});
+
+function loadChecklistCompliance() {
+    fetch(`/checklist_compliance/documento/{{ document.id }}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateChecklistTable(data.checklist);
+                updateChecklistStats(data.checklist);
+            }
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento checklist:', error);
+        });
+}
+
+function updateChecklistTable(checklist) {
+    const tbody = document.getElementById('checklist-tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    checklist.forEach(voce => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${voce.tipo_standard_display}</td>
+            <td>${voce.voce}</td>
+            <td>
+                ${voce.is_completa ? 
+                    `✅ ${voce.completata_da} il ${voce.completata_il}` : 
+                    '❌ Incompleta'
+                }
+            </td>
+            <td>${voce.note || ''}</td>
+            <td>
+                ${!voce.is_completa ? 
+                    `<button class="btn btn-success btn-sm completa-btn" data-id="${voce.id}">✔️ Completa</button>` : 
+                    ''
+                }
+                <button class="btn btn-danger btn-sm elimina-btn" data-id="${voce.id}">🗑️</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    // Aggiungi event listeners
+    addChecklistEventListeners();
+}
+
+function updateChecklistStats(checklist) {
+    const totale = checklist.length;
+    const completate = checklist.filter(c => c.is_completa).length;
+    const percentuale = totale > 0 ? Math.round((completate / totale) * 100) : 0;
+    
+    const statsDiv = document.getElementById('checklist-stats');
+    if (statsDiv) {
+        statsDiv.innerHTML = `
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">${totale}</h5>
+                            <p class="card-text">Totale Voci</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-success">${completate}</h5>
+                            <p class="card-text">Completate</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-warning">${totale - completate}</h5>
+                            <p class="card-text">Incompletate</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">${percentuale}%</h5>
+                            <p class="card-text">Completamento</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function addChecklistEventListeners() {
+    // Completamento voce
+    document.querySelectorAll('.completa-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            const note = prompt('Inserisci una nota (opzionale):');
+            
+            try {
+                const res = await fetch(`/checklist_compliance/${id}/completa`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ note: note })
+                });
+                
+                if (res.ok) {
+                    loadChecklistCompliance();
+                    showAlert('success', 'Voce checklist completata con successo!');
+                } else {
+                    const data = await res.json();
+                    showAlert('danger', data.message || 'Errore nel completamento');
+                }
+            } catch (error) {
+                showAlert('danger', 'Errore di connessione');
+            }
+        });
+    });
+    
+    // Eliminazione voce
+    document.querySelectorAll('.elimina-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.id;
+            if (confirm('Confermi eliminazione della voce checklist?')) {
+                try {
+                    const res = await fetch(`/checklist_compliance/${id}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (res.ok) {
+                        loadChecklistCompliance();
+                        showAlert('success', 'Voce checklist eliminata con successo!');
+                    } else {
+                        const data = await res.json();
+                        showAlert('danger', data.message || 'Errore nell\'eliminazione');
+                    }
+                } catch (error) {
+                    showAlert('danger', 'Errore di connessione');
+                }
+            }
+        });
+    });
+}
+
+// Form aggiunta nuova voce
+document.getElementById('formNuovaVoce')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    
+    const data = {
+        documento_id: {{ document.id }},
+        tipo_standard: formData.get('tipo_standard'),
+        voce: formData.get('voce'),
+        note: formData.get('note')
+    };
+    
+    try {
+        const res = await fetch('/checklist_compliance/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (res.ok) {
+            form.reset();
+            loadChecklistCompliance();
+            showAlert('success', 'Voce checklist aggiunta con successo!');
+        } else {
+            const data = await res.json();
+            showAlert('danger', data.message || 'Errore nell\'aggiunta');
+        }
+    } catch (error) {
+        showAlert('danger', 'Errore di connessione');
+    }
+});
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('.container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // Auto-remove dopo 5 secondi
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+</script>
+
+<!-- === SEZIONE FIRME MANUALI === -->
+<div class="mt-4">
+    <h4>✍️ Firme Manuali Registrate</h4>
+    
+    {% if document.firme_manuali.count() > 0 %}
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Firmato da</th>
+                        <th>Ruolo</th>
+                        <th>Data Firma</th>
+                        <th>Note</th>
+                        <th>Scan</th>
+                        <th>Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for firma in document.firme_manuali.order_by(FirmaManuale.data_firma.desc()).all() %}
+                    <tr>
+                        <td>
+                            <strong>{{ firma.firmato_da }}</strong>
+                            {% if firma.is_recente %}
+                                <span class="badge bg-success ms-1">🆕 Recente</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ firma.ruolo or '—' }}</td>
+                        <td>
+                            <strong>{{ firma.data_firma_display }}</strong>
+                            <br><small class="text-muted">Registrato il {{ firma.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                        </td>
+                        <td>
+                            {% if firma.note %}
+                                <span class="text-muted">{{ firma.note }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if firma.file_scan %}
+                                <a href="{{ url_for('firme_manuali.download_firma_manuale', firma_id=firma.id) }}"
+                                   class="btn btn-sm btn-outline-primary" target="_blank">
+                                   📎 Scarica
+                                </a>
+                            {% else %}
+                                <span class="text-muted">Nessun file</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if current_user.role == 'admin' %}
+                                <form method="POST" action="{{ url_for('firme_manuali.delete_firma_manuale', firma_id=firma.id) }}" 
+                                      style="display: inline;" onsubmit="return confirm('Sei sicuro di voler eliminare questa firma?')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        🗑️ Elimina
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Statistiche firme -->
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title">📊 Statistiche Firme</h6>
+                        <ul class="list-unstyled mb-0">
+                            <li><strong>Totale firme:</strong> {{ document.firme_manuali.count() }}</li>
+                            <li><strong>Firme recenti (≤30 giorni):</strong> {{ document.firme_manuali.filter(FirmaManuale.is_recente == True).count() }}</li>
+                            <li><strong>Con file scan:</strong> {{ document.firme_manuali.filter(FirmaManuale.file_scan.isnot(None)).count() }}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h6 class="card-title">📝 Aggiungi Nuova Firma</h6>
+                        <p class="card-text">Registra una nuova firma manuale scansionata per questo documento.</p>
+                        <a href="{{ url_for('firme_manuali.upload_firma_manuale') }}?documento_id={{ document.id }}" 
+                           class="btn btn-light">
+                           ✍️ Carica Firma
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-danger text-white">
+                    <div class="card-body">
+                        <h6 class="card-title">📄 Export Registro</h6>
+                        <p class="card-text">Genera PDF audit-ready con tutte le firme registrate.</p>
+                        <a href="{{ url_for('firme_manuali.export_firme_pdf', documento_id=document.id) }}" 
+                           class="btn btn-light">
+                           📄 Esporta PDF
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <strong>Nessuna firma manuale registrata</strong> per questo documento.
+            <br>
+            <a href="{{ url_for('firme_manuali.upload_firma_manuale') }}?documento_id={{ document.id }}" 
+               class="btn btn-primary mt-2">
+               ✍️ Registra Prima Firma
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- === SEZIONE CHECKLIST COMPLIANCE === -->
+<div class="mt-4">
+    <h4>📋 Checklist Compliance (Audit)</h4>
+    
+    <!-- Statistiche -->
+    <div id="checklist-stats" class="mb-3"></div>
+    
+    <!-- Tabella checklist -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover" id="tabellaChecklist">
+            <thead class="table-dark">
+                <tr>
+                    <th>Standard</th>
+                    <th>Voce</th>
+                    <th>Completata</th>
+                    <th>Note</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody id="checklist-tbody">
+                <!-- Popolato via JavaScript -->
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Form aggiunta voce -->
+    <div class="card mt-3">
+        <div class="card-header">
+            <h6 class="mb-0">➕ Aggiungi Nuova Voce Checklist</h6>
+        </div>
+        <div class="card-body">
+            <form id="formNuovaVoce">
+                <div class="row">
+                    <div class="col-md-3">
+                        <select class="form-control" name="tipo_standard" required>
+                            <option value="">Seleziona Standard</option>
+                            <option value="ISO 9001">ISO 9001 - Gestione Qualità</option>
+                            <option value="ISO 14001">ISO 14001 - Gestione Ambientale</option>
+                            <option value="ISO 45001">ISO 45001 - Sicurezza e Salute</option>
+                            <option value="GDPR">GDPR - Protezione Dati</option>
+                            <option value="HACCP">HACCP - Sicurezza Alimentare</option>
+                            <option value="BRC">BRC - Standard Sicurezza Alimentare</option>
+                            <option value="IFS">IFS - Standard Sicurezza Alimentare</option>
+                            <option value="NIS2">NIS2 - Sicurezza Informatica</option>
+                            <option value="ISO 27001">ISO 27001 - Sicurezza Informatica</option>
+                            <option value="SOX">SOX - Controlli Finanziari</option>
+                            <option value="FDA">FDA - Sicurezza Farmaceutica</option>
+                            <option value="GxP">GxP - Buone Pratiche Farmaceutiche</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <input type="text" class="form-control" name="voce" placeholder="Voce checklist" required>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" class="form-control" name="note" placeholder="Note (opzionale)">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">➕ Aggiungi</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Bottone Export PDF -->
+    <div class="mt-3">
+        <a href="{{ url_for('checklist_compliance.export_checklist_pdf', documento_id=document.id) }}"
+           class="btn btn-outline-dark">
+           📄 Esporta Checklist Audit (PDF)
+        </a>
+        <small class="text-muted ms-2">
+            Genera PDF audit-ready con firma digitale e QR code per verifica
+        </small>
+    </div>
+</div>
+{% endblock %}

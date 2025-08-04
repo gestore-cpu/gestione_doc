@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ doc.title or doc.original_filename }} - Mercury Document Intelligence</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @top-center {
+                content: "Mercury Document Intelligence";
+                font-size: 10pt;
+                color: #666;
+            }
+            @bottom-center {
+                content: "Pagina " counter(page) " di " counter(pages);
+                font-size: 10pt;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12pt;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff;
+        }
+        
+        .title {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 14pt;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .document-info {
+            margin-bottom: 30px;
+        }
+        
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .info-table th,
+        .info-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        .info-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            width: 30%;
+        }
+        
+        .ai-section {
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .ai-title {
+            font-size: 16pt;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 15px;
+        }
+        
+        .ai-status {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .ai-explain {
+            font-size: 12pt;
+            line-height: 1.5;
+            color: #555;
+        }
+        
+        .content-section {
+            margin: 30px 0;
+        }
+        
+        .content-title {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 15px;
+        }
+        
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 10pt;
+            color: #666;
+            text-align: center;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11pt;
+            margin-right: 10px;
+        }
+        
+        .badge-success {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .badge-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .badge-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .badge-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">{{ doc.title or doc.original_filename }}</div>
+        <div class="subtitle">Mercury Document Intelligence</div>
+    </div>
+    
+    <div class="document-info">
+        <h2>📋 Informazioni Documento</h2>
+        <table class="info-table">
+            <tr>
+                <th>Azienda:</th>
+                <td>{{ doc.company.name if doc.company else 'N/A' }}</td>
+            </tr>
+            <tr>
+                <th>Reparto:</th>
+                <td>{{ doc.department.name if doc.department else 'N/A' }}</td>
+            </tr>
+            <tr>
+                <th>Caricato da:</th>
+                <td>{{ doc.user.username if doc.user else 'N/A' }}</td>
+            </tr>
+            <tr>
+                <th>Data caricamento:</th>
+                <td>{{ doc.upload_date.strftime('%d/%m/%Y %H:%M') if doc.upload_date else 'N/A' }}</td>
+            </tr>
+            <tr>
+                <th>Ultimo aggiornamento:</th>
+                <td>{{ doc.last_updated.strftime('%d/%m/%Y %H:%M') if doc.last_updated else 'N/A' }}</td>
+            </tr>
+            <tr>
+                <th>File originale:</th>
+                <td>{{ doc.original_filename }}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="ai-section">
+        <div class="ai-title">🤖 Analisi AI</div>
+        
+        <div class="ai-status">
+            Stato: 
+            <span class="badge badge-{{ 'success' if doc.ai_status == 'completo' else 'warning' if doc.ai_status == 'incompleto' else 'danger' if doc.ai_status in ['scaduto', 'manca_firma'] else 'secondary' }}">
+                {{ doc.ai_status.upper() if doc.ai_status else 'NON ANALIZZATO' }}
+            </span>
+        </div>
+        
+        <div class="ai-explain">
+            <strong>Spiegazione:</strong><br>
+            {{ doc.ai_explain or 'Nessuna analisi AI disponibile per questo documento.' }}
+        </div>
+        
+        {% if doc.ai_task_id %}
+        <div style="margin-top: 15px;">
+            <strong>Task ID:</strong> {{ doc.ai_task_id }}
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="content-section">
+        <div class="content-title">📄 Contenuto Documento</div>
+        <p>Questo documento è stato caricato nel sistema Mercury Document Intelligence e analizzato automaticamente per verificare la conformità e la completezza.</p>
+        
+        <p><strong>File originale:</strong> {{ doc.original_filename }}</p>
+        
+        {% if doc.description %}
+        <p><strong>Descrizione:</strong> {{ doc.description }}</p>
+        {% endif %}
+        
+        <p>Il documento è stato processato dal sistema AI per identificare eventuali problemi di conformità, scadenze o mancanze di firme.</p>
+    </div>
+    
+    <div class="footer">
+        <p>📄 Generato automaticamente da Mercury Document Intelligence</p>
+        <p>🕒 {{ moment().format('DD/MM/YYYY HH:mm') }}</p>
+        <p>Mercury Surgelati - Sistema di Gestione Documentale Intelligente</p>
+    </div>
+</body>
+</html> 

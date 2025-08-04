@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 Alert AI Sicurezza - Dashboard Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .card-stats {
+            transition: transform 0.2s;
+        }
+        .card-stats:hover {
+            transform: translateY(-2px);
+        }
+        .alert-row {
+            transition: background-color 0.2s;
+        }
+        .alert-row:hover {
+            background-color: #f8f9fa;
+        }
+        .severity-badge {
+            font-size: 0.8em;
+            padding: 4px 8px;
+        }
+        .filter-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .alert-details {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 mb-0">
+                            <i class="fas fa-shield-alt text-danger"></i>
+                            Alert AI Sicurezza
+                        </h1>
+                        <p class="text-muted mb-0">Monitoraggio comportamenti sospetti nei download documentali</p>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-warning me-2" onclick="runAnalysis()">
+                            <i class="fas fa-search"></i> Analizza Ora
+                        </button>
+                        <a href="{{ url_for('admin.export_ai_alerts') }}" class="btn btn-outline-success">
+                            <i class="fas fa-download"></i> Esporta CSV
+                        </a>
+                        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistiche Card -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card card-stats bg-danger text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="card-title mb-0">{{ stats.total or 0 }}</h4>
+                                <p class="card-text">🚨 Alert Totali</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-exclamation-triangle fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-stats bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="card-title mb-0">{{ stats.pending or 0 }}</h4>
+                                <p class="card-text">⏳ In Attesa</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-clock fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-stats bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="card-title mb-0">{{ stats.resolved or 0 }}</h4>
+                                <p class="card-text">✅ Risolti</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-check-circle fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-stats bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="card-title mb-0">{{ (stats.severity_stats or {}).get('alta', 0) + (stats.severity_stats or {}).get('critica', 0) }}</h4>
+                                <p class="card-text">🔥 Critici</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-fire fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtri -->
+        <div class="filter-section">
+            <h5 class="mb-3">
+                <i class="fas fa-filter"></i>
+                Filtri Avanzati
+            </h5>
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label for="severity" class="form-label">Severità</label>
+                    <select name="severity" id="severity" class="form-select">
+                        <option value="">🔥 Tutte le severità</option>
+                        <option value="bassa" {% if severity_filter == 'bassa' %}selected{% endif %}>
+                            🟢 Bassa
+                        </option>
+                        <option value="media" {% if severity_filter == 'media' %}selected{% endif %}>
+                            🟡 Media
+                        </option>
+                        <option value="alta" {% if severity_filter == 'alta' %}selected{% endif %}>
+                            🔴 Alta
+                        </option>
+                        <option value="critica" {% if severity_filter == 'critica' %}selected{% endif %}>
+                            ⚫ Critica
+                        </option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="type" class="form-label">Tipo Alert</label>
+                    <select name="type" id="type" class="form-select">
+                        <option value="">🎯 Tutti i tipi</option>
+                        <option value="download_massivo" {% if type_filter == 'download_massivo' %}selected{% endif %}>
+                            📥 Download Massivo
+                        </option>
+                        <option value="accesso_fuori_orario" {% if type_filter == 'accesso_fuori_orario' %}selected{% endif %}>
+                            🌙 Accesso Fuori Orario
+                        </option>
+                        <option value="ripetizione_file" {% if type_filter == 'ripetizione_file' %}selected{% endif %}>
+                            🔄 Ripetizione File
+                        </option>
+                        <option value="ip_sospetto" {% if type_filter == 'ip_sospetto' %}selected{% endif %}>
+                            🌐 IP Sospetto
+                        </option>
+                        <option value="tentativo_documento_bloccato" {% if type_filter == 'tentativo_documento_bloccato' %}selected{% endif %}>
+                            🚫 Tentativo Documento Bloccato
+                        </option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="resolved" class="form-label">Stato</label>
+                    <select name="resolved" id="resolved" class="form-select">
+                        <option value="">📊 Tutti</option>
+                        <option value="false" {% if resolved_filter == 'false' %}selected{% endif %}>
+                            ⏳ In Attesa
+                        </option>
+                        <option value="true" {% if resolved_filter == 'true' %}selected{% endif %}>
+                            ✅ Risolti
+                        </option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Filtra
+                        </button>
+                    </div>
+                </div>
+            </form>
+            <div class="mt-3">
+                <a href="{{ url_for('admin.ai_alerts') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-times"></i> Reset Filtri
+                </a>
+            </div>
+        </div>
+
+        <!-- Grafici -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie"></i>
+                            Distribuzione per Severità
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="severityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar"></i>
+                            Distribuzione per Tipo
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="typeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabella Alert -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i>
+                    Alert AI Sicurezza ({{ alerts|length }} record)
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>👤 Utente</th>
+                                <th>🎯 Tipo Alert</th>
+                                <th>📄 Documento</th>
+                                <th>🚨 Severità</th>
+                                <th>📝 Descrizione</th>
+                                <th>🌐 IP</th>
+                                <th>⏰ Timestamp</th>
+                                <th>✅ Stato</th>
+                                <th>🔧 Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for alert in alerts %}
+                            <tr class="alert-row">
+                                <td>
+                                    <span class="badge bg-secondary">{{ alert.id }}</span>
+                                </td>
+                                <td>
+                                    <strong>{{ alert.user.username if alert.user else 'N/A' }}</strong>
+                                    {% if alert.user %}
+                                    <br><small class="text-muted">{{ alert.user.email }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info severity-badge">
+                                        {{ alert.alert_type_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if alert.document %}
+                                    <strong>{{ alert.document.title[:50] }}{% if alert.document.title|length > 50 %}...{% endif %}</strong>
+                                    <br><small class="text-muted">ID: {{ alert.document.id }}</small>
+                                    {% else %}
+                                    <small class="text-muted">N/A</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge {{ alert.severity_badge_class }} severity-badge">
+                                        {{ alert.severity.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="alert-details" title="{{ alert.description }}">
+                                        {{ alert.description[:100] + '...' if alert.description|length > 100 else alert.description }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <small>{{ alert.ip_address or 'N/A' }}</small>
+                                </td>
+                                <td>
+                                    <small>{{ alert.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                                </td>
+                                <td>
+                                    {% if alert.resolved %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check"></i> Risolto
+                                    </span>
+                                    {% if alert.resolved_by %}
+                                    <br><small class="text-muted">da {{ alert.resolved_by }}</small>
+                                    {% endif %}
+                                    {% else %}
+                                    <span class="badge bg-warning">
+                                        <i class="fas fa-clock"></i> In Attesa
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-outline-info btn-sm" 
+                                                onclick="viewAlertDetails({{ alert.id }})" 
+                                                title="Visualizza Dettagli">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% if not alert.resolved %}
+                                        <button type="button" class="btn btn-outline-success btn-sm" 
+                                                onclick="resolveAlert({{ alert.id }})" 
+                                                title="Risolve Alert">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="10" class="text-center py-4">
+                                    <div class="text-muted">
+                                        <i class="fas fa-shield-alt fa-3x mb-3"></i>
+                                        <p>Nessun alert AI trovato</p>
+                                        <small>Gli alert appariranno qui quando l'AI rileverà comportamenti sospetti</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Dettagli Alert -->
+    <div class="modal fade" id="alertDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-info-circle"></i>
+                        Dettagli Alert AI
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="alertDetailsContent">
+                    <!-- Contenuto dinamico -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Dati per i grafici
+        const severityData = {
+            labels: ['Bassa', 'Media', 'Alta', 'Critica'],
+            datasets: [{
+                data: [
+                    {{ (stats.severity_stats or {}).get('bassa', 0) }},
+                    {{ (stats.severity_stats or {}).get('media', 0) }},
+                    {{ (stats.severity_stats or {}).get('alta', 0) }},
+                    {{ (stats.severity_stats or {}).get('critica', 0) }}
+                ],
+                backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6c757d']
+            }]
+        };
+
+        const typeData = {
+            labels: {{ (stats.type_stats or {}).keys() | list | tojson }},
+            datasets: [{
+                data: {{ (stats.type_stats or {}).values() | list | tojson }},
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
+                ]
+            }]
+        };
+
+        // Grafico severità
+        new Chart(document.getElementById('severityChart'), {
+            type: 'doughnut',
+            data: severityData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Grafico tipo
+        new Chart(document.getElementById('typeChart'), {
+            type: 'bar',
+            data: typeData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Funzioni per gestione alert
+        function runAnalysis() {
+            if (confirm('Eseguire analisi manuale dei download sospetti?')) {
+                fetch('{{ url_for("admin.analyze_suspicious_downloads") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Errore: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore:', error);
+                    alert('Errore durante analisi');
+                });
+            }
+        }
+
+        function viewAlertDetails(alertId) {
+            // Simula caricamento dettagli
+            document.getElementById('alertDetailsContent').innerHTML = 
+                '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Caricamento...</div>';
+            
+            // Qui andrebbe una chiamata AJAX per caricare i dettagli
+            setTimeout(() => {
+                document.getElementById('alertDetailsContent').innerHTML = 
+                    '<p>Dettagli dell\'alert ID: ' + alertId + '</p>' +
+                    '<p>Funzionalità in sviluppo...</p>';
+            }, 500);
+            
+            new bootstrap.Modal(document.getElementById('alertDetailsModal')).show();
+        }
+
+        function resolveAlert(alertId) {
+            if (confirm('Confermi di risolvere questo alert?')) {
+                fetch(`{{ url_for("admin.resolve_ai_alert", alert_id=0) }}`.replace('0', alertId), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Errore: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore:', error);
+                    alert('Errore durante risoluzione alert');
+                });
+            }
+        }
+
+        // Auto-refresh ogni 30 secondi
+        setInterval(() => {
+            location.reload();
+        }, 30000);
+    </script>
+</body>
+</html> 

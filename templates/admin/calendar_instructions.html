@@ -1,0 +1,225 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>📅 Calendario ICS Pubblico</h2>
+                    <p class="text-muted mb-0">Istruzioni per collegare il calendario revisioni ai client di calendario</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('docs.calendario_pubblico_ics', token=ics_token) }}" 
+                       class="btn btn-outline-primary" target="_blank">
+                        📥 Scarica ICS
+                    </a>
+                </div>
+            </div>
+
+            <!-- LINK ICS -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔗 Link Calendario ICS</h5>
+                </div>
+                <div class="card-body">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="icsLink" 
+                               value="{{ request.host_url }}docs/public/calendar/revisioni.ics?token={{ ics_token }}" 
+                               readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyLink()">
+                            📋 Copia
+                        </button>
+                    </div>
+                    <small class="text-muted mt-2 d-block">
+                        Questo link si aggiorna automaticamente con le revisioni programmate e scadute.
+                    </small>
+                </div>
+            </div>
+
+            <!-- ISTRUZIONI GOOGLE CALENDAR -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📌 Google Calendar</h5>
+                </div>
+                <div class="card-body">
+                    <ol>
+                        <li>Vai su <a href="https://calendar.google.com" target="_blank">calendar.google.com</a></li>
+                        <li>Nella colonna sinistra clic su <strong>"Altri calendari"</strong></li>
+                        <li>Clic su <strong>"Aggiungi da URL"</strong></li>
+                        <li>Incolla il link ICS:</li>
+                        <div class="bg-light p-3 rounded mt-2">
+                            <code>{{ request.host_url }}docs/public/calendar/revisioni.ics?token={{ ics_token }}</code>
+                        </div>
+                        <li>Premi <strong>"Aggiungi calendario"</strong></li>
+                        <li>Il calendario <strong>"Revisione Documenti"</strong> apparirà automaticamente</li>
+                        <li>Si aggiornerà automaticamente ogni giorno</li>
+                    </ol>
+                    <div class="alert alert-info mt-3">
+                        <strong>💡 Suggerimento:</strong> Puoi personalizzare il colore del calendario cliccando sui tre punti accanto al nome.
+                    </div>
+                </div>
+            </div>
+
+            <!-- ISTRUZIONI OUTLOOK -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🟦 Outlook Web / Desktop</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Outlook Web:</h6>
+                    <ol>
+                        <li>Vai su <a href="https://outlook.live.com" target="_blank">outlook.live.com</a></li>
+                        <li>Clic su <strong>"Calendario"</strong></li>
+                        <li>Clic su <strong>"Aggiungi calendario"</strong></li>
+                        <li>Seleziona <strong>"Da Internet"</strong></li>
+                        <li>Incolla il link ICS e clic <strong>"Importa"</strong></li>
+                    </ol>
+                    
+                    <h6 class="mt-4">Outlook Desktop:</h6>
+                    <ol>
+                        <li>Apri Outlook Desktop</li>
+                        <li>Vai su <strong>File > Apri > Importa</strong></li>
+                        <li>Seleziona <strong>"Importa un file iCalendar (.ics)"</strong></li>
+                        <li>Scarica il file ICS dal link sopra</li>
+                        <li>Apri il file scaricato</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- ISTRUZIONI APPLE CALENDAR -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🍎 Apple Calendar</h5>
+                </div>
+                <div class="card-body">
+                    <ol>
+                        <li>Apri l'app <strong>Calendario</strong> su Mac</li>
+                        <li>Vai su <strong>File > Nuovo Calendario da URL</strong></li>
+                        <li>Incolla il link ICS:</li>
+                        <div class="bg-light p-3 rounded mt-2">
+                            <code>{{ request.host_url }}docs/public/calendar/revisioni.ics?token={{ ics_token }}</code>
+                        </div>
+                        <li>Premi <strong>Invio</strong></li>
+                        <li>Il calendario verrà aggiunto automaticamente</li>
+                    </ol>
+                    <div class="alert alert-warning mt-3">
+                        <strong>⚠️ Nota:</strong> Su iOS, usa l'app Calendario e aggiungi il calendario tramite iCloud.
+                    </div>
+                </div>
+            </div>
+
+            <!-- INFORMAZIONI TECNICHE -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔧 Informazioni Tecniche</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>📋 Eventi Inclusi:</h6>
+                            <ul>
+                                <li><strong>Revisioni Programmate:</strong> Documenti con prossima revisione</li>
+                                <li><strong>Revisioni Urgenti:</strong> Documenti scaduti da max 30 giorni</li>
+                                <li><strong>Orari:</strong> 9:00-17:00 per revisioni normali</li>
+                                <li><strong>Promemoria:</strong> 1 giorno prima automatico</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>🔐 Sicurezza:</h6>
+                            <ul>
+                                <li><strong>Token Protetto:</strong> Accesso solo con token valido</li>
+                                <li><strong>HTTPS:</strong> Connessione sicura</li>
+                                <li><strong>No Cache:</strong> Dati sempre aggiornati</li>
+                                <li><strong>Logging:</strong> Accessi tracciati</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-success mt-3">
+                        <strong>✅ Vantaggi:</strong> Il calendario si aggiorna automaticamente ogni volta che viene sincronizzato dal client, mostrando sempre le revisioni più recenti.
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATISTICHE CALENDARIO -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📊 Statistiche Calendario</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h4 class="text-primary">{{ stats.revisioni_programmate }}</h4>
+                                <small class="text-muted">Revisioni Programmate</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h4 class="text-warning">{{ stats.revisioni_urgenti }}</h4>
+                                <small class="text-muted">Revisioni Urgenti</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h4 class="text-info">{{ stats.prossimi_30_giorni }}</h4>
+                                <small class="text-muted">Prossimi 30 giorni</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h4 class="text-success">{{ stats.aziende_coperte }}</h4>
+                                <small class="text-muted">Aziende Coperte</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LINK DI NAVIGAZIONE -->
+            <div class="mt-4">
+                <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-secondary">
+                    ← Torna alla Panoramica
+                </a>
+                <a href="{{ url_for('admin.docs_scadenziario') }}" class="btn btn-outline-warning ms-2">
+                    📅 Scadenziario
+                </a>
+                <a href="{{ url_for('docs.registro_audit') }}" class="btn btn-outline-info ms-2">
+                    📋 Registro Audit
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// === FUNZIONE PER COPIARE LINK ===
+function copyLink() {
+    const linkInput = document.getElementById('icsLink');
+    linkInput.select();
+    linkInput.setSelectionRange(0, 99999); // Per dispositivi mobili
+    document.execCommand('copy');
+    
+    // Feedback visivo
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '✅ Copiato!';
+    button.classList.remove('btn-outline-secondary');
+    button.classList.add('btn-success');
+    
+    setTimeout(() => {
+        button.innerHTML = originalText;
+        button.classList.remove('btn-success');
+        button.classList.add('btn-outline-secondary');
+    }, 2000);
+}
+
+// === FUNZIONE PER TESTARE LINK ===
+function testLink() {
+    const link = document.getElementById('icsLink').value;
+    window.open(link, '_blank');
+}
+</script>
+
+{% endblock %} 

@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+
+{% block title %}Visite Mediche - SYNTHIA DOCS{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>🏥 Gestione Visite Mediche</h2>
+                <div>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#nuovaVisitaModal">
+                        ➕ Nuova Visita
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pulsanti Export -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📊 Export Archivio</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6>📄 Export PDF</h6>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('visite_mediche.export_pdf', filtro='tutte') }}" 
+                                   class="btn btn-outline-danger btn-sm">
+                                   📄 Tutte le visite
+                                </a>
+                                <a href="{{ url_for('visite_mediche.export_pdf', filtro='scadenza') }}" 
+                                   class="btn btn-outline-warning btn-sm">
+                                   ⚠️ In scadenza
+                                </a>
+                                <a href="{{ url_for('visite_mediche.export_pdf', filtro='scadute') }}" 
+                                   class="btn btn-outline-danger btn-sm">
+                                   🚨 Scadute
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>📊 Export CSV</h6>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('visite_mediche.export_csv', filtro='tutte') }}" 
+                                   class="btn btn-outline-success btn-sm">
+                                   📊 Tutte le visite
+                                </a>
+                                <a href="{{ url_for('visite_mediche.export_csv', filtro='scadenza') }}" 
+                                   class="btn btn-outline-warning btn-sm">
+                                   ⚠️ In scadenza
+                                </a>
+                                <a href="{{ url_for('visite_mediche.export_csv', filtro='scadute') }}" 
+                                   class="btn btn-outline-danger btn-sm">
+                                   🚨 Scadute
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>📦 Export ZIP Completo</h6>
+                            <div class="d-grid gap-1">
+                                <a href="{{ url_for('visite_mediche.export_zip_visite') }}" 
+                                   class="btn btn-outline-primary btn-sm">
+                                   📦 Archivio Completo
+                                </a>
+                                <a href="{{ url_for('visite_mediche.export_zip_visite') }}?stato=scadute" 
+                                   class="btn btn-outline-danger btn-sm">
+                                   🚨 Solo Scadute
+                                </a>
+                                <a href="{{ url_for('visite_mediche.export_zip_visite') }}?stato=in_scadenza" 
+                                   class="btn btn-outline-warning btn-sm">
+                                   ⚠️ In Scadenza
+                                </a>
+                                <small class="text-muted mt-1">
+                                    PDF + Certificati + Log
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Form filtri avanzati per ZIP -->
+                    <div class="mt-3">
+                        <button class="btn btn-outline-secondary btn-sm" type="button" 
+                                data-bs-toggle="collapse" data-bs-target="#filtriAvanzati">
+                            🔍 Filtri Avanzati ZIP
+                        </button>
+                        <div class="collapse mt-2" id="filtriAvanzati">
+                            <div class="card card-body">
+                                <form method="GET" action="{{ url_for('visite_mediche.export_zip_visite') }}" class="row g-2">
+                                    <div class="col-md-3">
+                                        <label for="utente" class="form-label">Utente</label>
+                                        <select class="form-select form-select-sm" name="utente" id="utente">
+                                            <option value="">Tutti gli utenti</option>
+                                            {% for user in users %}
+                                                <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="mansione" class="form-label">Mansione</label>
+                                        <input type="text" class="form-control form-control-sm" name="mansione" id="mansione" placeholder="Es. Autista, Operatore">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label for="dal" class="form-label">Dal</label>
+                                        <input type="date" class="form-control form-control-sm" name="dal" id="dal">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label for="al" class="form-label">Al</label>
+                                        <input type="date" class="form-control form-control-sm" name="al" id="al">
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                                            📦 Esporta ZIP
+                                        </button>
+                                    </div>
+                                </form>
+                                
+                                <!-- Informazioni sui filtri -->
+                                <div class="mt-3">
+                                    <small class="text-muted">
+                                        <strong>💡 Suggerimenti:</strong><br>
+                                        • <strong>Utente:</strong> Seleziona un utente specifico o lascia "Tutti" per esportare tutto<br>
+                                        • <strong>Mansione:</strong> Filtra per ruolo (es. "Autista", "Operatore")<br>
+                                        • <strong>Periodo:</strong> Seleziona range date per filtrare per data visita<br>
+                                        • <strong>Combinazione:</strong> Puoi usare tutti i filtri insieme
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistiche -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ statistiche.totali }}</h5>
+                            <p class="card-text">Totale Visite</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ statistiche.in_scadenza }}</h5>
+                            <p class="card-text">In Scadenza</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ statistiche.scadute }}</h5>
+                            <p class="card-text">Scadute</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ statistiche.completate }}</h5>
+                            <p class="card-text">Completate</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabella Visite -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Elenco Visite Mediche</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="tabellaVisite">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Utente</th>
+                                    <th>Mansione</th>
+                                    <th>Tipo Visita</th>
+                                    <th>Data Visita</th>
+                                    <th>Scadenza</th>
+                                    <th>Esito</th>
+                                    <th>Stato</th>
+                                    <th>Certificato</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for visita in visite %}
+                                <tr data-visita-id="{{ visita.id }}">
+                                    <td>{{ visita.user.username if visita.user else 'N/A' }}</td>
+                                    <td>{{ visita.ruolo }}</td>
+                                    <td>{{ visita.tipo_visita }}</td>
+                                    <td>{{ visita.data_visita.strftime('%d/%m/%Y') if visita.data_visita else 'N/A' }}</td>
+                                    <td>{{ visita.scadenza.strftime('%d/%m/%Y') if visita.scadenza else 'N/A' }}</td>
+                                    <td>{{ visita.esito or 'N/A' }}</td>
+                                    <td>
+                                        <span class="badge {{ visita.badge_class }}">
+                                            {{ visita.status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if visita.certificato_filename %}
+                                            <span class="text-success">✓</span>
+                                        {% else %}
+                                            <span class="text-danger">✗</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-primary modifica-visita" 
+                                                    data-visita-id="{{ visita.id }}">
+                                                ✏️
+                                            </button>
+                                            {% if visita.certificato_filename %}
+                                            <a href="{{ url_for('visite_mediche.scarica_certificato', visita_id=visita.id) }}" 
+                                               class="btn btn-sm btn-outline-success">
+                                                📄
+                                            </a>
+                                            {% endif %}
+                                            <button class="btn btn-sm btn-outline-danger elimina-visita" 
+                                                    data-visita-id="{{ visita.id }}">
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nuova Visita -->
+<div class="modal fade" id="nuovaVisitaModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">➕ Nuova Visita Medica</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formNuovaVisita" enctype="multipart/form-data">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="user_id" class="form-label">Utente *</label>
+                                <select class="form-control" name="user_id" required>
+                                    <option value="">Seleziona utente...</option>
+                                    {% for user in users %}
+                                    <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="ruolo" class="form-label">Mansione *</label>
+                                <input type="text" class="form-control" name="ruolo" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="tipo_visita" class="form-label">Tipo Visita *</label>
+                                <input type="text" class="form-control" name="tipo_visita" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="data_visita" class="form-label">Data Visita *</label>
+                                <input type="date" class="form-control" name="data_visita" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="scadenza" class="form-label">Data Scadenza *</label>
+                                <input type="date" class="form-control" name="scadenza" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="esito" class="form-label">Esito</label>
+                                <select class="form-control" name="esito">
+                                    <option value="">Seleziona esito...</option>
+                                    <option value="Idoneo">Idoneo</option>
+                                    <option value="Non idoneo">Non idoneo</option>
+                                    <option value="Idoneo con limitazioni">Idoneo con limitazioni</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="certificato" class="form-label">Certificato (PDF, PNG, JPG)</label>
+                        <input type="file" class="form-control" name="certificato" accept=".pdf,.png,.jpg,.jpeg">
+                    </div>
+                    <div class="mb-3">
+                        <label for="note" class="form-label">Note</label>
+                        <textarea class="form-control" name="note" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" id="salvaVisita">Salva Visita</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Modifica Visita -->
+<div class="modal fade" id="modificaVisitaModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">✏️ Modifica Visita Medica</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formModificaVisita" enctype="multipart/form-data">
+                    <input type="hidden" name="visita_id" id="edit_visita_id">
+                    <!-- Stessi campi del form nuova visita -->
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" id="aggiornaVisita">Aggiorna Visita</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestione form nuova visita
+    document.getElementById('salvaVisita').addEventListener('click', function() {
+        const form = document.getElementById('formNuovaVisita');
+        const formData = new FormData(form);
+        
+        fetch('/visite_mediche/', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Errore: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Errore:', error);
+            alert('Errore durante il salvataggio');
+        });
+    });
+
+    // Gestione modifica visita
+    document.querySelectorAll('.modifica-visita').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const visitaId = this.dataset.visitaId;
+            // Carica dati visita e popola form
+            fetch(`/visite_mediche/${visitaId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Popola form modifica
+                    document.getElementById('edit_visita_id').value = visitaId;
+                    // ... popola altri campi
+                    $('#modificaVisitaModal').modal('show');
+                }
+            });
+        });
+    });
+
+    // Gestione eliminazione visita
+    document.querySelectorAll('.elimina-visita').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const visitaId = this.dataset.visitaId;
+            if (confirm('Sei sicuro di voler eliminare questa visita?')) {
+                fetch(`/visite_mediche/${visitaId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Errore: ' + data.message);
+                    }
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 

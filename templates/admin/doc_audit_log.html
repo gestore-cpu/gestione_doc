@@ -1,0 +1,298 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>📋 Registro Audit Revisioni e Firme</h2>
+                    <p class="text-muted mb-0">Registro completo per auditor, responsabili qualità e CEO</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('docs.export_audit_log', format='csv') }}" class="btn btn-outline-success me-2">
+                        📊 Esporta CSV
+                    </a>
+                    <a href="{{ url_for('docs.export_audit_log', format='pdf') }}" class="btn btn-outline-danger">
+                        📄 Esporta PDF
+                    </a>
+                </div>
+            </div>
+
+            <!-- STATISTICHE RAPIDE -->
+            <div class="row mb-4">
+                <div class="col-md-2">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">📄 Documenti</h6>
+                            <h4>{{ stats.total_documents }}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-white bg-info">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">📋 Versioni</h6>
+                            <h4>{{ stats.total_versions }}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-white bg-success">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">🔐 Firme</h6>
+                            <h4>{{ stats.total_signatures }}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-white bg-warning">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">✅ Con 2FA</h6>
+                            <h4>{{ stats.with_2fa }}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-white bg-secondary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">❌ Senza 2FA</h6>
+                            <h4>{{ stats.without_2fa }}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-white bg-dark">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">📊 % 2FA</h6>
+                            <h4>
+                                {% if stats.total_signatures > 0 %}
+                                    {{ "%.1f"|format(stats.with_2fa / stats.total_signatures * 100) }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FILTRI -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 Filtri</h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="document" class="form-label">Documento</label>
+                            <input type="text" class="form-control" id="document" name="document" 
+                                   value="{{ filters.document }}" placeholder="Cerca documento...">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="role" class="form-label">Ruolo</label>
+                            <select class="form-select" id="role" name="role">
+                                <option value="">Tutti i ruoli</option>
+                                <option value="CEO" {% if filters.role == 'CEO' %}selected{% endif %}>CEO</option>
+                                <option value="RSPP" {% if filters.role == 'RSPP' %}selected{% endif %}>RSPP</option>
+                                <option value="DIRIGENTE" {% if filters.role == 'DIRIGENTE' %}selected{% endif %}>DIRIGENTE</option>
+                                <option value="ADMIN" {% if filters.role == 'ADMIN' %}selected{% endif %}>ADMIN</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="date_from" class="form-label">Da Data</label>
+                            <input type="date" class="form-control" id="date_from" name="date_from" 
+                                   value="{{ filters.date_from }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="date_to" class="form-label">A Data</label>
+                            <input type="date" class="form-control" id="date_to" name="date_to" 
+                                   value="{{ filters.date_to }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <div>
+                                <button type="submit" class="btn btn-primary">🔍 Filtra</button>
+                                <a href="{{ url_for('docs.registro_audit') }}" class="btn btn-outline-secondary">🔄 Reset</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- TABELLA REGISTRO -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Registro Completo ({{ stats.total_signatures }} firme)</h5>
+                </div>
+                <div class="card-body">
+                    {% if versions %}
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>📄 Documento</th>
+                                    <th>📋 Versione</th>
+                                    <th>📅 Data/Ora Firma</th>
+                                    <th>👤 Firmato da</th>
+                                    <th>🏷️ Ruolo</th>
+                                    <th>🔐 SHA256</th>
+                                    <th>✅ 2FA</th>
+                                    <th>🔢 Token</th>
+                                    <th>📝 Note</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in versions %}
+                                    {% if v.signatures %}
+                                        {% for s in v.signatures %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ v.document.title or v.document.original_filename }}</strong>
+                                                {% if v.document.is_critical %}
+                                                    <span class="badge bg-danger ms-1">Critico</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">v{{ v.version_number }}</span>
+                                                {% if v.is_active %}
+                                                    <span class="badge bg-success ms-1">Attiva</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                            <td><strong>{{ s.signed_by }}</strong></td>
+                                            <td>
+                                                <span class="badge bg-secondary">{{ s.role }}</span>
+                                            </td>
+                                            <td>
+                                                <code class="small" title="{{ s.hash_sha256 }}">
+                                                    {{ s.hash_sha256[:16] }}...
+                                                </code>
+                                            </td>
+                                            <td>
+                                                {% if s.token_used %}
+                                                    <span class="badge bg-success">✅ 2FA</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">❌ No 2FA</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if s.token_used %}
+                                                    <code class="small">{{ s.token_used }}</code>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if s.signature_note %}
+                                                    <small>{{ s.signature_note }}</small>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr class="table-warning">
+                                            <td>
+                                                <strong>{{ v.document.title or v.document.original_filename }}</strong>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">v{{ v.version_number }}</span>
+                                            </td>
+                                            <td colspan="7" class="text-center text-muted">
+                                                <em>Nessuna firma registrata</em>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-file-alt fa-3x mb-3"></i>
+                        <h5>Nessun record trovato</h5>
+                        <p>Non ci sono firme o revisioni registrate.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- INFORMAZIONI AUDIT -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📊 Informazioni per Audit</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>🔐 Sicurezza Firma</h6>
+                            <ul class="list-unstyled">
+                                <li>✅ <strong>Firme con 2FA:</strong> {{ stats.with_2fa }}</li>
+                                <li>❌ <strong>Firme senza 2FA:</strong> {{ stats.without_2fa }}</li>
+                                <li>📊 <strong>Percentuale 2FA:</strong> 
+                                    {% if stats.total_signatures > 0 %}
+                                        {{ "%.1f"|format(stats.with_2fa / stats.total_signatures * 100) }}%
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>📋 Copertura Documentale</h6>
+                            <ul class="list-unstyled">
+                                <li>📄 <strong>Documenti totali:</strong> {{ stats.total_documents }}</li>
+                                <li>📋 <strong>Versioni firmate:</strong> {{ stats.total_versions }}</li>
+                                <li>🔐 <strong>Firme totali:</strong> {{ stats.total_signatures }}</li>
+                                <li>📊 <strong>Media firme/doc:</strong> 
+                                    {% if stats.total_documents > 0 %}
+                                        {{ "%.1f"|format(stats.total_signatures / stats.total_documents) }}
+                                    {% else %}
+                                        0
+                                    {% endif %}
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LINK DI NAVIGAZIONE -->
+            <div class="mt-4">
+                <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-secondary">
+                    ← Torna alla Panoramica
+                </a>
+                <a href="{{ url_for('admin.docs_scadenziario') }}" class="btn btn-outline-warning ms-2">
+                    📅 Scadenziario
+                </a>
+                <a href="{{ url_for('admin.docs_kpi_dashboard') }}" class="btn btn-outline-info ms-2">
+                    📊 KPI AI
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// === FUNZIONE PER ESPORTAZIONE ===
+function exportData(format) {
+    const url = new URL(window.location);
+    url.searchParams.set('format', format);
+    window.location.href = url.toString();
+}
+
+// === FUNZIONE PER FILTRI DINAMICI ===
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-submit form quando cambiano i filtri
+    const filterInputs = document.querySelectorAll('#document, #role, #date_from, #date_to');
+    filterInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            this.form.submit();
+        });
+    });
+});
+</script>
+
+{% endblock %} 

@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Copertura Attestati | Mercury</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .dashboard-card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+    }
+    .table th {
+      background: linear-gradient(45deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+    }
+    .badge {
+      font-size: 0.8em;
+      padding: 0.5em 0.8em;
+    }
+    .progress {
+      height: 8px;
+      border-radius: 10px;
+    }
+    .btn-action {
+      border-radius: 20px;
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+    }
+    .stats-card {
+      background: linear-gradient(45deg, #667eea, #764ba2);
+      color: white;
+      border-radius: 15px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container-fluid py-4">
+  
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="dashboard-card p-4 text-center">
+        <h1 class="text-primary mb-3">
+          <i class="fas fa-chart-pie me-2"></i>
+          Dashboard Copertura Attestati
+        </h1>
+        <p class="text-muted mb-0">
+          Monitoraggio stato formazione e completamento attestati per evento
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistiche Generali -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="stats-card text-center">
+        <h3 class="mb-2">{{ dashboard|length }}</h3>
+        <p class="mb-0">Eventi Totali</p>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stats-card text-center">
+        <h3 class="mb-2">{{ dashboard|sum(attribute='tot') }}</h3>
+        <p class="mb-0">Partecipanti Totali</p>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stats-card text-center">
+        <h3 class="mb-2">{{ dashboard|sum(attribute='completati') }}</h3>
+        <p class="mb-0">Attestati Completati</p>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stats-card text-center">
+        <h3 class="mb-2">
+          {% set tot_completati = dashboard|sum(attribute='completati') %}
+          {% set tot_partecipanti = dashboard|sum(attribute='tot') %}
+          {% if tot_partecipanti > 0 %}
+            {{ "%.1f"|format((tot_completati / tot_partecipanti) * 100) }}%
+          {% else %}
+            0%
+          {% endif %}
+        </h3>
+        <p class="mb-0">Copertura Media</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sezione Audit -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="dashboard-card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="mb-0">
+            <i class="fas fa-shield-alt me-2"></i>
+            🛡️ Verifica Audit-Ready
+          </h4>
+          <div>
+            <button type="button" class="btn btn-warning btn-action" onclick="verificaAuditEvento()">
+              <i class="fas fa-shield-alt me-2"></i>
+              🔍 Verifica Audit
+            </button>
+            <button type="button" class="btn btn-success btn-action ms-2" onclick="exportAuditCSV()">
+              <i class="fas fa-download me-2"></i>
+              📤 Export CSV
+            </button>
+            <button type="button" class="btn btn-danger btn-action ms-2" onclick="exportAuditPDF()">
+              <i class="fas fa-file-pdf me-2"></i>
+              🖨 Export PDF
+            </button>
+            <button type="button" class="btn btn-success btn-action ms-2" onclick="downloadAttestatiZIP()">
+              <i class="fas fa-file-archive me-2"></i>
+              📦 Download ZIP Attestati
+            </button>
+          </div>
+        </div>
+        
+        <!-- Risultati Audit -->
+        <div id="risultati-audit" style="display: none;">
+          <div class="alert alert-info">
+            <h5 class="alert-heading">
+              <i class="fas fa-clipboard-check me-2"></i>
+              Risultati Verifica Audit
+            </h5>
+            <div id="audit-stato"></div>
+            <div id="audit-problemi"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pulsanti Azione -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="dashboard-card p-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i class="fas fa-table me-2"></i>
+            Dettaglio Eventi
+          </h5>
+          <div>
+            <a href="{{ url_for('qms_bp.export_copertura_pdf') }}" 
+               class="btn btn-outline-danger btn-action me-2">
+              <i class="fas fa-file-pdf me-1"></i>
+              📄 Esporta PDF
+            </a>
+            <a href="{{ url_for('qms_bp.export_copertura_csv') }}" 
+               class="btn btn-outline-success btn-action me-2">
+              <i class="fas fa-download me-1"></i>
+              📥 Esporta CSV
+            </a>
+            <a href="{{ url_for('admin.admin_dashboard') }}" 
+               class="btn btn-outline-secondary btn-action">
+              <i class="fas fa-arrow-left me-1"></i>
+              🔙 Torna alla Dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabella Eventi -->
+  <div class="row">
+    <div class="col-12">
+      <div class="dashboard-card p-4">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th><i class="fas fa-calendar me-1"></i> Evento</th>
+                <th><i class="fas fa-calendar-day me-1"></i> Data</th>
+                <th><i class="fas fa-users me-1"></i> Tot Partecipanti</th>
+                <th><i class="fas fa-signature me-1"></i> Firma Presenza</th>
+                <th><i class="fas fa-certificate me-1"></i> Attestati</th>
+                <th><i class="fas fa-percentage me-1"></i> % Copertura</th>
+                <th><i class="fas fa-info-circle me-1"></i> Stato</th>
+                <th><i class="fas fa-cogs me-1"></i> Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in dashboard %}
+              <tr>
+                <td>
+                  <strong>{{ item.evento.titolo }}</strong>
+                  {% if item.evento.descrizione %}
+                    <br><small class="text-muted">{{ item.evento.descrizione[:50] }}...</small>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if item.evento.data_evento %}
+                    {{ item.evento.data_evento.strftime('%d/%m/%Y') }}
+                  {% else %}
+                    <span class="text-muted">N/A</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-primary">{{ item.tot }}</span>
+                </td>
+                <td>
+                  <span class="badge bg-info">{{ item.firmati }}</span>
+                  {% if item.tot > 0 %}
+                    <small class="text-muted d-block">
+                      {{ "%.1f"|format((item.firmati / item.tot) * 100) }}%
+                    </small>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-success">{{ item.completati }}</span>
+                  {% if item.tot > 0 %}
+                    <small class="text-muted d-block">
+                      {{ "%.1f"|format((item.completati / item.tot) * 100) }}%
+                    </small>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="d-flex align-items-center">
+                    <div class="progress flex-grow-1 me-2" style="width: 60px;">
+                      <div class="progress-bar bg-{{ item.badge_class }}" 
+                           style="width: {{ item.percentuale }}%"></div>
+                    </div>
+                    <span class="fw-bold">{{ item.percentuale }}%</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="badge bg-{{ item.badge_class }}">
+                    {% if item.stato == "completato" %}
+                      ✅ {{ item.stato|title }}
+                    {% elif item.stato == "parziale" %}
+                      ⚠️ {{ item.stato|title }}
+                    {% else %}
+                      ❌ {{ item.stato|title }}
+                    {% endif %}
+                  </span>
+                </td>
+                <td>
+                  <div class="btn-group btn-group-sm" role="group">
+                    <a href="{{ url_for('qms_bp.evento_detail', evento_id=item.evento.id) }}" 
+                       class="btn btn-outline-primary" title="Dettaglio Evento">
+                      <i class="fas fa-eye"></i>
+                    </a>
+                    <a href="{{ url_for('qms_bp.partecipazioni_evento', evento_id=item.evento.id) }}" 
+                       class="btn btn-outline-info" title="Partecipanti">
+                      <i class="fas fa-users"></i>
+                    </a>
+                    <a href="{{ url_for('qms_bp.download_attestati_zip', evento_id=item.evento.id) }}" 
+                       class="btn btn-outline-success" title="Download ZIP Attestati">
+                      <i class="fas fa-file-archive"></i>
+                    </a>
+                    {% if item.stato != "completato" %}
+                      <button class="btn btn-outline-warning" 
+                              onclick="alert('Funzione di notifica in sviluppo')" 
+                              title="Notifica Mancanti">
+                        <i class="fas fa-bell"></i>
+                      </button>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert AI (Bonus) -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="dashboard-card p-4">
+        <h5 class="text-primary mb-3">
+          <i class="fas fa-robot me-2"></i>
+          Suggerimenti AI
+        </h5>
+        <div class="row">
+          {% if alert_ai %}
+            {% for alert in alert_ai %}
+              <div class="col-md-6 mb-3">
+                <div class="alert alert-{{ alert.severity }}">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <strong>{{ alert.evento }}</strong><br>
+                      <small>{{ alert.messaggio }}</small>
+                    </div>
+                    <div>
+                      {% if alert.tipo == "firma_senza_attestato" %}
+                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                      {% elif alert.tipo == "attestato_senza_firma" %}
+                        <i class="fas fa-exclamation-circle text-danger"></i>
+                      {% elif alert.tipo == "scadenza_prossima" %}
+                        <i class="fas fa-clock text-danger"></i>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-{{ alert.severity }}" 
+                            onclick="notificaMancanti('{{ alert.evento }}', {{ alert.conteggio }})">
+                      <i class="fas fa-bell me-1"></i>
+                      Notifica ({{ alert.conteggio }})
+                    </button>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="col-12">
+              <div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>Perfetto!</strong> Nessuna anomalia rilevata. Tutti gli eventi sono in regola.
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// Auto-refresh ogni 5 minuti per aggiornamenti in tempo reale
+setTimeout(function() {
+    location.reload();
+}, 300000);
+
+// Tooltip per i pulsanti
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+// Funzione per notificare partecipanti mancanti
+function notificaMancanti(evento, conteggio) {
+    if (confirm(`Inviare notifica per ${conteggio} partecipanti mancanti dell'evento "${evento}"?`)) {
+        // TODO: Implementare chiamata API per invio notifiche
+        alert(`Notifica inviata per ${conteggio} partecipanti dell'evento "${evento}"`);
+        
+        // Log dell'azione
+        fetch('/admin/api/log_notifica', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                evento: evento,
+                conteggio: conteggio,
+                tipo: 'notifica_mancanti'
+            })
+        }).catch(error => console.error('Errore log notifica:', error));
+    }
+}
+
+// Funzione per esportare dati specifici evento
+function esportaEventoSpecifico(eventoId) {
+    window.open(`/admin/eventi/${eventoId}/export`, '_blank');
+}
+
+// Funzione per verifica audit evento
+async function verificaAuditEvento() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Mostra spinner
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>⏳ Verifica in corso...';
+    button.disabled = true;
+    
+    try {
+        // Ottieni l'ID dell'evento dalla tabella (assumiamo il primo evento)
+        const eventi = document.querySelectorAll('tr[data-evento-id]');
+        if (eventi.length === 0) {
+            alert('Nessun evento disponibile per la verifica audit');
+            return;
+        }
+        
+        const eventoId = eventi[0].getAttribute('data-evento-id');
+        
+        // Chiamata API
+        const response = await fetch(`/qms/eventi/${eventoId}/verifica_audit`);
+        if (!response.ok) throw new Error('Errore nella verifica audit');
+        
+        const data = await response.json();
+        
+        // Mostra risultati
+        mostraRisultatiAudit(data);
+        
+    } catch (error) {
+        console.error('Errore verifica audit:', error);
+        alert('Errore durante la verifica audit: ' + error.message);
+    } finally {
+        // Ripristina bottone
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+// Funzione per export CSV audit
+async function exportAuditCSV() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Mostra spinner
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>⏳ Generazione CSV...';
+    button.disabled = true;
+    
+    try {
+        // Ottieni l'ID dell'evento dalla tabella
+        const eventi = document.querySelectorAll('tr[data-evento-id]');
+        if (eventi.length === 0) {
+            alert('Nessun evento disponibile per l\'export');
+            return;
+        }
+        
+        const eventoId = eventi[0].getAttribute('data-evento-id');
+        
+        // Download CSV
+        window.open(`/qms/eventi/${eventoId}/verifica_audit/export_csv`, '_blank');
+        
+    } catch (error) {
+        console.error('Errore export CSV:', error);
+        alert('Errore durante l\'export CSV: ' + error.message);
+    } finally {
+        // Ripristina bottone
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+// Funzione per export PDF audit
+async function exportAuditPDF() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Mostra spinner
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>⏳ Generazione PDF...';
+    button.disabled = true;
+    
+    try {
+        // Ottieni l'ID dell'evento dalla tabella
+        const eventi = document.querySelectorAll('tr[data-evento-id]');
+        if (eventi.length === 0) {
+            alert('Nessun evento disponibile per l\'export');
+            return;
+        }
+        
+        const eventoId = eventi[0].getAttribute('data-evento-id');
+        
+        // Download PDF
+        window.open(`/qms/eventi/${eventoId}/verifica_audit/export_pdf`, '_blank');
+        
+    } catch (error) {
+        console.error('Errore export PDF:', error);
+        alert('Errore durante l\'export PDF: ' + error.message);
+    } finally {
+        // Ripristina bottone
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+// Funzione per download ZIP attestati
+async function downloadAttestatiZIP() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    
+    // Mostra spinner
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>⏳ Preparazione ZIP...';
+    button.disabled = true;
+    
+    try {
+        // Ottieni l'ID dell'evento dalla tabella
+        const eventi = document.querySelectorAll('tr[data-evento-id]');
+        if (eventi.length === 0) {
+            alert('Nessun evento disponibile per il download');
+            return;
+        }
+        
+        const eventoId = eventi[0].getAttribute('data-evento-id');
+        
+        // Download ZIP
+        window.open(`/qms/eventi/${eventoId}/download_attestati_zip`, '_blank');
+        
+    } catch (error) {
+        console.error('Errore download ZIP:', error);
+        alert('Errore durante il download ZIP: ' + error.message);
+    } finally {
+        // Ripristina bottone
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+// Funzione per mostrare risultati audit
+function mostraRisultatiAudit(data) {
+    const risultatiDiv = document.getElementById('risultati-audit');
+    const statoDiv = document.getElementById('audit-stato');
+    const problemiDiv = document.getElementById('audit-problemi');
+    
+    // Stato generale
+    const statoClass = data.stato === 'completo' ? 'success' : 'warning';
+    const statoIcon = data.stato === 'completo' ? 'check-circle' : 'exclamation-triangle';
+    
+    statoDiv.innerHTML = `
+        <div class="alert alert-${statoClass} mb-3">
+            <h6 class="alert-heading">
+                <i class="fas fa-${statoIcon} me-2"></i>
+                Stato Audit: ${data.stato === 'completo' ? '🟢 Completo' : '🟡 Incompleto'}
+            </h6>
+            <p class="mb-2">
+                <strong>Evento:</strong> ${data.evento_titolo}<br>
+                <strong>Partecipanti:</strong> ${data.totale_partecipanti}<br>
+                <strong>Problemi rilevati:</strong> ${data.problemi_count}
+            </p>
+        </div>
+    `;
+    
+    // Problemi dettagliati
+    if (data.problemi && data.problemi.length > 0) {
+        let problemiHTML = '<div class="table-responsive"><table class="table table-sm">';
+        problemiHTML += '<thead><tr><th>Nome</th><th>Email</th><th>Firma</th><th>Attestato</th></tr></thead><tbody>';
+        
+        data.problemi.forEach(problema => {
+            problemiHTML += `
+                <tr>
+                    <td>${problema.nome}</td>
+                    <td>${problema.email}</td>
+                    <td><span class="badge ${problema.firma === '✅' ? 'bg-success' : 'bg-danger'}">${problema.firma}</span></td>
+                    <td><span class="badge ${problema.attestato === '✅' ? 'bg-success' : 'bg-danger'}">${problema.attestato}</span></td>
+                </tr>
+            `;
+        });
+        
+        problemiHTML += '</tbody></table></div>';
+        problemiHTML += `
+            <div class="mt-3">
+                <a href="/qms/eventi/${data.evento_id}/verifica_audit/export_csv" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-download me-2"></i>📤 Export CSV
+                </a>
+                <a href="/qms/eventi/${data.evento_id}/verifica_audit/export_pdf" class="btn btn-outline-danger btn-sm ms-2">
+                    <i class="fas fa-file-pdf me-2"></i>🖨 Export PDF
+                </a>
+                <a href="/qms/eventi/${data.evento_id}/download_attestati_zip" class="btn btn-outline-success btn-sm ms-2">
+                    <i class="fas fa-file-archive me-2"></i>📦 Download ZIP
+                </a>
+            </div>
+        `;
+        
+        problemiDiv.innerHTML = problemiHTML;
+    } else {
+        problemiDiv.innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>Nessun problema rilevato!</p>';
+    }
+    
+    // Mostra sezione risultati
+    risultatiDiv.style.display = 'block';
+    
+    // Scroll alla sezione risultati
+    risultatiDiv.scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+</body>
+</html>

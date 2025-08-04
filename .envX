@@ -1,0 +1,10 @@
+# Chiave segreta per Flask (sessioni + CSRF)
+SECRET_KEY=1Y2AvreutIS34ELiefcHRU39FJfdglwlb4xUhtnzUQnM=
+
+# Chiave Fernet per crittografia (32-byte url-safe base64)
+FERNET_KEY=1Y2AvreutIS34ELiefcHRU39FJfdglwlb4xUhtnzUQnM=
+
+# Credenziali mail
+MAIL_USERNAME=noreply@mercurysurgelati.org
+MAIL_PASSWORD=prbc kkph eljn tzwu
+MAIL_DEFAULT_SENDER=noreply@mercurysurgelati.org

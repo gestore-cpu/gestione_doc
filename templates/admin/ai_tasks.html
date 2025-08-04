@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block title %}Task AI - Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-robot"></i> Task AI Generati Automaticamente</h2>
+                <div class="btn-group">
+                    <button class="btn btn-outline-primary" onclick="exportTasks()">
+                        <i class="fas fa-download"></i> Esporta CSV
+                    </button>
+                    <button class="btn btn-outline-warning" onclick="cleanupTasks()">
+                        <i class="fas fa-broom"></i> Pulisci Obsoleti
+                    </button>
+                    <button class="btn btn-outline-info" onclick="refreshStats()">
+                        <i class="fas fa-sync"></i> Aggiorna Stats
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistiche -->
+            <div class="row mb-4">
+                <div class="col-md-2">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ stats.totali }}</h4>
+                            <small>Totali</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ stats.da_fare }}</h4>
+                            <small>Da Fare</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ stats.in_corso }}</h4>
+                            <small>In Corso</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ stats.completati }}</h4>
+                            <small>Completati</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ stats.critici }}</h4>
+                            <small>Critici</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-secondary text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ stats.scaduti }}</h4>
+                            <small>Scaduti</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtri -->
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="filterStatus">Stato:</label>
+                                    <select id="filterStatus" class="form-control" onchange="filterTasks()">
+                                        <option value="">Tutti</option>
+                                        <option value="Da fare">Da fare</option>
+                                        <option value="In corso">In corso</option>
+                                        <option value="Completato">Completato</option>
+                                        <option value="Annullato">Annullato</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="filterPriority">Priorità:</label>
+                                    <select id="filterPriority" class="form-control" onchange="filterTasks()">
+                                        <option value="">Tutte</option>
+                                        <option value="Critica">Critica</option>
+                                        <option value="Alta">Alta</option>
+                                        <option value="Media">Media</option>
+                                        <option value="Bassa">Bassa</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="filterModule">Modulo:</label>
+                                    <select id="filterModule" class="form-control" onchange="filterTasks()">
+                                        <option value="">Tutti</option>
+                                        <option value="QMS">QMS</option>
+                                        <option value="FocusMe">FocusMe AI</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="searchTask">Cerca:</label>
+                                    <input type="text" id="searchTask" class="form-control" placeholder="Cerca nei task..." onkeyup="filterTasks()">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabella Task -->
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-tasks"></i> Lista Task AI</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="tasksTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Titolo</th>
+                                    <th>Priorità</th>
+                                    <th>Stato</th>
+                                    <th>Assegnato a</th>
+                                    <th>Scadenza</th>
+                                    <th>Modulo</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in tasks %}
+                                <tr class="task-row" 
+                                    data-status="{{ task.stato }}" 
+                                    data-priority="{{ task.priorita }}"
+                                    data-module="{% if 'QMS' in task.descrizione %}QMS{% elif 'FocusMe' in task.descrizione %}FocusMe{% else %}Altro{% endif %}">
+                                    <td>{{ task.id }}</td>
+                                    <td>
+                                        <strong>{{ task.titolo }}</strong>
+                                        {% if task.is_overdue and task.stato != 'Completato' %}
+                                            <span class="badge bg-danger">⚠️ Scaduto</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ task.priority_color }}">
+                                            {{ task.priorita }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge {{ task.status_badge_class }}">
+                                            {{ task.stato }}
+                                        </span>
+                                    </td>
+                                    <td>{{ task.assegnato_a or 'N/A' }}</td>
+                                    <td>
+                                        {% if task.scadenza %}
+                                            {{ task.scadenza.strftime('%d/%m/%Y') }}
+                                            {% if task.is_overdue and task.stato != 'Completato' %}
+                                                <br><small class="text-danger">Scaduto</small>
+                                            {% endif %}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if 'QMS' in task.descrizione %}
+                                            <span class="badge bg-info">🏭 QMS</span>
+                                        {% elif 'FocusMe' in task.descrizione %}
+                                            <span class="badge bg-success">🧠 FocusMe</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Altro</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" onclick="viewTaskDetails({{ task.id }})">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-outline-warning" onclick="updateTaskStatus({{ task.id }})">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            {% if task.stato != 'Completato' %}
+                                            <button class="btn btn-outline-success" onclick="completeTask({{ task.id }})">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per dettagli task -->
+<div class="modal fade" id="taskDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Dettagli Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="taskDetailsContent">
+                <!-- Contenuto dinamico -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per aggiornamento stato -->
+<div class="modal fade" id="updateTaskModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Aggiorna Stato Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updateTaskForm">
+                    <div class="mb-3">
+                        <label for="newStatus" class="form-label">Nuovo Stato:</label>
+                        <select class="form-control" id="newStatus" name="stato" required>
+                            <option value="Da fare">Da fare</option>
+                            <option value="In corso">In corso</option>
+                            <option value="Completato">Completato</option>
+                            <option value="Annullato">Annullato</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="taskNotes" class="form-label">Note aggiuntive:</label>
+                        <textarea class="form-control" id="taskNotes" name="note" rows="3" placeholder="Aggiungi note..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="submitTaskUpdate()">Aggiorna</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTaskId = null;
+
+function filterTasks() {
+    const statusFilter = document.getElementById('filterStatus').value;
+    const priorityFilter = document.getElementById('filterPriority').value;
+    const moduleFilter = document.getElementById('filterModule').value;
+    const searchFilter = document.getElementById('searchTask').value.toLowerCase();
+    
+    const rows = document.querySelectorAll('.task-row');
+    
+    rows.forEach(row => {
+        const status = row.getAttribute('data-status');
+        const priority = row.getAttribute('data-priority');
+        const module = row.getAttribute('data-module');
+        const text = row.textContent.toLowerCase();
+        
+        const statusMatch = !statusFilter || status === statusFilter;
+        const priorityMatch = !priorityFilter || priority === priorityFilter;
+        const moduleMatch = !moduleFilter || module === moduleFilter;
+        const searchMatch = !searchFilter || text.includes(searchFilter);
+        
+        if (statusMatch && priorityMatch && moduleMatch && searchMatch) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function viewTaskDetails(taskId) {
+    // Per ora mostra un messaggio semplice
+    document.getElementById('taskDetailsContent').innerHTML = `
+        <div class="alert alert-info">
+            <h6>Task ID: ${taskId}</h6>
+            <p>I dettagli completi del task verranno caricati dinamicamente.</p>
+        </div>
+    `;
+    new bootstrap.Modal(document.getElementById('taskDetailsModal')).show();
+}
+
+function updateTaskStatus(taskId) {
+    currentTaskId = taskId;
+    new bootstrap.Modal(document.getElementById('updateTaskModal')).show();
+}
+
+function completeTask(taskId) {
+    if (confirm('Segnare questo task come completato?')) {
+        fetch(`/admin/ai/tasks/${taskId}/update`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `stato=Completato&note=Completato automaticamente`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Errore: ' + data.message);
+            }
+        });
+    }
+}
+
+function submitTaskUpdate() {
+    if (!currentTaskId) return;
+    
+    const formData = new FormData(document.getElementById('updateTaskForm'));
+    
+    fetch(`/admin/ai/tasks/${currentTaskId}/update`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + data.message);
+        }
+    });
+}
+
+function exportTasks() {
+    window.location.href = '/admin/ai/tasks/export';
+}
+
+function cleanupTasks() {
+    if (confirm('Eliminare i task obsoleti? Questa azione non può essere annullata.')) {
+        fetch('/admin/ai/tasks/cleanup', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Errore: ' + data.message);
+            }
+        });
+    }
+}
+
+function refreshStats() {
+    fetch('/admin/ai/tasks/stats')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Aggiorna le statistiche nella pagina
+            console.log('Statistiche aggiornate:', data.stats);
+            location.reload();
+        }
+    });
+}
+</script>
+{% endblock %} 

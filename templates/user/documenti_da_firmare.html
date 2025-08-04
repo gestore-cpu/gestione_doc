@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Documenti da Firmare</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-12">
+      <h2 class="mb-4">
+        <i class="fas fa-signature text-primary"></i> 
+        Documenti da Firmare
+      </h2>
+      
+      <!-- Messaggi flash -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Statistiche -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">📄 Totali</h5>
+              <h3>{{ documenti_da_firmare|length }}</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-success text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">✅ Firmati</h5>
+              <h3>{{ documenti_firmati|length }}</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+              <h5 class="card-title">⏳ In Attesa</h5>
+              <h3>{{ documenti_da_firmare|length - documenti_firmati|length }}</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-info text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">📊 Progresso</h5>
+              <h3>{{ "%.0f"|format((documenti_firmati|length / documenti_da_firmare|length * 100) if documenti_da_firmare|length > 0 else 0) }}%</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documenti da firmare -->
+      {% if documenti_da_firmare %}
+        <div class="card">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="fas fa-list"></i> 
+              Documenti che richiedono la tua firma
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>📄 Documento</th>
+                    <th>🏷️ Categoria</th>
+                    <th>📅 Data Caricamento</th>
+                    <th>👤 Uploader</th>
+                    <th>✍️ Firma</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for doc in documenti_da_firmare %}
+                    <tr>
+                      <td>
+                        <strong>{{ doc.title }}</strong>
+                        {% if doc.description %}
+                          <br><small class="text-muted">{{ doc.description }}</small>
+                        {% endif %}
+                        {% if doc.tag %}
+                          <br><span class="badge bg-primary">{{ doc.tag }}</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if doc.categoria_ai %}
+                          <span class="badge bg-info">{{ doc.categoria_ai }}</span>
+                        {% else %}
+                          <span class="text-muted">-</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {{ doc.created_at.strftime('%d/%m/%Y') if doc.created_at else '-' }}
+                      </td>
+                      <td>
+                        {{ doc.uploader_email }}
+                      </td>
+                      <td>
+                        <form method="POST" action="{{ url_for('docs.firma_documento_post', doc_id=doc.id) }}" class="d-flex gap-2">
+                          <input type="text" 
+                                 name="nome_firma" 
+                                 class="form-control form-control-sm" 
+                                 required 
+                                 placeholder="Il tuo nome completo"
+                                 maxlength="150"
+                                 pattern="[A-Za-zÀ-ÿ\s]+"
+                                 title="Inserisci solo lettere e spazi">
+                          <button type="submit" class="btn btn-success btn-sm">
+                            <i class="fas fa-signature"></i> Firma
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-success">
+          <h5><i class="fas fa-check-circle"></i> Ottimo lavoro!</h5>
+          <p class="mb-0">Non ci sono documenti che richiedono la tua firma al momento.</p>
+        </div>
+      {% endif %}
+
+      <!-- Documenti già firmati -->
+      {% if documenti_firmati %}
+        <div class="card mt-4">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="fas fa-check-circle text-success"></i> 
+              Documenti già firmati
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>📄 Documento</th>
+                    <th>🏷️ Categoria</th>
+                    <th>✍️ Tua Firma</th>
+                    <th>📅 Data Firma</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for firma in documenti_firmati %}
+                    <tr class="table-success">
+                      <td>
+                        <strong>{{ firma.document.title }}</strong>
+                        {% if firma.document.description %}
+                          <br><small class="text-muted">{{ firma.document.description }}</small>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if firma.document.categoria_ai %}
+                          <span class="badge bg-info">{{ firma.document.categoria_ai }}</span>
+                        {% else %}
+                          <span class="text-muted">-</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        <strong>{{ firma.nome_firma }}</strong>
+                      </td>
+                      <td>
+                        {{ firma.data_firma_formatted }}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Informazioni aggiuntive -->
+      <div class="card mt-4">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i class="fas fa-info-circle"></i> 
+            Informazioni sulla Firma Elettronica
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h6>📋 Cosa significa firmare un documento?</h6>
+              <ul class="list-unstyled">
+                <li>✅ <strong>Confermi di aver letto</strong> il documento</li>
+                <li>✅ <strong>Accetti le condizioni</strong> contenute</li>
+                <li>✅ <strong>Ti impegni a rispettare</strong> le norme indicate</li>
+                <li>✅ <strong>La firma è tracciata</strong> e conservata</li>
+              </ul>
+            </div>
+            <div class="col-md-6">
+              <h6>🔒 Sicurezza e Privacy</h6>
+              <ul class="list-unstyled">
+                <li>🔐 <strong>Firma sicura</strong> con timestamp</li>
+                <li>📧 <strong>Tracciamento IP</strong> per sicurezza</li>
+                <li>📊 <strong>Report disponibili</strong> per admin</li>
+                <li>🗂️ <strong>Archiviazione permanente</strong> delle firme</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Validazione form firma
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = document.querySelectorAll('form[action*="firma_documento"]');
+    
+    forms.forEach(form => {
+        const nomeInput = form.querySelector('input[name="nome_firma"]');
+        const submitBtn = form.querySelector('button[type="submit"]');
+        
+        // Validazione nome
+        nomeInput.addEventListener('input', function() {
+            const nome = this.value.trim();
+            const isValid = nome.length >= 3 && /^[A-Za-zÀ-ÿ\s]+$/.test(nome);
+            
+            submitBtn.disabled = !isValid;
+            
+            if (!isValid && nome.length > 0) {
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-invalid');
+            }
+        });
+        
+        // Conferma prima di firmare
+        form.addEventListener('submit', function(e) {
+            const nome = nomeInput.value.trim();
+            if (!confirm(`Confermi di voler firmare il documento con il nome "${nome}"?\n\nQuesta azione non può essere annullata.`)) {
+                e.preventDefault();
+            }
+        });
+    });
+});
+</script>
+
+</body>
+</html> 

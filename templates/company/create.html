@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2>Crea Nuova Azienda</h2>
+  <form method="POST" action="{{ url_for('company.create_company') }}">
+    <div class="mb-3">
+      <label for="name" class="form-label">Nome Azienda</label>
+      <input type="text" class="form-control" id="name" name="name" required>
+    </div>
+    <div class="mb-3">
+      <label for="description" class="form-label">Descrizione (opzionale)</label>
+      <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+    </div>
+    <button type="submit" class="btn btn-success">Salva</button>
+    <a href="{{ url_for('company.list_companies') }}" class="btn btn-secondary ms-2">Annulla</a>
+  </form>
+</div>
+{% endblock %}

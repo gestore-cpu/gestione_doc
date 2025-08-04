@@ -1,0 +1,317 @@
+<!-- DEBUG: QUESTO È IL TEMPLATE ATTIVO -->
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestione Utenti - Mercury Surgelati</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: url('{{ url_for('static', filename='sfondo.jpg') }}') no-repeat center center fixed;
+      background-size: cover;
+    }
+    .logo { max-height: 80px; }
+    .table-container {
+      background-color: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+    .valid-flag {
+      display: inline-block;
+      margin-top: 10px;
+      color: green;
+      font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container mt-4">
+  <div class="text-center mb-4">
+    <img src="{{ url_for('static', filename='logonew.png') }}" alt="Logo Mercury" class="logo">
+  </div>
+
+  <h1 class="mb-4">Gestione Utenti</h1>
+
+  <table class="table table-bordered table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Ruolo</th>
+        <th>Aziende</th>
+        <th>Reparti</th>
+        <th>Azioni</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td>{{ user.username }}</td>
+        <td>{{ user.email }}</td>
+        <td>{{ user.role }}</td>
+        <td>{{ user.companies | map(attribute='name') | join(', ') }}</td>
+        <td>{{ user.departments | map(attribute='name') | join(', ') }}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-primary"
+                  data-bs-toggle="modal"
+                  data-bs-target="#editUserModal{{ user.id }}">
+            ✏️ Modifica
+          </button>
+          <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}" style="display:inline; margin-left: 4px;" onsubmit="return confirm('Sei sicuro di voler eliminare questo utente?');">
+            <button type="submit" class="btn btn-sm btn-danger">🗑️ Elimina</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <hr class="my-5">
+  <h3 class="text-center text-success mb-4">➕ Crea Nuovo Utente</h3>
+
+  <form action="{{ url_for('admin.create_user') }}" method="POST" class="bg-white p-4 rounded shadow mb-5">
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <label for="first_name" class="form-label">Nome</label>
+        <input type="text" class="form-control" id="first_name" name="first_name" required>
+      </div>
+      <div class="col-md-6">
+        <label for="last_name" class="form-label">Cognome</label>
+        <input type="text" class="form-control" id="last_name" name="last_name" required>
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <label for="username" class="form-label">Username</label>
+        <input type="text" class="form-control" id="username" name="username" required>
+      </div>
+      <div class="col-md-6">
+        <label for="email" class="form-label">Email</label>
+        <input type="email" class="form-control" id="email" name="email" required>
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <label for="password" class="form-label">Password Provvisoria</label>
+        <input type="text" class="form-control" id="password" name="password" required>
+      </div>
+      <div class="col-md-6">
+        <label for="role" class="form-label">Ruolo</label>
+        <select class="form-select" id="role" name="role" required>
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Associazioni Azienda → Reparti -->
+    <div class="row mb-3">
+      <div class="col-md-12">
+        <label class="form-label">Associazioni Azienda → Reparti</label>
+        <div class="p-3 rounded" style="background-color: #f9f9f9; border: 1px solid #ccc;">
+          {% set colors = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#20c997'] %}
+          {% for company in companies %}
+            {% set color = colors[loop.index0 % colors|length] %}
+            <div class="mb-3 p-2 rounded" style="background-color: {{ color }}20;">
+              <strong style="color: {{ color }}">{{ company.name }}</strong>
+              <div class="form-check mt-1">
+                <input class="form-check-input company-checkbox"
+                       type="checkbox"
+                       name="company_ids"
+                       value="{{ company.id }}"
+                       id="company_{{ company.id }}"
+                       onchange="toggleDepartments({{ company.id }})">
+                <label class="form-check-label"
+                       for="company_{{ company.id }}"
+                       style="color: {{ color }}">✔️ Includi azienda</label>
+              </div>
+              <div class="row mt-2" id="departments-{{ company.id }}" style="display: none;">
+                {% if company.id in company_departments %}
+                  {% for dept in company_departments[company.id] %}
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        <input class="form-check-input department-checkbox"
+                               type="checkbox"
+                               name="department_ids"
+                               value="{{ dept.id }}"
+                               id="dept_{{ dept.id }}">
+                        <label class="form-check-label" for="dept_{{ dept.id }}">{{ dept.name }}</label>
+                      </div>
+                    </div>
+                  {% endfor %}
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+          <div id="flag-message" class="valid-flag"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Permessi -->
+    <div class="form-check mb-2">
+      <input class="form-check-input" type="checkbox" value="1" id="can_download" name="can_download">
+      <label class="form-check-label" for="can_download">✅ Autorizzato al download</label>
+    </div>
+    <div class="form-check mb-2">
+      <input class="form-check-input" type="checkbox" value="1" id="can_access_reserved" name="can_access_reserved">
+      <label class="form-check-label" for="can_access_reserved">🔐 Accesso a file riservati</label>
+    </div>
+    <div class="form-check mb-4">
+      <input class="form-check-input" type="checkbox" value="1" id="can_manage_files" name="can_manage_files">
+      <label class="form-check-label" for="can_manage_files">🛠️ Permessi speciali (modifica/elimina file)</label>
+    </div>
+
+    <div class="text-center">
+      <button type="submit" class="btn btn-success">✅ Crea Utente</button>
+      <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-secondary">↩️ Torna alla Dashboard</a>
+    </div>
+  </form>
+</div>
+
+<!-- === MODALI DI MODIFICA UTENTE === -->
+{% for user in users %}
+<div class="modal fade" id="editUserModal{{ user.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <form method="POST" action="{{ url_for('admin.update_user', user_id=user.id) }}">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title">Modifica Utente: {{ user.username }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <div class="mb-3">
+            <label>Username</label>
+            <input type="text" name="username" class="form-control" value="{{ user.username }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label>Email</label>
+            <input type="email" name="email" class="form-control" value="{{ user.email }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label>Ruolo</label>
+            <select name="role" class="form-select role-selector" data-user-id="{{ user.id }}">
+              <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+              <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
+              <option value="guest" {% if user.role == 'guest' %}selected{% endif %}>Guest</option>
+            </select>
+          </div>
+
+          <div class="guest-section" id="guest-section-{{ user.id }}" {% if user.role != 'guest' %}style="display:none"{% endif %}>
+            <div class="mb-3">
+              <label>Data di Scadenza Accesso</label>
+              <input type="date" name="access_expiration" class="form-control" value="{{ user.access_expiration.strftime('%Y-%m-%d') if user.access_expiration else '' }}">
+            </div>
+
+            <div class="form-check mb-3">
+              <input type="checkbox" class="form-check-input" name="can_download" {% if user.can_download %}checked{% endif %}>
+              <label class="form-check-label">Autorizzato al Download</label>
+            </div>
+
+            <label class="mb-2">Documenti visibili</label>
+            <table class="table table-sm">
+              <thead>
+                <tr><th>📄 Nome</th><th>Azienda</th><th>Reparto</th><th>Revoca</th></tr>
+              </thead>
+              <tbody>
+                {% for doc in user.documents %}
+                <tr>
+                  <td>{{ doc.title }}</td>
+                  <td>{{ doc.company.name }}</td>
+                  <td>{{ doc.department.name }}</td>
+                  <td><input type="checkbox" name="revoke_docs" value="{{ doc.id }}"></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="non-guest-section" id="non-guest-section-{{ user.id }}" {% if user.role == 'guest' %}style="display:none"{% endif %}>
+            <div class="mb-3">
+              <label>Aziende associate</label>
+              <select name="company_ids" multiple class="form-select">
+                {% for company in companies %}
+                  <option value="{{ company.id }}" {% if user.companies|selectattr('id', 'equalto', company.id)|list %}selected{% endif %}>{{ company.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label>Reparti associati</label>
+              <select name="department_ids" multiple class="form-select">
+                {% for dept in departments %}
+                  <option value="{{ dept.id }}" {% if user.departments|selectattr('id', 'equalto', dept.id)|list %}selected{% endif %}>{{ dept.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">💾 Salva</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toggleDepartments(companyId) {
+  const checkbox = document.getElementById("company_" + companyId);
+  const deptContainer = document.getElementById("departments-" + companyId);
+  deptContainer.style.display = checkbox.checked ? 'flex' : 'none';
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const companyCheckboxes = document.querySelectorAll('.company-checkbox');
+  const departmentCheckboxes = document.querySelectorAll('.department-checkbox');
+  const flagMessage = document.getElementById('flag-message');
+
+  function updateFlag() {
+    const selectedCompanies = [...companyCheckboxes].filter(cb => cb.checked).length;
+    const selectedDepts = [...departmentCheckboxes].filter(cb => cb.checked).length;
+    if (selectedCompanies >= 2 && selectedDepts >= 2) {
+      flagMessage.innerHTML = '✅ Selezione valida: almeno 2 aziende e 2 reparti';
+    } else {
+      flagMessage.innerHTML = '';
+    }
+  }
+
+  companyCheckboxes.forEach(cb => {
+    cb.addEventListener('change', () => {
+      toggleDepartments(cb.value);
+      updateFlag();
+    });
+  });
+
+  departmentCheckboxes.forEach(cb => cb.addEventListener('change', updateFlag));
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.role-selector').forEach(function(select) {
+    select.addEventListener('change', function() {
+      const userId = this.dataset.userId;
+      const role = this.value;
+      document.getElementById(`guest-section-${userId}`).style.display = (role === 'guest') ? 'block' : 'none';
+      document.getElementById(`non-guest-section-${userId}`).style.display = (role === 'guest') ? 'none' : 'block';
+    });
+  });
+});
+</script>
+</body>
+</html>
+

@@ -1,0 +1,353 @@
+/**
+ * 🧠 Tooltip Permanenti - Jack Synthia
+ * CSS per tooltip fissi accanto ai bottoni più usati
+ */
+
+/* Container principale del tooltip */
+.jack-tooltip-box {
+    position: absolute;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    z-index: 1000;
+    visibility: hidden;
+    opacity: 0;
+    transition: all 0.3s ease-in-out;
+    max-width: 280px;
+    min-width: 200px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+/* Contenuto del tooltip */
+.jack-tooltip-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+/* Icona Jack */
+.jack-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+/* Testo del tooltip */
+.jack-text {
+    flex: 1;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+/* Freccia del tooltip */
+.jack-tooltip-arrow {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: 8px solid transparent;
+}
+
+/* Posizionamento freccia per ogni direzione */
+.jack-tooltip-box[data-position="top"] .jack-tooltip-arrow {
+    bottom: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-top-color: #667eea;
+    border-bottom: none;
+}
+
+.jack-tooltip-box[data-position="bottom"] .jack-tooltip-arrow {
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-bottom-color: #667eea;
+    border-top: none;
+}
+
+.jack-tooltip-box[data-position="left"] .jack-tooltip-arrow {
+    right: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-left-color: #667eea;
+    border-right: none;
+}
+
+.jack-tooltip-box[data-position="right"] .jack-tooltip-arrow {
+    left: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-right-color: #667eea;
+    border-left: none;
+}
+
+/* Stati hover e focus */
+.jack-tooltip-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
+}
+
+/* Animazioni */
+@keyframes jackTooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes jackTooltipFadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(10px) scale(0.95);
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .jack-tooltip-box {
+        max-width: 240px;
+        min-width: 180px;
+        padding: 10px 12px;
+        font-size: 0.8rem;
+    }
+    
+    .jack-icon {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .jack-tooltip-content {
+        gap: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .jack-tooltip-box {
+        max-width: 200px;
+        min-width: 160px;
+        padding: 8px 10px;
+        font-size: 0.75rem;
+    }
+    
+    .jack-icon {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* Supporto per elementi con position relative */
+.btn-upload,
+.btn-analyze-ai,
+.btn-sign,
+.btn-approve,
+.btn-export,
+.btn-view,
+.btn-download,
+.btn-filter,
+.btn-help,
+.btn-settings,
+[data-onboarding] {
+    position: relative !important;
+}
+
+/* Override per elementi specifici */
+.jack-tooltip-box[data-position="top"] {
+    margin-bottom: 8px;
+}
+
+.jack-tooltip-box[data-position="bottom"] {
+    margin-top: 8px;
+}
+
+.jack-tooltip-box[data-position="left"] {
+    margin-right: 8px;
+}
+
+.jack-tooltip-box[data-position="right"] {
+    margin-left: 8px;
+}
+
+/* Focus states per accessibilità */
+.jack-tooltip-box:focus-within {
+    outline: 2px solid rgba(255, 255, 255, 0.8);
+    outline-offset: 2px;
+}
+
+/* Supporto per tema scuro */
+@media (prefers-color-scheme: dark) {
+    .jack-tooltip-box {
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .jack-tooltip-box[data-position="top"] .jack-tooltip-arrow {
+        border-top-color: #4a5568;
+    }
+    
+    .jack-tooltip-box[data-position="bottom"] .jack-tooltip-arrow {
+        border-bottom-color: #4a5568;
+    }
+    
+    .jack-tooltip-box[data-position="left"] .jack-tooltip-arrow {
+        border-left-color: #4a5568;
+    }
+    
+    .jack-tooltip-box[data-position="right"] .jack-tooltip-arrow {
+        border-right-color: #4a5568;
+    }
+}
+
+/* Animazioni per elementi target */
+.btn-upload:hover,
+.btn-analyze-ai:hover,
+.btn-sign:hover,
+.btn-approve:hover,
+.btn-export:hover,
+.btn-view:hover,
+.btn-download:hover,
+.btn-filter:hover,
+.btn-help:hover,
+.btn-settings:hover,
+[data-onboarding]:hover {
+    transform: translateY(-1px);
+    transition: transform 0.2s ease;
+}
+
+/* Loading state per tooltip */
+.jack-tooltip-box.loading {
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%);
+    color: #4a5568;
+}
+
+.jack-tooltip-box.loading .jack-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Tooltip per elementi disabilitati */
+.btn:disabled + .jack-tooltip-box {
+    opacity: 0.6;
+    filter: grayscale(0.5);
+}
+
+/* Supporto per tooltip personalizzati */
+.jack-tooltip-custom {
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+}
+
+.jack-tooltip-custom .jack-tooltip-arrow {
+    border-top-color: #48bb78;
+    border-bottom-color: #48bb78;
+    border-left-color: #48bb78;
+    border-right-color: #48bb78;
+}
+
+/* Tooltip per errori */
+.jack-tooltip-error {
+    background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+}
+
+.jack-tooltip-error .jack-tooltip-arrow {
+    border-top-color: #f56565;
+    border-bottom-color: #f56565;
+    border-left-color: #f56565;
+    border-right-color: #f56565;
+}
+
+/* Tooltip per warning */
+.jack-tooltip-warning {
+    background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+}
+
+.jack-tooltip-warning .jack-tooltip-arrow {
+    border-top-color: #ed8936;
+    border-bottom-color: #ed8936;
+    border-left-color: #ed8936;
+    border-right-color: #ed8936;
+}
+
+/* Z-index management */
+.jack-tooltip-box {
+    z-index: 1000;
+}
+
+/* Per elementi in modal o dropdown */
+.modal .jack-tooltip-box,
+.dropdown .jack-tooltip-box {
+    z-index: 1050;
+}
+
+/* Per elementi in sidebar */
+.sidebar .jack-tooltip-box {
+    z-index: 1100;
+}
+
+/* Per elementi in navbar */
+.navbar .jack-tooltip-box {
+    z-index: 1150;
+}
+
+/* Supporto per tooltip con contenuto HTML */
+.jack-tooltip-box .jack-text {
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.jack-tooltip-box .jack-text strong {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 1);
+}
+
+.jack-tooltip-box .jack-text em {
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Supporto per tooltip con link */
+.jack-tooltip-box .jack-text a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: underline;
+}
+
+.jack-tooltip-box .jack-text a:hover {
+    color: rgba(255, 255, 255, 1);
+}
+
+/* Supporto per tooltip con liste */
+.jack-tooltip-box .jack-text ul,
+.jack-tooltip-box .jack-text ol {
+    margin: 5px 0;
+    padding-left: 15px;
+}
+
+.jack-tooltip-box .jack-text li {
+    margin: 2px 0;
+}
+
+/* Supporto per tooltip con codice */
+.jack-tooltip-box .jack-text code {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8em;
+} 

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Danni - Gestione Documenti</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-light">
+
+<div class="container-fluid mt-4">
+  <div class="row">
+    <div class="col-12">
+      <!-- Header -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+          <i class="fas fa-exclamation-triangle text-danger"></i> 
+          Dashboard Danni Aziendali
+        </h2>
+        <div>
+          <a href="{{ url_for('admin.export_danni') }}" class="btn btn-outline-primary me-2">
+            <i class="fas fa-download"></i> Esporta CSV
+          </a>
+          <a href="{{ url_for('admin.export_danni_pdf') }}" class="btn btn-outline-danger">
+            <i class="fas fa-file-pdf"></i> Esporta PDF
+          </a>
+        </div>
+      </div>
+
+      <!-- Statistiche principali -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">📄 Totali</h5>
+              <h3>{{ totale }}</h3>
+              <small>Documenti danni</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+              <h5 class="card-title">⚠️ Recenti</h5>
+              <h3>{{ danni_recenti }}</h3>
+              <small>Ultimi 30 giorni</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">💰 Costi Totali</h5>
+              <h3>€{{ "%.2f"|format(costi_totali) }}</h3>
+              <small>Valore riparazioni</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-info text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">📊 Media</h5>
+              <h3>€{{ "%.2f"|format(costo_medio) }}</h3>
+              <small>Costo medio per danno</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grafici -->
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="fas fa-chart-pie"></i> 
+                Danni per Categoria
+              </h5>
+            </div>
+            <div class="card-body">
+              <canvas id="categoriaChart" width="400" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0">
+                <i class="fas fa-chart-bar"></i> 
+                Danni per Responsabile
+              </h5>
+            </div>
+            <div class="card-body">
+              <canvas id="responsabileChart" width="400" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabella documenti danni -->
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i class="fas fa-table"></i> 
+            Documenti Danni
+          </h5>
+          <div class="input-group" style="width: 300px;">
+            <input type="text" class="form-control" id="searchInput" placeholder="Cerca documenti...">
+            <button class="btn btn-outline-secondary" type="button" onclick="filterTable()">
+              <i class="fas fa-search"></i>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover" id="danniTable">
+              <thead class="table-light">
+                <tr>
+                  <th>📄 Documento</th>
+                  <th>🏷️ Tipo</th>
+                  <th>👤 Responsabile</th>
+                  <th>🚛 Asset</th>
+                  <th>📅 Data</th>
+                  <th>💰 Costo</th>
+                  <th>📊 Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for doc in documenti %}
+                  <tr>
+                    <td>
+                      <strong>{{ doc.title }}</strong>
+                      <br><small class="text-muted">{{ doc.filename }}</small>
+                      {% if doc.description %}
+                        <br><small class="text-muted">{{ doc.description[:50] }}{% if doc.description|length > 50 %}...{% endif %}</small>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if doc.categoria_ai %}
+                        <span class="badge bg-info">{{ doc.categoria_ai }}</span>
+                      {% else %}
+                        <span class="text-muted">-</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if doc.responsabile %}
+                        <strong>{{ doc.responsabile.username }}</strong>
+                        <br><small class="text-muted">{{ doc.responsabile.email }}</small>
+                      {% else %}
+                        <span class="text-muted">Non Assegnato</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if doc.asset %}
+                        <span class="badge bg-secondary">{{ doc.asset.nome }}</span>
+                        <br><small class="text-muted">{{ doc.asset.tipo_display }}</small>
+                      {% else %}
+                        <span class="text-muted">Non Specificato</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {{ doc.created_at.strftime('%d/%m/%Y') if doc.created_at else '-' }}
+                      <br><small class="text-muted">{{ doc.created_at.strftime('%H:%M') if doc.created_at else '' }}</small>
+                    </td>
+                    <td>
+                      {% if hasattr(doc, 'valore_riparazione') and doc.valore_riparazione %}
+                        <span class="text-danger fw-bold">€{{ "%.2f"|format(doc.valore_riparazione) }}</span>
+                      {% else %}
+                        <span class="text-muted">-</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="btn-group btn-group-sm">
+                        <a href="{{ url_for('admin.view_document', document_id=doc.id) }}" 
+                           class="btn btn-outline-primary" title="Visualizza">
+                          <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="{{ url_for('admin.download_document', document_id=doc.id) }}" 
+                           class="btn btn-outline-success" title="Download">
+                          <i class="fas fa-download"></i>
+                        </a>
+                        <button class="btn btn-outline-info" 
+                                onclick="showDocumentDetails({{ doc.id }})" 
+                                title="Dettagli">
+                          <i class="fas fa-info-circle"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Statistiche aggiuntive -->
+      <div class="row mt-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="fas fa-chart-line"></i> 
+                Danni per Asset
+              </h6>
+            </div>
+            <div class="card-body">
+              <canvas id="assetChart" width="400" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="fas fa-calendar-alt"></i> 
+                Timeline Danni
+              </h6>
+            </div>
+            <div class="card-body">
+              <canvas id="timelineChart" width="400" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal dettagli documento -->
+<div class="modal fade" id="documentModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Dettagli Documento Danno</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="documentModalBody">
+        <!-- Contenuto dinamico -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// Dati per i grafici
+const categoriaData = {
+  labels: {{ per_categoria.keys()|list|tojson }},
+  datasets: [{
+    label: 'Danni per Categoria',
+    data: {{ per_categoria.values()|list|tojson }},
+    backgroundColor: [
+      'rgba(255, 99, 132, 0.8)',
+      'rgba(54, 162, 235, 0.8)',
+      'rgba(255, 206, 86, 0.8)',
+      'rgba(75, 192, 192, 0.8)',
+      'rgba(153, 102, 255, 0.8)'
+    ],
+    borderWidth: 1
+  }]
+};
+
+const responsabileData = {
+  labels: {{ per_utente.keys()|list|tojson }},
+  datasets: [{
+    label: 'Danni per Responsabile',
+    data: {{ per_utente.values()|list|tojson }},
+    backgroundColor: 'rgba(54, 162, 235, 0.8)',
+    borderColor: 'rgba(54, 162, 235, 1)',
+    borderWidth: 1
+  }]
+};
+
+const assetData = {
+  labels: {{ per_asset.keys()|list|tojson }},
+  datasets: [{
+    label: 'Danni per Asset',
+    data: {{ per_asset.values()|list|tojson }},
+    backgroundColor: 'rgba(255, 159, 64, 0.8)',
+    borderColor: 'rgba(255, 159, 64, 1)',
+    borderWidth: 1
+  }]
+};
+
+// Inizializza grafici
+document.addEventListener('DOMContentLoaded', function() {
+  // Grafico torta per categorie
+  const categoriaCtx = document.getElementById('categoriaChart').getContext('2d');
+  new Chart(categoriaCtx, {
+    type: 'pie',
+    data: categoriaData,
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'bottom'
+        }
+      }
+    }
+  });
+
+  // Grafico barre per responsabili
+  const responsabileCtx = document.getElementById('responsabileChart').getContext('2d');
+  new Chart(responsabileCtx, {
+    type: 'bar',
+    data: responsabileData,
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1
+          }
+        }
+      }
+    }
+  });
+
+  // Grafico barre per asset
+  const assetCtx = document.getElementById('assetChart').getContext('2d');
+  new Chart(assetCtx, {
+    type: 'bar',
+    data: assetData,
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1
+          }
+        }
+      }
+    }
+  });
+
+  // Timeline danni (esempio)
+  const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+  new Chart(timelineCtx, {
+    type: 'line',
+    data: {
+      labels: ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu'],
+      datasets: [{
+        label: 'Danni per Mese',
+        data: [3, 5, 2, 8, 4, 6],
+        borderColor: 'rgb(255, 99, 132)',
+        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+        tension: 0.1
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1
+          }
+        }
+      }
+    }
+  });
+});
+
+// Funzioni utility
+function filterTable() {
+  const input = document.getElementById('searchInput');
+  const filter = input.value.toLowerCase();
+  const table = document.getElementById('danniTable');
+  const rows = table.getElementsByTagName('tr');
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const cells = row.getElementsByTagName('td');
+    let found = false;
+
+    for (let j = 0; j < cells.length; j++) {
+      const cell = cells[j];
+      if (cell.textContent.toLowerCase().indexOf(filter) > -1) {
+        found = true;
+        break;
+      }
+    }
+
+    row.style.display = found ? '' : 'none';
+  }
+}
+
+function showDocumentDetails(docId) {
+  // Implementazione per mostrare dettagli documento
+  document.getElementById('documentModalBody').innerHTML = `
+    <p>Caricamento dettagli documento ID: ${docId}...</p>
+  `;
+  new bootstrap.Modal(document.getElementById('documentModal')).show();
+}
+
+// Ricerca in tempo reale
+document.getElementById('searchInput').addEventListener('input', filterTable);
+</script>
+
+</body>
+</html> 

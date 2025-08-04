@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>I Miei Ospiti</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #eef2f7, #ffffff);
+    }
+    .sidebar {
+      min-height: 100vh;
+      background-color: #f8f9fa;
+      border-right: 1px solid #dee2e6;
+    }
+    .sidebar h5 {
+      padding-left: 1rem;
+    }
+    .content-area {
+      padding: 2rem;
+    }
+    .table thead {
+      background-color: #f1f1f1;
+    }
+    .chart-card {
+      background-color: #fff;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-top: 2rem;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+    }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+  <div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 col-lg-2 sidebar py-3">
+      <img src="/static/img/logo.png" alt="Logo" class="img-fluid mb-4" style="max-height: 80px;">
+      <h5><i class="fa-solid fa-building"></i> Azienda</h5>
+      <ul class="list-unstyled ps-3">
+        <li>🔹 Reparto Produzione</li>
+        <li>🔹 Reparto Qualità</li>
+      </ul>
+      <h5 class="mt-4"><i class="fa-solid fa-bars"></i> Navigazione</h5>
+      <ul class="list-unstyled ps-3">
+        <li><a href="/dashboard" class="text-decoration-none">📁 Dashboard</a></li>
+        <li><a href="/upload" class="text-decoration-none">📤 Carica Documento</a></li>
+      </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="col-md-9 col-lg-10 content-area">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">👥 I Miei Ospiti</h2>
+        <a href="/add_guest" class="btn btn-success">
+          <i class="fa fa-user-plus"></i> Aggiungi Ospite
+        </a>
+      </div>
+
+      <!-- Tabella ospiti -->
+      <table class="table table-bordered align-middle text-center">
+        <thead>
+          <tr>
+            <th>📄 Documento</th>
+            <th>📧 Email Ospite</th>
+            <th>📆 Scadenza</th>
+            <th>🔒 Stato</th>
+            <th>✉️ Azioni</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if entries %}
+            {% for entry in entries %}
+            <tr>
+              <td>{{ entry.doc.title }}</td>
+              <td>{{ entry.email }}</td>
+              <td>{{ entry.expiry }}</td>
+              <td>
+                {% if entry.is_expired %}
+                  <span class="badge bg-danger">Scaduto</span>
+                {% else %}
+                  <span class="badge bg-success">Attivo</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if not entry.is_expired %}
+                <a href="/resend_invite/{{ entry.doc.id }}" class="btn btn-sm btn-outline-primary" title="Invia nuovamente l'invito">
+                  <i class="fa fa-paper-plane"></i> Reinvita
+                </a>
+                {% else %}
+                <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-muted">Nessun ospite trovato.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+
+      <!-- Grafico -->
+      <div class="chart-card">
+        <h5 class="mb-3">📊 Accessi Ospiti negli Ultimi 7 Giorni</h5>
+        <canvas id="guestChart" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  fetch("/api/guest-activity")
+    .then(res => res.json())
+    .then(data => {
+      const ctx = document.getElementById('guestChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.labels,
+          datasets: [{
+            label: 'Accessi',
+            data: data.accesses,
+            backgroundColor: '#007bff'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: 'Accessi Ospiti (ultimi 7 giorni)' }
+          }
+        }
+      });
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

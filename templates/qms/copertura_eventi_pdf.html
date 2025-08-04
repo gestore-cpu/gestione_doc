@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Copertura Attestati - Report PDF</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 30px; 
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    h1, h2 { 
+      text-align: center; 
+      margin-bottom: 20px;
+    }
+    h1 { font-size: 24px; color: #2c3e50; }
+    h2 { font-size: 18px; color: #7f8c8d; }
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-top: 30px; 
+      font-size: 11px;
+    }
+    th, td { 
+      border: 1px solid #ddd; 
+      padding: 6px; 
+      text-align: center; 
+    }
+    th { 
+      background-color: #f8f9fa; 
+      font-weight: bold;
+      color: #495057;
+    }
+    .badge { 
+      padding: 3px 8px; 
+      border-radius: 4px; 
+      color: white; 
+      font-weight: bold;
+      font-size: 10px;
+    }
+    .completo { background-color: #28a745; }
+    .parziale { background-color: #ffc107; color: #212529; }
+    .incompleto { background-color: #dc3545; }
+    .alert-box { 
+      margin-top: 40px; 
+      border: 1px dashed #dc3545; 
+      padding: 15px;
+      background-color: #fff5f5;
+    }
+    .small { 
+      font-size: 10px; 
+      color: #777; 
+      text-align: right;
+      margin-top: 30px;
+    }
+    img.logo { 
+      max-height: 50px; 
+      margin-bottom: 20px; 
+    }
+    .header-info {
+      text-align: center;
+      margin-bottom: 30px;
+      padding: 15px;
+      background-color: #f8f9fa;
+      border-radius: 5px;
+    }
+    .stats-row {
+      display: flex;
+      justify-content: space-around;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .stat-box {
+      flex: 1;
+      margin: 0 10px;
+      padding: 10px;
+      background-color: #e9ecef;
+      border-radius: 5px;
+    }
+    .stat-number {
+      font-size: 18px;
+      font-weight: bold;
+      color: #495057;
+    }
+    .stat-label {
+      font-size: 10px;
+      color: #6c757d;
+    }
+    @media print {
+      body { margin: 15px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div style="text-align: center;">
+    <img src="{{ url_for('static', filename='img/logo.png') }}" class="logo" alt="Logo">
+    <h1>Report Copertura Attestati</h1>
+    <h2>Data Generazione: {{ data_generazione }}</h2>
+  </div>
+
+  <!-- Statistiche generali -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-number">{{ stats.total_eventi }}</div>
+      <div class="stat-label">Eventi Totali</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number">{{ stats.total_partecipanti }}</div>
+      <div class="stat-label">Partecipanti</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number">{{ stats.total_attestati }}</div>
+      <div class="stat-label">Attestati Completati</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number">{{ stats.media_copertura }}%</div>
+      <div class="stat-label">Media Copertura</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Evento</th>
+        <th>Data</th>
+        <th>Partecipanti</th>
+        <th>Firme</th>
+        <th>Attestati</th>
+        <th>Copertura</th>
+        <th>Stato</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for evento in eventi %}
+      <tr>
+        <td style="text-align: left;">{{ evento.titolo }}</td>
+        <td>{{ evento.data }}</td>
+        <td>{{ evento.totale }}</td>
+        <td>{{ evento.firme }}</td>
+        <td>{{ evento.attestati }}</td>
+        <td>{{ evento.percentuale }}%</td>
+        <td>
+          <span class="badge 
+            {% if evento.percentuale >= 100 %}completo
+            {% elif evento.percentuale >= 60 %}parziale
+            {% else %}incompleto{% endif %}">
+            {{ evento.stato }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if alert_ai %}
+  <div class="alert-box">
+    <h3 style="margin-top: 0; color: #dc3545;">⚠️ Anomalie rilevate (AI)</h3>
+    <ul style="margin: 0; padding-left: 20px;">
+      {% for alert in alert_ai %}
+      <li style="margin-bottom: 5px;">{{ alert }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="small">
+    Report generato da SYNTHIA.QMS | {{ user_email }} | Pagina 1 di 1
+  </div>
+</body>
+</html>

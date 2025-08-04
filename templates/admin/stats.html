@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Statistiche Attività</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background-image: url("/static/sfondo.jpg");
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center;
+      color: white;
+      font-family: Arial, Helvetica, sans-serif;
+      min-height: 100vh;
+      padding: 30px;
+    }
+    .container {
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 30px;
+      border-radius: 15px;
+    }
+    .logo {
+      max-width: 180px;
+      display: block;
+      margin: 0 auto 20px auto;
+    }
+    .table th, .table td {
+      color: white;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <img src="{{ url_for('static', filename='logonew.png') }}" alt="Logo Mercury" class="logo">
+
+    <h1>Statistiche Attività Documenti</h1>
+
+    <hr>
+
+    <h2>Totali</h2>
+    <p><strong>📤 Upload totali:</strong> {{ total_uploads }}</p>
+    <p><strong>📥 Download totali:</strong> {{ total_downloads }}</p>
+
+    {% if current_user.is_admin %}
+    <a href="{{ url_for('admin.export_downloads_csv') }}" class="btn btn-outline-primary btn-sm mt-2">
+      📤 Esporta log download (CSV)
+    </a>
+    {% endif %}
+
+    <hr>
+
+    <!-- === SEZIONE STATISTICHE DOWNLOAD NEGATI === -->
+    <h2>📊 Statistiche Download Negati</h2>
+    
+    <!-- Badge AI Trend -->
+    <div id="ai-trend-badge" class="alert alert-warning alert-dismissible fade show mb-3" style="display: none;">
+      <div class="d-flex align-items-center">
+        <span class="badge bg-danger me-2">⚠️ AI</span>
+        <strong>Trend negativo in crescita</strong>
+        <span class="ms-2" id="ai-trend-details">-</span>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    
+    <div class="row mb-4">
+      <div class="col-md-3">
+        <div class="card bg-danger text-white">
+          <div class="card-body text-center">
+            <h3 id="denied-today">-</h3>
+            <p class="mb-0">🔴 Negati Oggi</p>
+            <small id="denied-change">-</small>
+            <div id="trend-indicator" class="mt-1"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+          <div class="card-body text-center">
+            <h3 id="top-user-count">-</h3>
+            <p class="mb-0">👤 Utente Top</p>
+            <small id="top-user-name">-</small>
+            <div id="user-severity" class="mt-1"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card bg-info text-white">
+          <div class="card-body text-center">
+            <h3 id="top-reason-count">-</h3>
+            <p class="mb-0">📄 Motivo Top</p>
+            <small id="top-reason-name">-</small>
+            <div id="reason-anomaly" class="mt-1"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card bg-secondary text-white">
+          <div class="card-body text-center">
+            <h3 id="total-denied">-</h3>
+            <p class="mb-0">📊 Totale Negati</p>
+            <small>Ultimi 7 giorni</small>
+            <div class="mt-2">
+              <button class="btn btn-sm btn-outline-light" onclick="exportDeniedStats()">
+                📤 Esporta
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grafici Download Negati -->
+    <div class="row mb-4">
+      <div class="col-md-8">
+        <div class="card bg-dark">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">📈 Trend Download Negati (Ultimi 7 giorni)</h5>
+            <div id="trend-insight" class="badge bg-info" style="display: none;"></div>
+          </div>
+          <div class="card-body">
+            <canvas id="deniedTrendChart" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-dark">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">🍩 Distribuzione Motivi</h5>
+            <div id="anomaly-badge" class="badge bg-danger" style="display: none;">🛑 Anomalia</div>
+          </div>
+          <div class="card-body">
+            <canvas id="deniedReasonsChart" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Grafico Top Utenti -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card bg-dark">
+          <div class="card-header">
+            <h5 class="mb-0">👥 Top 5 Utenti per Tentativi Negati (Ultimi 7 giorni)</h5>
+          </div>
+          <div class="card-body">
+            <canvas id="topUsersChart" height="150"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <h2>Attività settimanale per utente</h2>
+    <table class="table table-dark table-bordered mt-3">
+      <thead>
+        <tr>
+          <th>Utente</th>
+          <th>Download negli ultimi 7 giorni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user, count in weekly_activities %}
+          <tr>
+            <td>{{ user }}</td>
+            <td>{{ count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Distribuzione per tipo di documento</h2>
+    <table class="table table-dark table-bordered mt-3">
+      <thead>
+        <tr>
+          <th>Estensione</th>
+          <th>Numero Documenti</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ext, count in doc_type_counts %}
+          <tr>
+            <td>{{ ext }}</td>
+            <td>{{ count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+  </div>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- JavaScript per statistiche download negati -->
+  <script>
+    let deniedStatsData = null;
+    
+    // Carica statistiche download negati
+    function loadDeniedStats() {
+      fetch('/admin/api/log_download_denied/stats')
+        .then(response => response.json())
+        .then(data => {
+          deniedStatsData = data;
+          
+          // Aggiorna box statistiche
+          document.getElementById('denied-today').textContent = data.today_count;
+          document.getElementById('denied-change').textContent = data.change_percentage;
+          document.getElementById('top-user-count').textContent = data.top_user.count;
+          document.getElementById('top-user-name').textContent = data.top_user.name;
+          document.getElementById('top-reason-count').textContent = data.top_reason.count;
+          document.getElementById('top-reason-name').textContent = data.top_reason.name;
+          document.getElementById('total-denied').textContent = data.total_week;
+          
+          // Analisi trend AI
+          analyzeTrendAI(data);
+          
+          // Crea grafici
+          createTrendChart(data.daily_data);
+          createReasonsChart(data.reasons_data);
+          createTopUsersChart(data.top_users_data);
+        })
+        .catch(error => {
+          console.error('Errore caricamento statistiche:', error);
+          document.getElementById('denied-today').textContent = 'Errore';
+        });
+    }
+    
+    // Analisi trend AI
+    function analyzeTrendAI(data) {
+      const dailyValues = data.daily_data.values;
+      const last3Days = dailyValues.slice(-3);
+      const previous3Days = dailyValues.slice(-6, -3);
+      
+      // Calcola trend ultimi 3 giorni
+      const currentAvg = last3Days.reduce((a, b) => a + b, 0) / 3;
+      const previousAvg = previous3Days.reduce((a, b) => a + b, 0) / 3;
+      
+      // Mostra badge AI se trend negativo
+      if (currentAvg > previousAvg && currentAvg >= 3) {
+        const increase = ((currentAvg - previousAvg) / previousAvg * 100).toFixed(1);
+        document.getElementById('ai-trend-badge').style.display = 'block';
+        document.getElementById('ai-trend-details').textContent = 
+          `Aumento del ${increase}% negli ultimi 3 giorni`;
+      }
+      
+      // Indicatori di severità
+      updateSeverityIndicators(data);
+    }
+    
+    // Aggiorna indicatori di severità
+    function updateSeverityIndicators(data) {
+      // Trend indicator
+      const trendIndicator = document.getElementById('trend-indicator');
+      if (data.change_percentage.includes('+')) {
+        trendIndicator.innerHTML = '<span class="badge bg-danger">↗️ Crescente</span>';
+      } else if (data.change_percentage.includes('-')) {
+        trendIndicator.innerHTML = '<span class="badge bg-success">↘️ Diminuente</span>';
+      } else {
+        trendIndicator.innerHTML = '<span class="badge bg-secondary">→ Stabile</span>';
+      }
+      
+      // User severity
+      const userSeverity = document.getElementById('user-severity');
+      if (data.top_user.count >= 5) {
+        userSeverity.innerHTML = '<span class="badge bg-danger">⚠️ Critico</span>';
+      } else if (data.top_user.count >= 3) {
+        userSeverity.innerHTML = '<span class="badge bg-warning">⚠️ Attenzione</span>';
+      } else {
+        userSeverity.innerHTML = '<span class="badge bg-success">✅ Normale</span>';
+      }
+      
+      // Reason anomaly
+      const reasonAnomaly = document.getElementById('reason-anomaly');
+      const topReasonPercentage = (data.top_reason.count / data.today_count * 100);
+      if (topReasonPercentage > 50) {
+        reasonAnomaly.innerHTML = '<span class="badge bg-danger">🛑 Anomalia</span>';
+        document.getElementById('anomaly-badge').style.display = 'inline';
+      }
+    }
+    
+    // Grafico trend settimanale con tooltip AI
+    function createTrendChart(dailyData) {
+      const ctx = document.getElementById('deniedTrendChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: dailyData.labels,
+          datasets: [{
+            label: 'Download Negati',
+            data: dailyData.values,
+            backgroundColor: dailyData.values.map(value => {
+              if (value >= 5) return 'rgba(220, 53, 69, 0.9)';  // Rosso per valori alti
+              if (value >= 3) return 'rgba(255, 193, 7, 0.8)';   // Giallo per valori medi
+              return 'rgba(40, 167, 69, 0.7)';                    // Verde per valori bassi
+            }),
+            borderColor: 'rgba(220, 53, 69, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: {
+                color: 'white'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                afterLabel: function(context) {
+                  const value = context.parsed.y;
+                  const date = context.label;
+                  
+                  // Insight AI nel tooltip
+                  let insight = '';
+                  if (value >= 5) {
+                    insight = '⚠️ Valore critico - Verificare immediatamente';
+                  } else if (value >= 3) {
+                    insight = '⚠️ Attenzione - Monitorare la situazione';
+                  } else if (value === 0) {
+                    insight = '✅ Nessun problema rilevato';
+                  } else {
+                    insight = 'ℹ️ Livello normale';
+                  }
+                  
+                  return [
+                    `Data: ${date}`,
+                    `Motivo top: ${deniedStatsData?.top_reason?.name || 'N/A'}`,
+                    `Utente top: ${deniedStatsData?.top_user?.name || 'N/A'}`,
+                    '',
+                    insight
+                  ];
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: 'white'
+              },
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)'
+              }
+            },
+            x: {
+              ticks: {
+                color: 'white'
+              },
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)'
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // Grafico distribuzione motivi con anomalia detection
+    function createReasonsChart(reasonsData) {
+      const ctx = document.getElementById('deniedReasonsChart').getContext('2d');
+      
+      // Calcola percentuali per anomalia detection
+      const total = reasonsData.values.reduce((a, b) => a + b, 0);
+      const percentages = reasonsData.values.map(value => (value / total * 100).toFixed(1));
+      
+      // Colori dinamici basati su severità
+      const colors = reasonsData.labels.map((label, index) => {
+        const percentage = parseFloat(percentages[index]);
+        if (percentage > 50) return 'rgba(220, 53, 69, 0.9)';  // Rosso per anomalia
+        if (percentage > 30) return 'rgba(255, 193, 7, 0.8)';  // Giallo per attenzione
+        return 'rgba(40, 167, 69, 0.7)';                        // Verde per normale
+      });
+      
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: reasonsData.labels.map((label, index) => 
+            `${label} (${percentages[index]}%)`
+          ),
+          datasets: [{
+            data: reasonsData.values,
+            backgroundColor: colors,
+            borderWidth: 2,
+            borderColor: 'rgba(0, 0, 0, 0.3)'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                color: 'white',
+                padding: 10
+              }
+            },
+            tooltip: {
+              callbacks: {
+                afterLabel: function(context) {
+                  const percentage = parseFloat(percentages[context.dataIndex]);
+                  let insight = '';
+                  
+                  if (percentage > 50) {
+                    insight = '🛑 ANOMALIA: Motivo dominante - Verificare cause';
+                  } else if (percentage > 30) {
+                    insight = '⚠️ ATTENZIONE: Motivo frequente - Monitorare';
+                  } else {
+                    insight = '✅ Normale';
+                  }
+                  
+                  return [
+                    `Percentuale: ${percentage}%`,
+                    '',
+                    insight
+                  ];
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // Grafico top utenti con colori dinamici
+    function createTopUsersChart(topUsersData) {
+      const ctx = document.getElementById('topUsersChart').getContext('2d');
+      
+      const colors = topUsersData.values.map(value => {
+        if (value >= 5) return 'rgba(220, 53, 69, 0.9)';  // Rosso - Critico
+        if (value >= 3) return 'rgba(255, 193, 7, 0.8)';   // Giallo - Attenzione
+        return 'rgba(40, 167, 69, 0.7)';                    // Verde - Normale
+      });
+      
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: topUsersData.labels,
+          datasets: [{
+            label: 'Tentativi Negati',
+            data: topUsersData.values,
+            backgroundColor: colors,
+            borderColor: colors.map(color => color.replace('0.8', '1').replace('0.9', '1').replace('0.7', '1')),
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y',  // Barre orizzontali
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                afterLabel: function(context) {
+                  const value = context.parsed.x;
+                  let severity = '';
+                  
+                  if (value >= 5) {
+                    severity = '🔴 CRITICO: Richiede intervento immediato';
+                  } else if (value >= 3) {
+                    severity = '🟡 ATTENZIONE: Monitorare comportamento';
+                  } else {
+                    severity = '🟢 NORMALE: Livello accettabile';
+                  }
+                  
+                  return [
+                    `Tentativi: ${value}`,
+                    '',
+                    severity
+                  ];
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: {
+                color: 'white'
+              },
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)'
+              }
+            },
+            y: {
+              ticks: {
+                color: 'white'
+              },
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)'
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // Funzione esportazione statistiche
+    function exportDeniedStats() {
+      if (!deniedStatsData) {
+        alert('Nessun dato disponibile per l\'esportazione');
+        return;
+      }
+      
+      // Log dell'esportazione
+      fetch('/admin/api/log_download_denied/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          export_type: 'stats',
+          timestamp: new Date().toISOString()
+        })
+      })
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `statistiche_download_negati_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      })
+      .catch(error => {
+        console.error('Errore esportazione:', error);
+        alert('Errore durante l\'esportazione');
+      });
+    }
+    
+    // Carica dati al caricamento pagina
+    document.addEventListener('DOMContentLoaded', function() {
+      loadDeniedStats();
+    });
+  </script>
+
+</body>
+</html>

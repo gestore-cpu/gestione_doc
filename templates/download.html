@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Download Documenti</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f9f9f9 url('/static/img/sfondo.png') no-repeat center center fixed;
+      background-size: cover;
+    }
+    .note-btn, .ai-btn { font-size: 0.8rem; padding: 0.25rem 0.5rem; }
+  </style>
+</head>
+<body class="p-4">
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center">
+      <img src="{{ url_for('static', filename='logo_mercury.png') }}" alt="Logo Mercury" style="height: 40px;" class="me-2">
+      <div>
+        <h3 class="mb-0">📥 Documenti Disponibili</h3>
+        <small>Visualizza, scarica o chiedi accesso ai documenti che ti interessano.</small>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <button id="aiSupportBtn" class="btn btn-outline-primary">💡 Chiedi all’AI</button>
+      <button id="resetTableBtn" class="btn btn-outline-secondary">Mostra tutti</button>
+    </div>
+  </div>
+
+  <!-- BARRA DI RICERCA + TABELLA -->
+  <input type="text" id="searchInput" class="form-control mb-3" placeholder="🔍 Cerca per nome, azienda, reparto...">
+
+  <table class="table table-bordered table-hover" id="docTable">
+    <thead class="table-light">
+      <tr>
+        <th>Nome file</th>
+        <th>Azienda</th>
+        <th>Reparto</th>
+        <th>Data</th>
+        <th>Azioni</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in documents %}
+        <tr>
+          <td>{{ doc.filename }}</td>
+          <td>{{ doc.company.name }}</td>
+          <td>{{ doc.department.name }}</td>
+          <td>{{ doc.upload_date.strftime('%d/%m/%Y') if doc.upload_date else '-' }}</td>
+          <td>
+            {% if doc.accessible %}
+              <a href="{{ url_for('welcome.download_file', doc_id=doc.id) }}" class="btn btn-success btn-sm">Scarica</a>
+            {% else %}
+              <span class="text-muted">🔒 Bloccato</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- BOX RIEPILOGO -->
+  <div class="row text-center mt-4">
+    <div class="col-md-3">
+      📁 <strong>{{ total_files }}</strong><br><small>file totali</small>
+    </div>
+    <div class="col-md-3">
+      🏢 <strong>{{ companies_count }}</strong><br><small>aziende</small>
+    </div>
+    <div class="col-md-3">
+      🏬 <strong>{{ departments_count }}</strong><br><small>reparti</small>
+    </div>
+    <div class="col-md-3">
+      ⏳ <strong>{{ recent_downloads_count }}</strong><br><small>download recenti</small>
+    </div>
+  </div>
+
+  <!-- JS LIVE SEARCH -->
+  <script>
+  document.getElementById("searchInput").addEventListener("input", function () {
+    const query = this.value.toLowerCase();
+    document.querySelectorAll("#docTable tbody tr").forEach(row => {
+      const text = row.innerText.toLowerCase();
+      row.style.display = text.includes(query) ? "" : "none";
+    });
+  });
+  document.getElementById("resetTableBtn").addEventListener("click", function () {
+    document.getElementById("searchInput").value = "";
+    document.querySelectorAll("#docTable tbody tr").forEach(row => row.style.display = "");
+  });
+  </script>
+  <script>
+function requestAccess(docId) {
+  const message = prompt("Motiva la richiesta (opzionale):");
+  fetch(`/request_access/${docId}`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({message})
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === "ok") {
+      alert("✅ Richiesta inviata con successo!");
+    } else if (data.status === "already_pending") {
+      alert("⚠️ Hai già una richiesta in attesa per questo documento.");
+    } else {
+      alert("❌ Errore durante la richiesta.");
+    }
+  });
+}
+</script>
+</body>
+</html> 

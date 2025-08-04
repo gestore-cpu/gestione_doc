@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}👁️ Dashboard Tracciamento Letture{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-eye"></i> 👁️ Dashboard Tracciamento Letture</h1>
+                <div>
+                    <a href="{{ url_for('docs.export_read_tracking_csv') }}" class="btn btn-outline-success">
+                        <i class="fas fa-file-csv"></i> 📊 Export CSV
+                    </a>
+                    <a href="{{ url_for('docs.dashboard_docs') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Statistiche Generali -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ total_documents }}</h3>
+                            <p class="mb-0">📄 Documenti Totali</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ total_reads }}</h3>
+                            <p class="mb-0">👁️ Letture Totali</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ total_users }}</h3>
+                            <p class="mb-0">👥 Utenti Attivi</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ unread_critical|length }}</h3>
+                            <p class="mb-0">⚠️ Critici Non Letti</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Documenti Critici Non Letti -->
+            {% if unread_critical %}
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> ⚠️ Documenti Critici Non Letti
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Documento</th>
+                                    <th>Azienda</th>
+                                    <th>Letture</th>
+                                    <th>% Completamento</th>
+                                    <th>Azione</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in unread_critical %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.document.name }}</strong>
+                                        {% if item.document.is_critical %}
+                                            <span class="badge bg-danger">Critico</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.document.company.name if item.document.company else 'N/A' }}</td>
+                                    <td>{{ item.stats.total_reads }}</td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar bg-{{ 'success' if item.stats.read_percentage > 80 else 'warning' if item.stats.read_percentage > 50 else 'danger' }}" 
+                                                 style="width: {{ item.stats.read_percentage }}%">
+                                                {{ item.stats.read_percentage }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('admin.view_document', id=item.document.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> Visualizza
+                                        </a>
+                                        <a href="{{ url_for('docs.document_read_stats', id=item.document.id) }}" 
+                                           class="btn btn-sm btn-outline-info">
+                                            <i class="fas fa-chart-bar"></i> Statistiche
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Documenti Più Letti -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-trophy"></i> 🏆 Documenti Più Letti
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if most_read_docs %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Documento</th>
+                                            <th>Letture</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for doc, count in most_read_docs %}
+                                        <tr>
+                                            <td>
+                                                <a href="{{ url_for('admin.view_document', id=doc.id) }}" 
+                                                   class="text-decoration-none">
+                                                    {{ doc.name }}
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">{{ count }}</span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted text-center">Nessun dato disponibile</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-users"></i> 👥 Utenti Più Attivi
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if most_active_users %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Utente</th>
+                                            <th>Letture</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for user_id, count in most_active_users %}
+                                        <tr>
+                                            <td>
+                                                {% set user = get_user_by_id(user_id) %}
+                                                {{ user.email if user else f"User {user_id}" }}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">{{ count }}</span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted text-center">Nessun dato disponibile</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Azioni Rapide -->
+            <div class="card">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt"></i> ⚡ Azioni Rapide
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>📊 Esportazione Dati</h6>
+                            <ul class="list-unstyled">
+                                <li><a href="{{ url_for('docs.export_read_tracking_csv') }}" class="text-decoration-none">
+                                    <i class="fas fa-file-csv"></i> Export CSV completo
+                                </a></li>
+                                <li><a href="#" class="text-decoration-none">
+                                    <i class="fas fa-file-pdf"></i> Report PDF (prossimamente)
+                                </a></li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>🎯 Monitoraggio</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-bell"></i> Alert documenti critici non letti</li>
+                                <li><i class="fas fa-chart-line"></i> Trend letture nel tempo</li>
+                                <li><i class="fas fa-clock"></i> Durata media lettura</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,287 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Nuova Prova di Evacuazione - SYNTHIA DOCS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        🧯 Nuova Prova di Evacuazione
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="formProvaEvacuazione" class="needs-validation" novalidate>
+                        
+                        <!-- Campi obbligatori -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="data" class="form-label">
+                                    📅 Data Prova <span class="text-danger">*</span>
+                                </label>
+                                <input type="date" 
+                                       class="form-control" 
+                                       id="data" 
+                                       name="data" 
+                                       required 
+                                       max="{{ today }}"
+                                       value="{{ today }}">
+                                <div class="invalid-feedback">
+                                    Seleziona la data della prova
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="luogo" class="form-label">
+                                    🏢 Luogo/Edificio <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="luogo" 
+                                       name="luogo" 
+                                       required 
+                                       placeholder="es. Sede principale, Reparto produzione">
+                                <div class="invalid-feedback">
+                                    Inserisci il luogo della prova
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="responsabile" class="form-label">
+                                    👤 Responsabile <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="responsabile" 
+                                       name="responsabile" 
+                                       required 
+                                       placeholder="Nome e cognome del responsabile">
+                                <div class="invalid-feedback">
+                                    Inserisci il responsabile della prova
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Note -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label for="note" class="form-label">
+                                    📝 Note e Osservazioni
+                                </label>
+                                <textarea class="form-control" 
+                                          id="note" 
+                                          name="note" 
+                                          rows="4" 
+                                          placeholder="Inserisci osservazioni, anomalie riscontrate, valutazioni..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- Upload files -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="planimetria" class="form-label">
+                                    🗺️ Planimetria (PDF/PNG/JPG)
+                                </label>
+                                <input type="file" 
+                                       class="form-control" 
+                                       id="planimetria" 
+                                       name="planimetria" 
+                                       accept=".pdf,.png,.jpg,.jpeg">
+                                <div class="form-text">
+                                    Massimo 5MB. Formati: PDF, PNG, JPG
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="verbale" class="form-label">
+                                    📄 Verbale (PDF/PNG/JPG)
+                                </label>
+                                <input type="file" 
+                                       class="form-control" 
+                                       id="verbale" 
+                                       name="verbale" 
+                                       accept=".pdf,.png,.jpg,.jpeg">
+                                <div class="form-text">
+                                    Massimo 5MB. Formati: PDF, PNG, JPG
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="foto" class="form-label">
+                                    📸 Foto Evento (PNG/JPG)
+                                </label>
+                                <input type="file" 
+                                       class="form-control" 
+                                       id="foto" 
+                                       name="foto" 
+                                       accept=".png,.jpg,.jpeg">
+                                <div class="form-text">
+                                    Massimo 5MB. Formati: PNG, JPG
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Punti mappa JSON -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label for="punti_mappa" class="form-label">
+                                    🎯 Punti Mappa Interattivi (JSON)
+                                </label>
+                                <textarea class="form-control" 
+                                          id="punti_mappa" 
+                                          name="punti_mappa" 
+                                          rows="3" 
+                                          placeholder='{"punti": [{"x": 100, "y": 200, "tipo": "uscita"}, {"x": 150, "y": 250, "tipo": "assembramento"}]}'></textarea>
+                                <div class="form-text">
+                                    Formato JSON per punti interattivi sulla planimetria (opzionale)
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Link FleetFix -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label for="link_fleetfix" class="form-label">
+                                    🔗 Link FleetFix (opzionale)
+                                </label>
+                                <input type="url" 
+                                       class="form-control" 
+                                       id="link_fleetfix" 
+                                       name="link_fleetfix" 
+                                       placeholder="https://fleetfix.mercurysurgelati.org/...">
+                                <div class="form-text">
+                                    Link esterno a FleetFix per documentazione aggiuntiva
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Pulsanti -->
+                        <div class="row">
+                            <div class="col-12">
+                                <hr>
+                                <div class="d-flex justify-content-between">
+                                    <a href="{{ url_for('prove_evacuazione.lista_prove_evacuazione') }}" 
+                                       class="btn btn-secondary">
+                                        ← Torna alla Lista
+                                    </a>
+                                    
+                                    <div>
+                                        <button type="reset" class="btn btn-warning me-2">
+                                            🔄 Reset
+                                        </button>
+                                        <button type="submit" class="btn btn-primary">
+                                            ✅ Salva Prova di Evacuazione
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview immagini -->
+<div class="row mt-3" id="previewContainer" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>🖼️ Anteprima File</h5>
+            </div>
+            <div class="card-body">
+                <div id="previewContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formProvaEvacuazione');
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Imposta la data massima a oggi
+    document.getElementById('data').max = today;
+    
+    // Validazione form
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
+        // Validazione file size
+        const files = ['planimetria', 'verbale', 'foto'];
+        let isValid = true;
+        
+        files.forEach(fileId => {
+            const fileInput = document.getElementById(fileId);
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const maxSize = 5 * 1024 * 1024; // 5MB
+                
+                if (file.size > maxSize) {
+                    alert(`❌ Il file ${file.name} è troppo grande. Massimo 5MB.`);
+                    isValid = false;
+                }
+            }
+        });
+        
+        if (!isValid) {
+            event.preventDefault();
+        }
+        
+        form.classList.add('was-validated');
+    });
+    
+    // Preview immagini
+    function handleFilePreview(input, previewId) {
+        const file = input.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById(previewId);
+                preview.innerHTML = `
+                    <div class="mb-2">
+                        <strong>${file.name}</strong> (${(file.size / 1024 / 1024).toFixed(2)} MB)
+                    </div>
+                    <img src="${e.target.result}" class="img-fluid" style="max-height: 200px;">
+                `;
+                document.getElementById('previewContainer').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+    
+    // Event listeners per preview
+    document.getElementById('planimetria').addEventListener('change', function() {
+        handleFilePreview(this, 'previewContent');
+    });
+    
+    document.getElementById('foto').addEventListener('change', function() {
+        handleFilePreview(this, 'previewContent');
+    });
+    
+    // Validazione JSON punti mappa
+    document.getElementById('punti_mappa').addEventListener('blur', function() {
+        const value = this.value.trim();
+        if (value) {
+            try {
+                JSON.parse(value);
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } catch (e) {
+                this.classList.remove('is-valid');
+                this.classList.add('is-invalid');
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,184 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<h3>📄 Tutti i Documenti</h3>
+
+<!-- Filtro Modulo -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h6 class="mb-0">
+      <i class="fas fa-filter"></i> 
+      Filtro per Modulo
+    </h6>
+  </div>
+  <div class="card-body">
+    <form method="GET" class="row g-3">
+      <div class="col-md-4">
+        <label for="modulo" class="form-label">Seleziona Modulo:</label>
+        <select name="modulo" id="modulo" class="form-select" onchange="this.form.submit()">
+          <option value="">📂 Tutti i moduli</option>
+          <option value="qms" {% if request.args.get('modulo') == 'qms' %}selected{% endif %}>
+            📋 QMS (Certificazioni, Manuali, Audit)
+          </option>
+          <option value="service" {% if request.args.get('modulo') == 'service' %}selected{% endif %}>
+            🔧 Service (Danni, Manutenzioni, Polizze)
+          </option>
+          <option value="elevate" {% if request.args.get('modulo') == 'elevate' %}selected{% endif %}>
+            📈 Elevate (Regolamenti, Policy, HR)
+          </option>
+          <option value="acquisti" {% if request.args.get('modulo') == 'acquisti' %}selected{% endif %}>
+            🛒 Acquisti (Fatture, Contratti, Fornitori)
+          </option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">&nbsp;</label>
+        <div>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search"></i> Filtra
+          </button>
+          <a href="{{ url_for('admin.documents_overview') }}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Reset
+          </a>
+        </div>
+      </div>
+      {% if request.args.get('modulo') %}
+      <div class="col-md-4">
+        <div class="alert alert-info mb-0">
+          <i class="fas fa-info-circle"></i> 
+          Filtro attivo: <strong>{{ request.args.get('modulo').upper() }}</strong>
+        </div>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+<table class="table table-bordered table-hover">
+  <thead class="table-light">
+    <tr>
+      <th>Titolo</th>
+      <th>Stato Approvazione</th>
+      <th>Firma</th>
+      <th>Data Creazione</th>
+      <th>Azioni</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for doc in all_docs %}
+      <tr>
+        <td>
+          {{ doc.title }}
+          {% if doc.collegato_a_modulo %}
+            <br><span class="badge bg-primary">{{ doc.collegato_a_modulo.upper() }}</span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="badge bg-{{ 'secondary' if doc.stato_approvazione == 'bozza' else 'warning' if doc.stato_approvazione == 'in_attesa' else 'success' if doc.stato_approvazione == 'approvato' else 'danger' }}">
+            {{ doc.stato_approvazione.capitalize() }}
+          </span>
+        </td>
+        <td>
+          {% if doc.firme %}
+            {% set firma = doc.firme[0] %}
+            {% if firma.approvato_dal_ceo %}
+              <span class="badge bg-success">✅ Approvato</span>
+            {% elif firma.firma_admin %}
+              <span class="badge bg-warning text-dark">⚠️ In attesa CEO</span>
+            {% elif firma %}
+              <span class="badge bg-info">📝 Firmato Utente</span>
+            {% else %}
+              <span class="badge bg-danger">❌ Non firmato</span>
+            {% endif %}
+            <br><small class="text-muted">{{ firma.user.full_name if firma.user else 'N/A' }}</small>
+          {% elif doc.stato_approvazione == 'approvato' and not doc.is_signed %}
+            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#firmaModal{{ doc.id }}">
+              🖋️ Firma
+            </button>
+          {% elif doc.is_signed %}
+            <span class="badge bg-primary">Firmato da {{ doc.signed_by }}</span>
+            {% if doc.signed_by_ai %}
+              <span class="badge bg-info text-dark ms-1">🧠 AI</span>
+            {% endif %}
+          {% else %}
+            <span class="text-muted">-</span>
+          {% endif %}
+        </td>
+        <td>{{ doc.created_at.strftime('%d/%m/%Y') if doc.created_at else '' }}</td>
+        <td>
+          <a href="{{ url_for('admin.view_document', document_id=doc.id) }}" class="btn btn-sm btn-outline-primary">👁️ Visualizza</a>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">Nessun documento trovato</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Modali per firma -->
+{% for doc in all_docs %}
+  {% if doc.stato_approvazione == 'approvato' and not doc.is_signed %}
+  <div class="modal fade" id="firmaModal{{ doc.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form method="POST" action="{{ url_for('admin.sign_document', doc_id=doc.id) }}">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">🖋️ Firma Documento</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>Vuoi firmare il documento <strong>{{ doc.title }}</strong>?</p>
+            <div class="mb-3">
+              <label for="firma_commento" class="form-label">Commento (facoltativo)</label>
+              <textarea class="form-control" name="firma_commento" rows="3" placeholder="Inserisci un commento per la firma..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-success">✅ Firma</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+{% endfor %}
+
+<h3>Documenti Obsoleti</h3>
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Titolo</th><th>Data Scadenza</th><th>Azioni</th></tr>
+  </thead>
+  <tbody>
+    {% for doc in obsolete_docs %}
+      <tr>
+        <td>{{ doc.title }}</td>
+        <td>{{ doc.expiry_date.strftime('%d/%m/%Y') if doc.expiry_date else '' }}</td>
+        <td><a href="{{ url_for('admin.view_document', document_id=doc.id) }}">Visualizza</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="3">Nessun documento obsoleto</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3>Documenti Protetti</h3>
+<table class="table table-bordered">
+  <thead>
+    <tr><th>Titolo</th><th>Note</th><th>Azioni</th></tr>
+  </thead>
+  <tbody>
+    {% for doc in protected_docs %}
+      <tr>
+        <td>{{ doc.title }}</td>
+        <td>{{ doc.note or '' }}</td>
+        <td>
+          <a href="{{ url_for('admin.view_document', document_id=doc.id) }}">Visualizza</a> |
+          <a href="{{ url_for('admin.edit_document_password', document_id=doc.id) }}">Modifica Password</a>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="3">Nessun documento protetto</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

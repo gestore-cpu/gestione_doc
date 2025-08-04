@@ -1,0 +1,25 @@
+# 1. Assegna i permessi corretti alla cartella dei log
+sudo chown -R www-data:www-data /var/www/gestione_doc/logs
+sudo chmod -R 755 /var/www/gestione_doc/logs
+
+# 2. Riavvia il servizio
+sudo systemctl restart gestione_doc
+
+# 3. Verifica che sia attivo
+sudo systemctl status gestione_doc
+
+# 4. Mostra eventuali nuovi log
+sudo journalctl -u gestione_doc.service -n 30 --no-pager
+[Unit]
+Description=Servizio gestione documenti
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/var/www/gestione_doc
+ExecStart=/var/www/gestione_doc/.venv/bin/gunicorn -c gunicorn_config.py wsgi:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target 

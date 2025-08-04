@@ -1,0 +1,222 @@
+<!-- 📁 Componente: jack_tooltips.html -->
+<!-- Tooltip permanenti per Jack Synthia -->
+
+<!-- Area per tooltip dinamici -->
+<div id="jack-tooltip-container" style="position: fixed; z-index: 10000; pointer-events: none;"></div>
+
+<!-- Stili inline per tooltip -->
+<style>
+.jack-tooltip-box {
+  position: absolute;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.4;
+  max-width: 250px;
+  visibility: hidden;
+  opacity: 0;
+  transition: all 0.3s ease-in-out;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.jack-tooltip-box.show {
+  visibility: visible;
+  opacity: 1;
+}
+
+.jack-tooltip-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+}
+
+.jack-tooltip-arrow.top {
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-top-color: #667eea;
+}
+
+.jack-tooltip-arrow.bottom {
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-bottom-color: #667eea;
+}
+
+.jack-tooltip-arrow.left {
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left-color: #667eea;
+}
+
+.jack-tooltip-arrow.right {
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-right-color: #667eea;
+}
+
+.jack-icon {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 16px;
+  animation: jackPulse 2s infinite;
+}
+
+@keyframes jackPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+</style>
+
+<!-- Script per tooltip -->
+<script>
+class JackTooltips {
+  constructor() {
+    this.tooltipContainer = document.getElementById('jack-tooltip-container');
+    this.activeTooltip = null;
+    this.setupTooltips();
+  }
+
+  setupTooltips() {
+    // Configurazione tooltip per DOCS
+    const tooltipConfigs = [
+      {
+        selector: '[data-jack-tooltip]',
+        message: '🤖 Jack dice: Clicca qui per vedere i dettagli del documento',
+        position: 'top'
+      },
+      {
+        selector: '.btn-upload',
+        message: '🤖 Jack dice: Carica qui i tuoi documenti',
+        position: 'bottom'
+      },
+      {
+        selector: '.btn-download',
+        message: '🤖 Jack dice: Scarica il documento in formato PDF',
+        position: 'left'
+      },
+      {
+        selector: '.btn-sign',
+        message: '🤖 Jack dice: Firma digitalmente il documento',
+        position: 'right'
+      },
+      {
+        selector: '.btn-analyze',
+        message: '🤖 Jack dice: Analizza il documento con AI',
+        position: 'top'
+      }
+    ];
+
+    tooltipConfigs.forEach(config => {
+      this.addTooltip(config);
+    });
+  }
+
+  addTooltip(config) {
+    const elements = document.querySelectorAll(config.selector);
+    elements.forEach(element => {
+      element.addEventListener('mouseenter', (e) => {
+        this.showTooltip(e.target, config.message, config.position);
+      });
+      
+      element.addEventListener('mouseleave', () => {
+        this.hideTooltip();
+      });
+      
+      element.addEventListener('focus', (e) => {
+        this.showTooltip(e.target, config.message, config.position);
+      });
+      
+      element.addEventListener('blur', () => {
+        this.hideTooltip();
+      });
+    });
+  }
+
+  showTooltip(element, message, position = 'top') {
+    this.hideTooltip();
+    
+    const tooltip = document.createElement('div');
+    tooltip.className = 'jack-tooltip-box';
+    tooltip.innerHTML = `
+      <span class="jack-icon">🤖</span>
+      ${message}
+      <div class="jack-tooltip-arrow ${position}"></div>
+    `;
+    
+    this.tooltipContainer.appendChild(tooltip);
+    this.activeTooltip = tooltip;
+    
+    // Posiziona tooltip
+    this.positionTooltip(tooltip, element, position);
+    
+    // Mostra con animazione
+    setTimeout(() => {
+      tooltip.classList.add('show');
+    }, 10);
+  }
+
+  positionTooltip(tooltip, element, position) {
+    const elementRect = element.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    let left, top;
+    
+    switch(position) {
+      case 'top':
+        left = elementRect.left + (elementRect.width / 2) - (tooltipRect.width / 2);
+        top = elementRect.top - tooltipRect.height - 10;
+        break;
+      case 'bottom':
+        left = elementRect.left + (elementRect.width / 2) - (tooltipRect.width / 2);
+        top = elementRect.bottom + 10;
+        break;
+      case 'left':
+        left = elementRect.left - tooltipRect.width - 10;
+        top = elementRect.top + (elementRect.height / 2) - (tooltipRect.height / 2);
+        break;
+      case 'right':
+        left = elementRect.right + 10;
+        top = elementRect.top + (elementRect.height / 2) - (tooltipRect.height / 2);
+        break;
+    }
+    
+    // Correggi se esce dal viewport
+    if (left < 10) left = 10;
+    if (left + tooltipRect.width > window.innerWidth - 10) {
+      left = window.innerWidth - tooltipRect.width - 10;
+    }
+    if (top < 10) top = 10;
+    if (top + tooltipRect.height > window.innerHeight - 10) {
+      top = window.innerHeight - tooltipRect.height - 10;
+    }
+    
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  }
+
+  hideTooltip() {
+    if (this.activeTooltip) {
+      this.activeTooltip.classList.remove('show');
+      setTimeout(() => {
+        if (this.activeTooltip && this.activeTooltip.parentElement) {
+          this.activeTooltip.remove();
+        }
+        this.activeTooltip = null;
+      }, 300);
+    }
+  }
+}
+
+// Inizializza tooltip quando il DOM è pronto
+document.addEventListener('DOMContentLoaded', () => {
+  window.jackTooltips = new JackTooltips();
+});
+</script> 

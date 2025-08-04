@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Insight AI QMS - Dashboard Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>🤖 Insight AI QMS</h2>
+                <button class="btn btn-primary" onclick="generaNuoviInsightQMS()">
+                    🔄 Genera Nuovi Insight
+                </button>
+            </div>
+            
+            <!-- Statistiche -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">📊 Totale</h5>
+                            <h3>{{ totali.totali }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">🚨 Critici</h5>
+                            <h3>{{ totali.critici }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">⚠️ Attenzione</h5>
+                            <h3>{{ totali.attenzione }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">✅ Risolti</h5>
+                            <h3>{{ totali.risolti }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabella Insight -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Insight Attivi</h5>
+                </div>
+                <div class="card-body">
+                    {% if insights %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>📁 Modulo QMS</th>
+                                    <th>🔍 Insight</th>
+                                    <th>⚠️ Severità</th>
+                                    <th>📅 Data</th>
+                                    <th>⚙️ Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for insight in insights %}
+                                <tr class="{% if insight.severity == 'critico' %}table-danger{% elif insight.severity == 'attenzione' %}table-warning{% else %}table-info{% endif %}">
+                                    <td>
+                                        <span class="badge bg-secondary">{{ insight.modulo_qms or 'N/A' }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold">{{ insight.insight_text }}</div>
+                                        <small class="text-muted">Tipo: {{ insight.insight_type }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 'danger' if insight.severity=='critico' else 'warning' if insight.severity=='attenzione' else 'info' }}">
+                                            {{ insight.severity.upper() }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ insight.data_creazione.strftime('%d/%m/%Y %H:%M') }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            {% if insight.documento_id %}
+                                            <a href="/admin/qms/documenti/{{ insight.documento_id }}" class="btn btn-sm btn-outline-info" title="Visualizza documento">
+                                                📄
+                                            </a>
+                                            {% endif %}
+                                            
+                                            {% if not insight.task_id %}
+                                            <button onclick="trasformaInTaskQMS({{ insight.id }})" class="btn btn-sm btn-outline-primary" title="Trasforma in Task">
+                                                📝 Task
+                                            </button>
+                                            {% else %}
+                                            <span class="badge bg-success">✅ Task creato</span>
+                                            {% endif %}
+                                            
+                                            <button onclick="resolveInsightQMS({{ insight.id }})" class="btn btn-sm btn-outline-success" title="Risolvi">
+                                                ✅
+                                            </button>
+                                            
+                                            <button onclick="ignoreInsightQMS({{ insight.id }})" class="btn btn-sm btn-outline-secondary" title="Ignora">
+                                                ❌
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <h5 class="text-muted">🎉 Nessun insight attivo!</h5>
+                        <p class="text-muted">Tutti i documenti QMS sono aggiornati e conformi.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function generaNuoviInsightQMS() {
+    if (!confirm('Sei sicuro di voler generare nuovi insight QMS?')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '⏳ Generazione...';
+    button.disabled = true;
+    
+    fetch('/admin/api/qms_ai/genera', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ Generati ${data.generati} nuovi insight QMS!`);
+            location.reload();
+        } else {
+            alert('❌ Errore: ' + data.error);
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('❌ Errore durante la generazione degli insight');
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function trasformaInTaskQMS(insightId) {
+    if (!confirm('Sei sicuro di voler trasformare questo insight in un task?')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '⏳ Trasformazione...';
+    button.disabled = true;
+    
+    fetch(`/admin/api/qms_ai/${insightId}/task`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ Insight trasformato in task ID: ${data.task_id}!`);
+            location.reload();
+        } else {
+            alert('❌ Errore: ' + data.error);
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('❌ Errore durante la trasformazione in task');
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function resolveInsightQMS(insightId) {
+    if (!confirm('Sei sicuro di voler risolvere questo insight?')) {
+        return;
+    }
+    
+    fetch(`/admin/api/qms_ai/${insightId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Insight risolto con successo!');
+            location.reload();
+        } else {
+            alert('❌ Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('❌ Errore durante la risoluzione');
+    });
+}
+
+function ignoreInsightQMS(insightId) {
+    if (!confirm('Sei sicuro di voler ignorare questo insight?')) {
+        return;
+    }
+    
+    fetch(`/admin/api/qms_ai/${insightId}/ignore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Insight ignorato con successo!');
+            location.reload();
+        } else {
+            alert('❌ Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('❌ Errore durante l\'ignoramento');
+    });
+}
+</script>
+{% endblock %} 

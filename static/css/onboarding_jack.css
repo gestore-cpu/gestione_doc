@@ -1,0 +1,312 @@
+/**
+ * 🎨 Stili per Onboarding AI Interattivo - Jack Synthia
+ * CSS per l'overlay, evidenziazioni e animazioni
+ */
+
+/* Overlay principale */
+.jack-onboarding-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Container del contenuto */
+.jack-onboarding-container {
+    position: absolute;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    max-width: 450px;
+    min-width: 400px;
+    animation: slideIn 0.4s ease-out;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Contenuto del passo */
+.jack-onboarding-content {
+    padding: 24px;
+    position: relative;
+}
+
+/* Step specifico */
+.jack-onboarding-step {
+    margin-bottom: 20px;
+}
+
+.jack-onboarding-step h6 {
+    color: white;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.jack-onboarding-step p {
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.jack-onboarding-step small {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.875rem;
+}
+
+/* Controlli */
+.jack-onboarding-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.jack-onboarding-controls .btn {
+    font-size: 0.875rem;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.jack-onboarding-controls .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Evidenziazione elementi target */
+.jack-onboarding-highlight {
+    position: relative;
+    z-index: 10000 !important;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.4) !important;
+    border-radius: 8px !important;
+    animation: pulse 2s infinite;
+    transition: all 0.3s ease;
+}
+
+.jack-onboarding-highlight::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    right: -8px;
+    bottom: -8px;
+    background: linear-gradient(45deg, #667eea, #764ba2, #667eea);
+    border-radius: 12px;
+    z-index: -1;
+    animation: borderGlow 2s infinite;
+}
+
+/* Animazioni */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(102, 126, 234, 0.6), 0 0 30px rgba(102, 126, 234, 0.6);
+    }
+    100% {
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.8), 0 0 20px rgba(102, 126, 234, 0.4);
+    }
+}
+
+@keyframes borderGlow {
+    0% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 0.8;
+    }
+    100% {
+        opacity: 0.5;
+    }
+}
+
+/* Pulsante riavvia onboarding */
+#restartOnboarding {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    transition: all 0.3s ease;
+}
+
+#restartOnboarding:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+    color: white;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .jack-onboarding-container {
+        max-width: 90vw;
+        min-width: auto;
+        margin: 20px;
+    }
+    
+    .jack-onboarding-content {
+        padding: 16px;
+    }
+    
+    .jack-onboarding-controls {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .jack-onboarding-controls .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Scroll behavior per elementi evidenziati */
+.jack-onboarding-highlight {
+    scroll-margin: 100px;
+}
+
+/* Focus states per accessibilità */
+.jack-onboarding-controls .btn:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.8);
+    outline-offset: 2px;
+}
+
+/* Loading state */
+.jack-onboarding-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+}
+
+.jack-onboarding-loading::after {
+    content: '';
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top: 3px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Messaggio di completamento */
+.alert-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.alert-success .btn-close {
+    filter: invert(1);
+}
+
+/* Override per elementi specifici */
+.jack-onboarding-highlight.btn,
+.jack-onboarding-highlight.a {
+    position: relative;
+    z-index: 10001 !important;
+}
+
+/* Supporto per elementi nascosti */
+.jack-onboarding-highlight[style*="display: none"],
+.jack-onboarding-highlight[style*="visibility: hidden"] {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* Effetti hover per controlli */
+.jack-onboarding-controls .btn-outline-light:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.jack-onboarding-controls .btn-primary:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+.jack-onboarding-controls .btn-outline-warning:hover {
+    background-color: rgba(255, 193, 7, 0.2);
+    border-color: rgba(255, 193, 7, 0.8);
+    color: white;
+}
+
+.jack-onboarding-controls .btn-outline-danger:hover {
+    background-color: rgba(220, 53, 69, 0.2);
+    border-color: rgba(220, 53, 69, 0.8);
+    color: white;
+}
+
+/* Disabled state */
+.jack-onboarding-controls .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* Progress indicator (opzionale) */
+.jack-onboarding-progress {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Tooltip per elementi target */
+.jack-onboarding-highlight::after {
+    content: '🎯';
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 20px;
+    animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateX(-50%) translateY(0);
+    }
+    40% {
+        transform: translateX(-50%) translateY(-5px);
+    }
+    60% {
+        transform: translateX(-50%) translateY(-3px);
+    }
+} 

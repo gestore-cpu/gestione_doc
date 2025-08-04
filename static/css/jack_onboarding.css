@@ -1,0 +1,203 @@
+/* 📁 File: static/css/jack_onboarding.css */
+
+#jack-onboarding-wrapper {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  max-width: 500px;
+  width: 90%;
+  text-align: center;
+  animation: jackSlideIn 0.6s ease-out;
+}
+
+@keyframes jackSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -60%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+#jack-onboarding-box {
+  color: white;
+  font-size: 18px;
+  line-height: 1.6;
+  margin-bottom: 25px;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 500;
+}
+
+#jack-onboarding-box::before {
+  content: "🤖";
+  font-size: 24px;
+  margin-right: 10px;
+  animation: jackPulse 2s infinite;
+}
+
+@keyframes jackPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.jack-message-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+}
+
+.jack-onboarding-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#jack-onboarding-next,
+#jack-onboarding-skip,
+#jack-onboarding-action {
+  margin: 0 5px;
+  padding: 12px 24px;
+  border-radius: 25px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+#jack-onboarding-next {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+#jack-onboarding-next:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+#jack-onboarding-action {
+  background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
+}
+
+#jack-onboarding-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+}
+
+#jack-onboarding-skip {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+#jack-onboarding-skip:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+/* Overlay di sfondo */
+#jack-onboarding-wrapper::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: -1;
+  backdrop-filter: blur(3px);
+}
+
+/* Evidenziazione elementi */
+.jack-highlight {
+  position: relative;
+  z-index: 1000;
+  animation: jackHighlight 2s infinite;
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.3);
+}
+
+@keyframes jackHighlight {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(102, 126, 234, 0.6);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  #jack-onboarding-wrapper {
+    width: 95%;
+    padding: 20px;
+  }
+  
+  #jack-onboarding-box {
+    font-size: 16px;
+    min-height: 60px;
+  }
+  
+  #jack-onboarding-next,
+  #jack-onboarding-skip,
+  #jack-onboarding-action {
+    padding: 10px 20px;
+    font-size: 14px;
+    min-width: 80px;
+  }
+  
+  .jack-onboarding-buttons {
+    gap: 8px;
+  }
+}
+
+/* Animazione di completamento */
+.onboarding-complete {
+  animation: jackComplete 0.8s ease-out;
+}
+
+@keyframes jackComplete {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0;
+  }
+}
+
+/* Stile per messaggio di completamento */
+.jack-message-container {
+  animation: jackMessageSlideIn 0.5s ease-out;
+}
+
+@keyframes jackMessageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+} 

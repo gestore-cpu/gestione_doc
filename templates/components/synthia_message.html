@@ -1,0 +1,326 @@
+{% macro synthia_message(messaggio="", azione_url="", azione_testo="", id="", tipo="info", dismissible=true, auto_remove=true) %}
+<div class="jack-message-container" id="{{ id or 'jack-message-' + range(1, 1000) | random }}">
+    <div class="card shadow-sm p-3 mb-3 border-0 jack-message-{{ tipo }}" 
+         style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <div class="d-flex align-items-start">
+            <img src="/static/img/jack_synthia_realistic.png" 
+                 width="48" height="48" 
+                 class="me-3 rounded-circle jack-avatar" 
+                 style="border: 2px solid white; flex-shrink: 0;">
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center justify-content-between">
+                    <h6 class="mb-2 fw-bold">
+                        <span class="jack-icon me-2">🎙</span>
+                        <span class="jack-title">Jack Synthia</span>
+                    </h6>
+                    {% if dismissible %}
+                    <button type="button" 
+                            class="btn-close btn-close-white jack-dismiss" 
+                            onclick="dismissJackMessage('{{ id or 'jack-message-' + range(1, 1000) | random }}')"
+                            aria-label="Chiudi messaggio">
+                    </button>
+                    {% endif %}
+                </div>
+                <p class="mb-2 jack-text">{{ messaggio }}</p>
+                {% if azione_url and azione_testo %}
+                <a href="{{ azione_url }}" 
+                   class="btn btn-sm btn-outline-light jack-action">
+                    {{ azione_testo }}
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.jack-message-container {
+    animation: jackMessageSlideIn 0.4s ease-out;
+}
+
+.jack-message-info {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+.jack-message-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+}
+
+.jack-message-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%) !important;
+}
+
+.jack-message-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #e83e8c 100%) !important;
+}
+
+.jack-message-primary {
+    background: linear-gradient(135deg, #007bff 0%, #6610f2 100%) !important;
+}
+
+.jack-avatar {
+    transition: transform 0.2s ease;
+}
+
+.jack-avatar:hover {
+    transform: scale(1.1);
+}
+
+.jack-text {
+    line-height: 1.5;
+    font-size: 0.95rem;
+}
+
+.jack-action {
+    transition: all 0.2s ease;
+    border-width: 2px;
+}
+
+.jack-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.jack-dismiss {
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.jack-dismiss:hover {
+    opacity: 1;
+}
+
+@keyframes jackMessageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes jackMessageSlideOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+.jack-message-container.removing {
+    animation: jackMessageSlideOut 0.3s ease-in forwards;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .jack-message-container .card {
+        padding: 12px !important;
+    }
+    
+    .jack-avatar {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    
+    .jack-text {
+        font-size: 0.9rem;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .jack-message-container .card {
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+}
+</style>
+
+<script>
+function dismissJackMessage(messageId) {
+    const container = document.getElementById(messageId);
+    if (container) {
+        container.classList.add('removing');
+        setTimeout(() => {
+            if (container.parentElement) {
+                container.remove();
+            }
+        }, 300);
+        
+        // Salva lo stato di dismiss in localStorage
+        localStorage.setItem(`jack_message_dismissed_${messageId}`, 'true');
+    }
+}
+
+// Auto-remove per messaggi temporanei
+{% if auto_remove %}
+setTimeout(() => {
+    const container = document.getElementById('{{ id or "jack-message-" + range(1, 1000) | random }}');
+    if (container && container.parentElement) {
+        dismissJackMessage('{{ id or "jack-message-" + range(1, 1000) | random }}');
+    }
+}, 10000); // 10 secondi
+{% endif %}
+
+// Verifica se il messaggio è già stato dismissato
+{% if id %}
+if (localStorage.getItem('jack_message_dismissed_{{ id }}')) {
+    const container = document.getElementById('{{ id }}');
+    if (container) {
+        container.remove();
+    }
+}
+{% endif %}
+</script>
+{% endmacro %}
+
+<!-- Macro per messaggi automatici da API -->
+{% macro synthia_auto_message(evento="", user_role="USER", modulo="") %}
+<div id="jack-auto-message-area" class="mb-3"></div>
+
+<script>
+async function loadJackAutoMessage(evento = '{{ evento }}', userRole = '{{ user_role }}', modulo = '{{ modulo }}') {
+    try {
+        // Carica preferenze utente
+        const userPrefsResponse = await fetch(`http://64.226.70.28/api/utente/${getCurrentUserId()}/preferenze`);
+        const userPrefs = await userPrefsResponse.json();
+        
+        // Carica messaggio Jack
+        const messageResponse = await fetch(`http://64.226.70.28/synthia/ai/evento/${evento}?user_role=${userRole}&modulo=${modulo}&stile=${userPrefs.jack_stile || 'default'}&umore=${userPrefs.jack_umore || 'neutral'}`);
+        const messageData = await messageResponse.json();
+        
+        if (messageData.messaggio) {
+            const messageArea = document.getElementById('jack-auto-message-area');
+            if (messageArea) {
+                // Usa il componente synthia_message
+                const messageHtml = `
+                    <div class="jack-message-container">
+                        <div class="card shadow-sm p-3 mb-3 border-0 jack-message-${messageData.tipo || 'info'}" 
+                             style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <div class="d-flex align-items-start">
+                                <img src="/static/img/jack_synthia_realistic.png" 
+                                     width="48" height="48" 
+                                     class="me-3 rounded-circle jack-avatar" 
+                                     style="border: 2px solid white; flex-shrink: 0;">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <h6 class="mb-2 fw-bold">
+                                            <span class="jack-icon me-2">🎙</span>
+                                            <span class="jack-title">Jack Synthia</span>
+                                        </h6>
+                                        <button type="button" 
+                                                class="btn-close btn-close-white jack-dismiss" 
+                                                onclick="this.parentElement.parentElement.parentElement.parentElement.remove()"
+                                                aria-label="Chiudi messaggio">
+                                        </button>
+                                    </div>
+                                    <p class="mb-2 jack-text">${messageData.messaggio}</p>
+                                    ${messageData.azione_url ? `<a href="${messageData.azione_url}" class="btn btn-sm btn-outline-light jack-action">${messageData.azione_testo}</a>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                messageArea.innerHTML = messageHtml;
+                
+                // Auto-remove dopo 10 secondi
+                setTimeout(() => {
+                    const container = messageArea.querySelector('.jack-message-container');
+                    if (container) {
+                        container.classList.add('removing');
+                        setTimeout(() => container.remove(), 300);
+                    }
+                }, 10000);
+            }
+        }
+    } catch (error) {
+        console.log('Errore nel caricamento messaggio Jack:', error);
+    }
+}
+
+// Funzione helper per ottenere ID utente corrente
+function getCurrentUserId() {
+    // Estrai da meta tag o variabile globale
+    const userIdMeta = document.querySelector('meta[name="user-id"]');
+    return userIdMeta ? userIdMeta.getAttribute('content') : 'default';
+}
+
+// Carica messaggio automatico al caricamento della pagina
+document.addEventListener('DOMContentLoaded', () => {
+    const evento = sessionStorage.getItem("jack_evento") || "{{ evento }}";
+    sessionStorage.removeItem("jack_evento");
+    
+    if (evento) {
+        loadJackAutoMessage(evento, '{{ user_role }}', '{{ modulo }}');
+    }
+});
+</script>
+{% endmacro %}
+
+<!-- Macro per area messaggi Jack -->
+{% macro synthia_message_area() %}
+<div id="jack-message-area" class="mb-3"></div>
+
+<script>
+// Funzione per aggiungere messaggio Jack dinamicamente
+function addJackMessage(messaggio, azione_url = null, azione_testo = null, tipo = 'info', id = null) {
+    const messageArea = document.getElementById('jack-message-area');
+    if (!messageArea) return;
+    
+    const messageId = id || `jack-message-${Date.now()}`;
+    const messageHtml = `
+        <div class="jack-message-container" id="${messageId}">
+            <div class="card shadow-sm p-3 mb-3 border-0 jack-message-${tipo}" 
+                 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="d-flex align-items-start">
+                    <img src="/static/img/jack_synthia_realistic.png" 
+                         width="48" height="48" 
+                         class="me-3 rounded-circle jack-avatar" 
+                         style="border: 2px solid white; flex-shrink: 0;">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <h6 class="mb-2 fw-bold">
+                                <span class="jack-icon me-2">🎙</span>
+                                <span class="jack-title">Jack Synthia</span>
+                            </h6>
+                            <button type="button" 
+                                    class="btn-close btn-close-white jack-dismiss" 
+                                    onclick="dismissJackMessage('${messageId}')"
+                                    aria-label="Chiudi messaggio">
+                            </button>
+                        </div>
+                        <p class="mb-2 jack-text">${messaggio}</p>
+                        ${azione_url ? `<a href="${azione_url}" class="btn btn-sm btn-outline-light jack-action">${azione_testo}</a>` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    messageArea.insertAdjacentHTML('afterbegin', messageHtml);
+    
+    // Auto-remove dopo 10 secondi
+    setTimeout(() => {
+        const container = document.getElementById(messageId);
+        if (container) {
+            dismissJackMessage(messageId);
+        }
+    }, 10000);
+}
+
+// Funzione per impostare evento Jack prima della navigazione
+function setJackEvento(evento) {
+    sessionStorage.setItem("jack_evento", evento);
+}
+
+// Esporta funzioni per uso globale
+window.addJackMessage = addJackMessage;
+window.setJackEvento = setJackEvento;
+window.dismissJackMessage = dismissJackMessage;
+</script>
+{% endmacro %} 

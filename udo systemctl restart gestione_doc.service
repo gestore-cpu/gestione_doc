@@ -1,0 +1,20 @@
+[0;1;31m×[0m gestione_doc.service - Gunicorn instance to serve gestione_doc
+     Loaded: loaded (]8;;file://documenti/etc/systemd/system/gestione_doc.service/etc/systemd/system/gestione_doc.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;31mfailed[0m (Result: exit-code) since Wed 2025-06-04 20:15:14 UTC; 1min 13s ago
+   Duration: 33.036s
+ Invocation: 72833be34bf34e369a325dd7c605ee64
+    Process: 30564 ExecStart=/var/www/gestione_doc/venv/bin/gunicorn -w 3 -b 127.0.0.1:8000 app:app [0;1;31m(code=exited, status=3)[0m
+   Main PID: 30564 (code=exited, status=3)
+   Mem peak: 132.3M
+        CPU: 2.963s
+
+Jun 04 20:14:44 documenti gunicorn[30564]:     self.log.error(msg)
+Jun 04 20:14:44 documenti gunicorn[30564]:   File "/var/www/gestione_doc/venv/lib/python3.12/site-packages/gunicorn/glogging.py", line 271, in error
+Jun 04 20:14:44 documenti gunicorn[30564]:     self.error_log.error(msg, *args, **kwargs)
+Jun 04 20:14:44 documenti gunicorn[30564]: Message: 'Worker (pid:30569) was sent SIGTERM!'
+Jun 04 20:14:44 documenti gunicorn[30564]: Arguments: ()
+Jun 04 20:15:14 documenti gunicorn[30564]: [2025-06-04 20:15:14 +0000] [30564] [ERROR] Shutting down: Master
+Jun 04 20:15:14 documenti gunicorn[30564]: [2025-06-04 20:15:14 +0000] [30564] [ERROR] Reason: Worker failed to boot.
+Jun 04 20:15:14 documenti systemd[1]: [0;1;39m[0;1;31m[0;1;39mgestione_doc.service: Main process exited, code=exited, status=3/NOTIMPLEMENTED[0m
+Jun 04 20:15:14 documenti systemd[1]: [0;1;38:5:185m[0;1;39m[0;1;38:5:185mgestione_doc.service: Failed with result 'exit-code'.[0m
+Jun 04 20:15:14 documenti systemd[1]: gestione_doc.service: Consumed 2.963s CPU time, 132.3M memory peak.

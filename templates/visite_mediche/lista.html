@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+  <!-- Header con statistiche -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h2 class="mb-0">🏥 Gestione Visite Mediche</h2>
+          <p class="text-muted mb-0">Gestione completa delle visite mediche dei dipendenti</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary" onclick="exportCSV()">
+            📊 Export CSV
+          </button>
+          <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalVisita">
+            ➕ Nuova Visita
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistiche Dashboard -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card bg-primary text-white">
+        <div class="card-body">
+          <h5 class="card-title">📋 Totali</h5>
+          <h3 class="mb-0">{{ totali.totali }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-success text-white">
+        <div class="card-body">
+          <h5 class="card-title">✅ Valide</h5>
+          <h3 class="mb-0">{{ totali.valide }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-warning text-dark">
+        <div class="card-body">
+          <h5 class="card-title">⚠️ In Scadenza</h5>
+          <h3 class="mb-0">{{ totali.in_scadenza }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-danger text-white">
+        <div class="card-body">
+          <h5 class="card-title">❌ Scadute</h5>
+          <h3 class="mb-0">{{ totali.scadute }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtri Avanzati -->
+  <div class="row mb-3">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0">🔍 Filtri Avanzati</h6>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <label class="form-label">Stato</label>
+              <select class="form-select" id="filtroStato">
+                <option value="">Tutti</option>
+                <option value="valida">Valide</option>
+                <option value="in_scadenza">In Scadenza</option>
+                <option value="scaduta">Scadute</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Ruolo</label>
+              <input type="text" class="form-control" id="filtroRuolo" placeholder="Filtra per ruolo">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Tipo Visita</label>
+              <input type="text" class="form-control" id="filtroTipo" placeholder="Filtra per tipo">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">&nbsp;</label>
+              <div>
+                <button class="btn btn-primary" onclick="applicaFiltri()">🔍 Applica</button>
+                <button class="btn btn-outline-secondary" onclick="resetFiltri()">🔄 Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabella Responsive -->
+  <div class="card">
+    <div class="card-header">
+      <h6 class="mb-0">📋 Elenco Visite Mediche</h6>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table id="tabellaVisite" class="table table-striped table-hover">
+          <thead class="table-dark">
+            <tr>
+              <th>👤 Utente</th>
+              <th>💼 Ruolo</th>
+              <th>🏥 Tipo Visita</th>
+              <th>📅 Data Visita</th>
+              <th>⏰ Scadenza</th>
+              <th>📊 Stato</th>
+              <th>📄 Certificato</th>
+              <th>⚙️ Azioni</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for visita in visite %}
+            <tr data-visita-id="{{ visita.id }}">
+              <td>
+                <strong>{{ visita.user.username if visita.user else 'N/A' }}</strong>
+                <br><small class="text-muted">{{ visita.user.email if visita.user else 'N/A' }}</small>
+              </td>
+              <td>{{ visita.ruolo }}</td>
+              <td>{{ visita.tipo_visita }}</td>
+              <td>{{ visita.data_visita.strftime('%d/%m/%Y') }}</td>
+              <td>
+                {{ visita.scadenza.strftime('%d/%m/%Y') }}
+                {% if not visita.is_expired %}
+                  <br><small class="text-muted">{{ visita.days_until_expiry }} giorni rimanenti</small>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge {{ visita.badge_class }}">{{ visita.status_display }}</span>
+              </td>
+              <td>
+                {% if visita.certificato_filename %}
+                  <button class="btn btn-sm btn-outline-info" onclick="scaricaCertificato({{ visita.id }})">
+                    📥 Scarica
+                  </button>
+                {% else %}
+                  <span class="text-muted">N/A</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button class="btn btn-sm btn-outline-primary" onclick="modificaVisita({{ visita.id }})" title="Modifica">
+                    ✏️
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger" onclick="eliminaVisita({{ visita.id }})" title="Elimina">
+                    🗑️
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="visualizzaDettagli({{ visita.id }})" title="Dettagli">
+                    👁️
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Form -->
+  <div class="modal fade" id="modalVisita" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="modalTitle">➕ Nuova Visita Medica</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="formVisita" enctype="multipart/form-data">
+          <div class="modal-body">
+            <input type="hidden" id="visitaId" name="visitaId">
+            
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="user_id" class="form-label">👤 Utente *</label>
+                  <select class="form-select" id="user_id" name="user_id" required>
+                    <option value="">Seleziona utente...</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="ruolo" class="form-label">💼 Ruolo *</label>
+                  <input type="text" class="form-control" id="ruolo" name="ruolo" required 
+                         placeholder="Es: Operatore, Magazziniere, Amministrativo">
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="tipo_visita" class="form-label">🏥 Tipo Visita *</label>
+                  <select class="form-select" id="tipo_visita" name="tipo_visita" required>
+                    <option value="">Seleziona tipo...</option>
+                    <option value="Medico Competente Annuale">Medico Competente Annuale</option>
+                    <option value="Visita Periodica">Visita Periodica</option>
+                    <option value="Visita Straordinaria">Visita Straordinaria</option>
+                    <option value="Visita Pre-assunzione">Visita Pre-assunzione</option>
+                    <option value="Visita di Controllo">Visita di Controllo</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="esito" class="form-label">📋 Esito *</label>
+                  <select class="form-select" id="esito" name="esito" required>
+                    <option value="">Seleziona esito...</option>
+                    <option value="Idoneo">Idoneo</option>
+                    <option value="Idoneo con limitazioni">Idoneo con limitazioni</option>
+                    <option value="Non idoneo">Non idoneo</option>
+                    <option value="Idoneo temporaneamente">Idoneo temporaneamente</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="data_visita" class="form-label">📅 Data Visita *</label>
+                  <input type="date" class="form-control" id="data_visita" name="data_visita" required>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="scadenza" class="form-label">⏰ Scadenza *</label>
+                  <input type="date" class="form-control" id="scadenza" name="scadenza" required>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="certificato" class="form-label">📄 Certificato (PDF)</label>
+              <input type="file" class="form-control" id="certificato" name="certificato" 
+                     accept=".pdf,.doc,.docx,.png,.jpg,.jpeg">
+              <div class="form-text">Formati supportati: PDF, DOC, DOCX, PNG, JPG</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="note" class="form-label">📝 Note</label>
+              <textarea class="form-control" id="note" name="note" rows="3" 
+                        placeholder="Note aggiuntive sulla visita..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">❌ Chiudi</button>
+            <button type="submit" class="btn btn-primary">
+              <span id="submitText">💾 Salva</span>
+              <span id="submitSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Dettagli -->
+  <div class="modal fade" id="modalDettagli" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title">👁️ Dettagli Visita Medica</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="dettagliVisita">
+          <!-- Contenuto caricato dinamicamente -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast per notifiche -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="toastNotifica" class="toast" role="alert">
+    <div class="toast-header">
+      <strong class="me-auto" id="toastTitle">Notifica</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+    </div>
+    <div class="toast-body" id="toastMessage">
+      <!-- Messaggio toast -->
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/visite_mediche.js') }}"></script>
+{% endblock %} 

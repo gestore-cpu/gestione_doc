@@ -1,0 +1,694 @@
+{% extends "admin/dashboard.html" %}
+
+{% block extra_css %}
+<style>
+/* Gradienti personalizzati per stile Apple/Notion */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.bg-gradient-success {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.bg-gradient-warning {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.bg-gradient-danger {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+}
+
+.bg-gradient-info {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+}
+
+/* Animazioni hover per cards */
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1) !important;
+}
+
+/* Badge con ombra morbida */
+.badge {
+    transition: all 0.3s ease;
+}
+
+.badge:hover {
+    transform: scale(1.05);
+}
+
+/* Font system moderno */
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Spacing migliorato */
+.fs-smaller {
+    font-size: 0.875rem;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem !important;
+    }
+    
+    .fs-1 {
+        font-size: 2rem !important;
+    }
+}
+
+/* Dashboard specific styles */
+.dashboard-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+}
+
+.ai-message-box {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    border-left: 5px solid #007bff;
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    border: none;
+    border-radius: 15px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+}
+
+.kpi-icon {
+    font-size: 2.5rem;
+    opacity: 0.8;
+}
+
+.kpi-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin: 0.5rem 0;
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.criticity-table {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.criticity-table th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 1rem;
+}
+
+.criticity-table td {
+    padding: 1rem;
+    vertical-align: middle;
+}
+
+.criticity-badge {
+    font-size: 0.8rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+}
+
+.controls-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.auto-refresh-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    background: rgba(0,123,255,0.9);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    display: none;
+}
+
+/* Loading animation */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <!-- Header Dashboard -->
+    <div class="dashboard-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-2">🧠 Dashboard AI Documentale – Jack Synthia</h1>
+                <p class="mb-0 opacity-75">Monitoraggio intelligente dello stato documentale con analisi AI in tempo reale</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="d-flex justify-content-end align-items-center">
+                    <div class="me-3">
+                        <small class="opacity-75">Auto-refresh</small>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+                        </div>
+                    </div>
+                    <button class="btn btn-light btn-sm" onclick="refreshDashboard()">
+                        <i class="fas fa-sync-alt"></i> Aggiorna
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto-refresh indicator -->
+    <div class="auto-refresh-indicator" id="refreshIndicator">
+        <i class="fas fa-sync-alt"></i> Aggiornamento automatico
+    </div>
+
+    <!-- Controlli Filtri -->
+    <div class="controls-section">
+        <div class="row align-items-end">
+            <div class="col-md-3">
+                <label for="periodFilter" class="form-label fw-medium">📅 Periodo</label>
+                <select id="periodFilter" class="form-select">
+                    <option value="current_month">Mese Corrente</option>
+                    <option value="last_month">Mese Precedente</option>
+                    <option value="current_quarter">Trimestre Corrente</option>
+                    <option value="last_quarter">Trimestre Precedente</option>
+                    <option value="custom">Personalizzato</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="companyFilter" class="form-label fw-medium">🏢 Azienda</label>
+                <select id="companyFilter" class="form-select">
+                    <option value="">Tutte le aziende</option>
+                    <!-- Popolato dinamicamente -->
+                </select>
+            </div>
+            <div class="col-md-6">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary" onclick="exportCSV()">
+                        📊 Esporta CSV
+                    </button>
+                    <button class="btn btn-outline-success" onclick="exportPDF()">
+                        📄 Esporta PDF
+                    </button>
+                    <button class="btn btn-outline-info" onclick="showFullscreen()">
+                        🖥️ Schermo Intero
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Messaggio AI Strategico -->
+    <div class="ai-message-box" id="aiMessageBox">
+        <div class="d-flex align-items-start">
+            <div class="me-3">
+                <i class="fas fa-robot fa-2x text-primary"></i>
+            </div>
+            <div>
+                <h5 class="mb-2">🤖 Analisi AI Strategica</h5>
+                <p class="mb-0" id="aiMessage">Caricamento analisi AI...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card kpi-card bg-gradient-danger text-white">
+                <div class="card-body text-center">
+                    <div class="kpi-icon">❗</div>
+                    <div class="kpi-number" id="scadenzeCount">-</div>
+                    <div class="kpi-label">Documenti in Scadenza</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card kpi-card bg-gradient-warning text-white">
+                <div class="card-body text-center">
+                    <div class="kpi-icon">✍️</div>
+                    <div class="kpi-number" id="firmeCount">-</div>
+                    <div class="kpi-label">Firme Mancanti</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card kpi-card bg-gradient-info text-white">
+                <div class="card-body text-center">
+                    <div class="kpi-icon">🚫</div>
+                    <div class="kpi-number" id="uploadCount">-</div>
+                    <div class="kpi-label">Upload Non Approvati</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card kpi-card bg-gradient-secondary text-white">
+                <div class="card-body text-center">
+                    <div class="kpi-icon">🕒</div>
+                    <div class="kpi-number" id="obsoletiCount">-</div>
+                    <div class="kpi-label">Documenti Obsoleti</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabella Criticità per Reparto -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📍 Criticità per Reparto</h5>
+                    <small class="text-muted">Clicca su un reparto per vedere i dettagli</small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 criticity-table" id="criticityTable">
+                            <thead>
+                                <tr>
+                                    <th>🏢 Reparto</th>
+                                    <th>❗ Criticità</th>
+                                    <th>📊 Documenti Totali</th>
+                                    <th>✅ Approvati</th>
+                                    <th>🖋️ Firmati</th>
+                                    <th>🔧 Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="criticityTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">
+                                        <div class="loading-spinner"></div> Caricamento dati...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grafici Aggiuntivi -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📈 Trend Criticità</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="trendChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🍩 Distribuzione Stati</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="distributionChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Dettaglio Criticità -->
+<div class="modal fade" id="criticityModal" tabindex="-1" aria-labelledby="criticityModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="criticityModalLabel">📍 Dettaglio Criticità</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body">
+                <div id="criticityDetails">
+                    <!-- Popolato dinamicamente -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                <button type="button" class="btn btn-primary" onclick="exportCriticityDetails()">📊 Esporta Dettagli</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// === Dashboard AI Documentale - Jack ===
+let dashboardData = {};
+let refreshInterval = null;
+let trendChart = null;
+let distributionChart = null;
+
+// Inizializzazione dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboard();
+    setupAutoRefresh();
+    setupEventListeners();
+});
+
+// Carica dati dashboard
+async function loadDashboard() {
+    try {
+        const userId = {{ current_user.id }};
+        const period = document.getElementById('periodFilter').value;
+        const company = document.getElementById('companyFilter').value;
+        
+        const url = `https://64.226.70.28/api/jack/docs/dashboard/${userId}?period=${period}&company=${company}`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Errore caricamento dashboard');
+        
+        dashboardData = await response.json();
+        
+        updateDashboardUI();
+        updateCharts();
+        
+        console.log('Dashboard aggiornata:', dashboardData);
+    } catch (error) {
+        console.error('Errore caricamento dashboard:', error);
+        showError('Errore nel caricamento dei dati. Riprova più tardi.');
+    }
+}
+
+// Aggiorna UI dashboard
+function updateDashboardUI() {
+    // KPI Cards
+    document.getElementById('scadenzeCount').textContent = dashboardData.scadenze_settimana || 0;
+    document.getElementById('firmeCount').textContent = dashboardData.firme_mancanti || 0;
+    document.getElementById('uploadCount').textContent = dashboardData.upload_non_approvati || 0;
+    document.getElementById('obsoletiCount').textContent = dashboardData.documenti_obsoleti || 0;
+    
+    // Messaggio AI
+    const aiMessage = document.getElementById('aiMessage');
+    if (dashboardData.suggerimento_ai) {
+        aiMessage.textContent = dashboardData.suggerimento_ai;
+    } else {
+        aiMessage.textContent = 'Nessun suggerimento AI disponibile al momento.';
+    }
+    
+    // Tabella criticità
+    updateCriticityTable();
+}
+
+// Aggiorna tabella criticità
+function updateCriticityTable() {
+    const tbody = document.getElementById('criticityTableBody');
+    const criticityData = dashboardData.criticita_per_reparto || {};
+    
+    if (Object.keys(criticityData).length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nessuna criticità rilevata</td></tr>';
+        return;
+    }
+    
+    let html = '';
+    for (const [reparto, criticità] of Object.entries(criticityData)) {
+        const severityClass = criticità > 5 ? 'danger' : criticità > 3 ? 'warning' : 'info';
+        
+        html += `
+            <tr onclick="showCriticityDetails('${reparto}')" style="cursor: pointer;">
+                <td><strong>${reparto}</strong></td>
+                <td><span class="badge bg-${severityClass} criticity-badge">${criticità}</span></td>
+                <td>${Math.floor(Math.random() * 50) + 10}</td>
+                <td>${Math.floor(Math.random() * 30) + 5}</td>
+                <td>${Math.floor(Math.random() * 20) + 3}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); showCriticityDetails('${reparto}')">
+                        👁️ Dettagli
+                    </button>
+                </td>
+            </tr>
+        `;
+    }
+    
+    tbody.innerHTML = html;
+}
+
+// Aggiorna grafici
+function updateCharts() {
+    updateTrendChart();
+    updateDistributionChart();
+}
+
+// Grafico trend criticità
+function updateTrendChart() {
+    const ctx = document.getElementById('trendChart');
+    if (trendChart) trendChart.destroy();
+    
+    trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu'],
+            datasets: [{
+                label: 'Criticità',
+                data: [12, 19, 15, 25, 22, 30],
+                borderColor: '#ff6b6b',
+                backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+// Grafico distribuzione stati
+function updateDistributionChart() {
+    const ctx = document.getElementById('distributionChart');
+    if (distributionChart) distributionChart.destroy();
+    
+    distributionChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Approvati', 'In Attesa', 'Scaduti', 'Obsoleti'],
+            datasets: [{
+                data: [65, 20, 10, 5],
+                backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6c757d']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+
+// Setup auto-refresh
+function setupAutoRefresh() {
+    const toggle = document.getElementById('autoRefreshToggle');
+    const indicator = document.getElementById('refreshIndicator');
+    
+    toggle.addEventListener('change', function() {
+        if (this.checked) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+    
+    if (toggle.checked) {
+        startAutoRefresh();
+    }
+}
+
+// Avvia auto-refresh
+function startAutoRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    
+    refreshInterval = setInterval(() => {
+        showRefreshIndicator();
+        loadDashboard().finally(() => {
+            hideRefreshIndicator();
+        });
+    }, 60000); // 60 secondi
+}
+
+// Ferma auto-refresh
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+    }
+}
+
+// Mostra indicatore refresh
+function showRefreshIndicator() {
+    const indicator = document.getElementById('refreshIndicator');
+    indicator.style.display = 'block';
+    indicator.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Aggiornamento...';
+}
+
+// Nasconde indicatore refresh
+function hideRefreshIndicator() {
+    const indicator = document.getElementById('refreshIndicator');
+    indicator.innerHTML = '<i class="fas fa-sync-alt"></i> Aggiornamento automatico';
+    setTimeout(() => {
+        indicator.style.display = 'none';
+    }, 2000);
+}
+
+// Setup event listeners
+function setupEventListeners() {
+    // Filtri
+    document.getElementById('periodFilter').addEventListener('change', loadDashboard);
+    document.getElementById('companyFilter').addEventListener('change', loadDashboard);
+}
+
+// Refresh manuale
+function refreshDashboard() {
+    showRefreshIndicator();
+    loadDashboard().finally(() => {
+        hideRefreshIndicator();
+    });
+}
+
+// Mostra dettagli criticità
+function showCriticityDetails(reparto) {
+    const modal = new bootstrap.Modal(document.getElementById('criticityModal'));
+    const detailsDiv = document.getElementById('criticityDetails');
+    
+    // Simula dati dettagliati
+    const details = {
+        reparto: reparto,
+        criticità: dashboardData.criticita_per_reparto[reparto] || 0,
+        documenti: [
+            { titolo: 'Documento A', stato: 'Scaduto', azione: 'Rinnovo urgente' },
+            { titolo: 'Documento B', stato: 'Non firmato', azione: 'Firma richiesta' },
+            { titolo: 'Documento C', stato: 'Obsoleto', azione: 'Aggiornamento necessario' }
+        ]
+    };
+    
+    detailsDiv.innerHTML = `
+        <h6>📍 Criticità per ${details.reparto}</h6>
+        <p class="text-muted">${details.criticità} documenti richiedono attenzione</p>
+        
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Documento</th>
+                        <th>Stato</th>
+                        <th>Azione Richiesta</th>
+                        <th>Link</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${details.documenti.map(doc => `
+                        <tr>
+                            <td>${doc.titolo}</td>
+                            <td><span class="badge bg-warning">${doc.stato}</span></td>
+                            <td>${doc.azione}</td>
+                            <td><a href="#" class="btn btn-sm btn-outline-primary">👁️ Vedi</a></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    modal.show();
+}
+
+// Export funzioni
+function exportCSV() {
+    const data = dashboardData.criticita_per_reparto || {};
+    let csv = 'Reparto,Criticità\n';
+    
+    for (const [reparto, criticità] of Object.entries(data)) {
+        csv += `${reparto},${criticità}\n`;
+    }
+    
+    downloadCSV(csv, 'criticita_reparti.csv');
+}
+
+function exportPDF() {
+    // Implementazione export PDF
+    alert('Export PDF in sviluppo');
+}
+
+function exportCriticityDetails() {
+    // Implementazione export dettagli
+    alert('Export dettagli in sviluppo');
+}
+
+function downloadCSV(csv, filename) {
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+function showFullscreen() {
+    if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen();
+    }
+}
+
+function showError(message) {
+    // Implementazione mostra errori
+    console.error(message);
+}
+
+// Salva messaggio Jack nello storico
+if (typeof salvaMessaggioJack === "function") {
+    salvaMessaggioJack("Dashboard AI documentale caricata - Monitoraggio criticità attivo");
+}
+</script>
+
+{% endblock %} 

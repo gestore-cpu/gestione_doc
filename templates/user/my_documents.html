@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>I miei documenti</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📄 I miei documenti</h2>
+    <a href="{{ url_for('docs.documenti_da_firmare') }}" class="btn btn-primary">
+      <i class="fas fa-signature"></i> Documenti da Firmare
+    </a>
+    <a href="{{ url_for('docs.ricerca_semantica') }}" class="btn btn-info">
+      <i class="fas fa-search"></i> Ricerca Semantica
+    </a>
+  </div>
+  
+  <!-- Filtri AI -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h6 class="mb-0">🔍 Filtri AI</h6>
+    </div>
+    <div class="card-body">
+      <form method="GET" class="row g-3">
+        <div class="col-md-3">
+          <label for="tag_filter" class="form-label">Tag:</label>
+          <select name="tag_filter" id="tag_filter" class="form-select">
+            <option value="">Tutti i tag</option>
+            <option value="Danno">Danno</option>
+            <option value="Certificazione">Certificazione</option>
+            <option value="Contabilità">Contabilità</option>
+            <option value="Risorse Umane">Risorse Umane</option>
+            <option value="Manutenzione">Manutenzione</option>
+            <option value="Formazione">Formazione</option>
+            <option value="Inventario">Inventario</option>
+            <option value="Legale">Legale</option>
+            <option value="Tecnico">Tecnico</option>
+            <option value="Amministrativo">Amministrativo</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="modulo_filter" class="form-label">Modulo:</label>
+          <select name="modulo_filter" id="modulo_filter" class="form-select">
+            <option value="">Tutti i moduli</option>
+            <option value="service">Service</option>
+            <option value="qms">QMS</option>
+            <option value="elevate">Elevate</option>
+            <option value="acquisti">Acquisti</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label for="categoria_filter" class="form-label">Categoria:</label>
+          <select name="categoria_filter" id="categoria_filter" class="form-select">
+            <option value="">Tutte le categorie</option>
+            <option value="Verbale incidente">Verbale incidente</option>
+            <option value="Manuale ISO">Manuale ISO</option>
+            <option value="Fattura">Fattura</option>
+            <option value="Regolamento">Regolamento</option>
+            <option value="Piano manutenzione">Piano manutenzione</option>
+            <option value="Corso formazione">Corso formazione</option>
+            <option value="Listino prodotti">Listino prodotti</option>
+            <option value="Contratto">Contratto</option>
+            <option value="Specifiche tecniche">Specifiche tecniche</option>
+            <option value="Pratica amministrativa">Pratica amministrativa</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">&nbsp;</label>
+          <div>
+            <button type="submit" class="btn btn-primary">🔍 Filtra</button>
+            <a href="{{ url_for('user.my_documents') }}" class="btn btn-secondary">🔄 Reset</a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Messaggi flash -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% if documents %}
+    <table class="table table-bordered bg-white">
+      <thead class="table-light">
+        <tr>
+          <th>Titolo</th>
+          <th>Tag AI</th>
+          <th>Modulo</th>
+          <th>Data Caricamento</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in documents %}
+        <tr>
+          <td>
+            {{ doc.title }}
+            {% if doc.categoria_ai %}
+              <br><small class="text-muted">{{ doc.categoria_ai }}</small>
+            {% endif %}
+          </td>
+          <td>
+            {% if doc.tag %}
+              <span class="badge bg-primary">{{ doc.tag }}</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if doc.collegato_a_modulo %}
+              <span class="badge bg-info text-dark">{{ doc.collegato_a_modulo|upper }}</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>{{ doc.created_at.strftime('%d/%m/%Y %H:%M') if doc.created_at else '' }}</td>
+          <td>
+            <a href="{{ url_for('admin.view_document', document_id=doc.id) }}" class="btn btn-sm btn-primary me-1">👁️ Visualizza</a>
+            <a href="{{ url_for('admin.view_document', document_id=doc.id) }}" class="btn btn-sm btn-success">⬇️ Download</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Nessun documento disponibile.</p>
+  {% endif %}
+</div>
+
+  </div>
+</div>
+
+<script>
+// Mantieni i valori dei filtri selezionati
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Ripristina i valori dei filtri
+    const tagFilter = urlParams.get('tag_filter');
+    if (tagFilter) {
+        document.getElementById('tag_filter').value = tagFilter;
+    }
+    
+    const moduloFilter = urlParams.get('modulo_filter');
+    if (moduloFilter) {
+        document.getElementById('modulo_filter').value = moduloFilter;
+    }
+    
+    const categoriaFilter = urlParams.get('categoria_filter');
+    if (categoriaFilter) {
+        document.getElementById('categoria_filter').value = categoriaFilter;
+    }
+});
+</script>
+
+</body>
+</html>

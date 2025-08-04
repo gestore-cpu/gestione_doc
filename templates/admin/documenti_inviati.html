@@ -1,0 +1,476 @@
+{% extends "base_admin.html" %}
+
+{% block title %}📧 Documenti Inviati{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    📧 Documenti Inviati
+                    <span class="badge bg-primary" id="contatore-invii">0</span>
+                </h1>
+                <div>
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filtri dinamici -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 Filtri Avanzati</h5>
+                </div>
+                <div class="card-body">
+                    <form id="filtro-invio" class="mb-3 d-flex gap-2 align-items-end flex-wrap">
+                        <div class="flex-grow-1">
+                            <label for="data_da" class="form-label">📅 Dal:</label>
+                            <input type="date" id="data_da" class="form-control" name="data_da">
+                        </div>
+                        <div class="flex-grow-1">
+                            <label for="data_a" class="form-label">📅 Al:</label>
+                            <input type="date" id="data_a" class="form-control" name="data_a">
+                        </div>
+                        <div class="flex-grow-1">
+                            <label for="stato" class="form-label">📦 Stato:</label>
+                            <select id="stato" class="form-select" name="stato">
+                                <option value="">Tutti gli stati</option>
+                                <option value="success">✅ Inviato</option>
+                                <option value="errore">❌ Errore</option>
+                                <option value="da_inviare">🕒 Da Inviare</option>
+                            </select>
+                        </div>
+                        <div class="flex-grow-1">
+                            <label for="email_destinatario" class="form-label">📧 Email:</label>
+                            <input type="text" id="email_destinatario" class="form-control" name="email_destinatario" placeholder="Filtra per email...">
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Filtra
+                            </button>
+                            <button type="button" id="reset-filtri" class="btn btn-secondary">
+                                <i class="fas fa-undo"></i> Reset
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Statistiche rapide -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">✅ Inviati</h5>
+                            <h3 class="mb-0" id="stat-inviati">0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">❌ Errori</h5>
+                            <h3 class="mb-0" id="stat-errori">0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <h5 class="card-title">🕒 Da Inviare</h5>
+                            <h3 class="mb-0" id="stat-da-inviare">0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">📧 Destinatari</h5>
+                            <h3 class="mb-0" id="stat-destinatari">0</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabella invii -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Storico Invii</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="tabella-invii">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>📄 Documento</th>
+                                    <th>👤 Utente</th>
+                                    <th>📧 Destinatario</th>
+                                    <th>📦 Stato</th>
+                                    <th>📅 Data Invio</th>
+                                    <th>⚠️ Errore</th>
+                                    <th>🛠️ Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-invii">
+                                <!-- I dati verranno caricati via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginazione -->
+                    <nav aria-label="Paginazione invii">
+                        <ul class="pagination justify-content-center" id="paginazione">
+                            <!-- Paginazione generata via JavaScript -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per dettagli errore -->
+<div class="modal fade" id="modalErrore" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">⚠️ Dettagli Errore</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="dettagli-errore"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template per riga tabella -->
+<template id="template-riga">
+    <tr data-stato="" data-data-invio="" data-email="">
+        <td>
+            <strong class="documento-titolo"></strong>
+            <br><small class="text-muted documento-id"></small>
+        </td>
+        <td>
+            <span class="utente-nome"></span>
+            <br><small class="text-muted utente-email"></small>
+        </td>
+        <td>
+            <span class="email-destinatario"></span>
+        </td>
+        <td>
+            <span class="badge stato-badge"></span>
+        </td>
+        <td>
+            <span class="data-invio"></span>
+        </td>
+        <td>
+            <span class="errore-testo"></span>
+        </td>
+        <td>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-primary btn-view-doc" title="Visualizza documento">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button type="button" class="btn btn-outline-warning btn-view-error" title="Dettagli errore" style="display: none;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </button>
+                <button type="button" class="btn btn-outline-success btn-reinvio" title="Reinvia email" style="display: none;">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+        </td>
+    </tr>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Variabili globali
+let inviiData = [];
+let currentPage = 1;
+const itemsPerPage = 20;
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    caricaInvii();
+    setupFiltri();
+    setupEventi();
+});
+
+// Carica i dati degli invii
+async function caricaInvii() {
+    try {
+        const response = await fetch('/admin/api/invii-documenti');
+        if (!response.ok) throw new Error('Errore nel caricamento dati');
+        
+        inviiData = await response.json();
+        aggiornaStatistiche();
+        renderizzaTabella();
+        aggiornaContatore();
+    } catch (error) {
+        console.error('Errore caricamento invii:', error);
+        mostraErrore('Errore nel caricamento dei dati degli invii');
+    }
+}
+
+// Setup filtri
+function setupFiltri() {
+    const form = document.getElementById('filtro-invio');
+    const resetBtn = document.getElementById('reset-filtri');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        applicaFiltri();
+    });
+    
+    resetBtn.addEventListener('click', function() {
+        resetFiltri();
+    });
+}
+
+// Applica filtri
+function applicaFiltri() {
+    const dataDa = document.getElementById('data_da').value;
+    const dataA = document.getElementById('data_a').value;
+    const stato = document.getElementById('stato').value;
+    const email = document.getElementById('email_destinatario').value.toLowerCase();
+    
+    const righe = document.querySelectorAll('#tbody-invii tr');
+    
+    righe.forEach(riga => {
+        let mostra = true;
+        
+        // Filtro data
+        if (dataDa || dataA) {
+            const dataInvio = riga.getAttribute('data-data-invio');
+            if (dataDa && dataInvio < dataDa) mostra = false;
+            if (dataA && dataInvio > dataA) mostra = false;
+        }
+        
+        // Filtro stato
+        if (stato && riga.getAttribute('data-stato') !== stato) {
+            mostra = false;
+        }
+        
+        // Filtro email
+        if (email) {
+            const emailDestinatario = riga.getAttribute('data-email').toLowerCase();
+            if (!emailDestinatario.includes(email)) {
+                mostra = false;
+            }
+        }
+        
+        riga.style.display = mostra ? '' : 'none';
+    });
+    
+    aggiornaContatore();
+}
+
+// Reset filtri
+function resetFiltri() {
+    document.getElementById('filtro-invio').reset();
+    
+    const righe = document.querySelectorAll('#tbody-invii tr');
+    righe.forEach(riga => {
+        riga.style.display = '';
+    });
+    
+    aggiornaContatore();
+}
+
+// Renderizza tabella
+function renderizzaTabella() {
+    const tbody = document.getElementById('tbody-invii');
+    const template = document.getElementById('template-riga');
+    
+    tbody.innerHTML = '';
+    
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedData = inviiData.slice(startIndex, endIndex);
+    
+    paginatedData.forEach(invio => {
+        const riga = template.content.cloneNode(true);
+        const tr = riga.querySelector('tr');
+        
+        // Imposta attributi data per filtri
+        tr.setAttribute('data-stato', invio.stato);
+        tr.setAttribute('data-data-invio', invio.data_invio);
+        tr.setAttribute('data-email', invio.email_destinatario);
+        
+        // Popola contenuto
+        tr.querySelector('.documento-titolo').textContent = invio.documento_title || 'N/A';
+        tr.querySelector('.documento-id').textContent = `ID: ${invio.documento_id}`;
+        tr.querySelector('.utente-nome').textContent = invio.utente_nome || 'N/A';
+        tr.querySelector('.utente-email').textContent = invio.utente_email || 'N/A';
+        tr.querySelector('.email-destinatario').textContent = invio.email_destinatario;
+        
+        // Stato con badge
+        const statoBadge = tr.querySelector('.stato-badge');
+        if (invio.stato === 'success') {
+            statoBadge.className = 'badge bg-success';
+            statoBadge.textContent = '✅ Inviato';
+        } else if (invio.stato === 'errore') {
+            statoBadge.className = 'badge bg-danger';
+            statoBadge.textContent = '❌ Errore';
+        } else {
+            statoBadge.className = 'badge bg-warning';
+            statoBadge.textContent = '🕒 Da Inviare';
+        }
+        
+        // Data formattata
+        tr.querySelector('.data-invio').textContent = invio.data_invio_formatted || 'N/A';
+        
+        // Errore
+        const erroreTesto = tr.querySelector('.errore-testo');
+        if (invio.errore) {
+            erroreTesto.textContent = invio.errore.substring(0, 50) + '...';
+            tr.querySelector('.btn-view-error').style.display = 'inline-block';
+        } else {
+            erroreTesto.textContent = '-';
+        }
+        
+        // Azioni
+        if (invio.stato === 'errore') {
+            tr.querySelector('.btn-reinvio').style.display = 'inline-block';
+        }
+        
+        // Eventi bottoni
+        tr.querySelector('.btn-view-doc').addEventListener('click', () => {
+            window.open(`/admin/document/${invio.documento_id}`, '_blank');
+        });
+        
+        if (invio.errore) {
+            tr.querySelector('.btn-view-error').addEventListener('click', () => {
+                mostraDettagliErrore(invio.errore);
+            });
+        }
+        
+        if (invio.stato === 'errore') {
+            tr.querySelector('.btn-reinvio').addEventListener('click', () => {
+                reinviaEmail(invio.firma_id, invio.documento_id);
+            });
+        }
+        
+        tbody.appendChild(riga);
+    });
+    
+    renderizzaPaginazione();
+}
+
+// Renderizza paginazione
+function renderizzaPaginazione() {
+    const paginazione = document.getElementById('paginazione');
+    const totalPages = Math.ceil(inviiData.length / itemsPerPage);
+    
+    paginazione.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+    
+    // Precedente
+    const liPrev = document.createElement('li');
+    liPrev.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    liPrev.innerHTML = `<a class="page-link" href="#" data-page="${currentPage - 1}">Precedente</a>`;
+    paginazione.appendChild(liPrev);
+    
+    // Pagine
+    for (let i = 1; i <= totalPages; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
+        paginazione.appendChild(li);
+    }
+    
+    // Successivo
+    const liNext = document.createElement('li');
+    liNext.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+    liNext.innerHTML = `<a class="page-link" href="#" data-page="${currentPage + 1}">Successivo</a>`;
+    paginazione.appendChild(liNext);
+    
+    // Eventi paginazione
+    paginazione.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (e.target.classList.contains('page-link')) {
+            const page = parseInt(e.target.getAttribute('data-page'));
+            if (page >= 1 && page <= totalPages) {
+                currentPage = page;
+                renderizzaTabella();
+            }
+        }
+    });
+}
+
+// Aggiorna statistiche
+function aggiornaStatistiche() {
+    const inviati = inviiData.filter(i => i.stato === 'success').length;
+    const errori = inviiData.filter(i => i.stato === 'errore').length;
+    const daInviare = inviiData.filter(i => i.stato === 'da_inviare').length;
+    const destinatariUnici = new Set(inviiData.map(i => i.email_destinatario)).size;
+    
+    document.getElementById('stat-inviati').textContent = inviati;
+    document.getElementById('stat-errori').textContent = errori;
+    document.getElementById('stat-da-inviare').textContent = daInviare;
+    document.getElementById('stat-destinatari').textContent = destinatariUnici;
+}
+
+// Aggiorna contatore
+function aggiornaContatore() {
+    const righeVisibili = document.querySelectorAll('#tbody-invii tr:not([style*="display: none"])').length;
+    document.getElementById('contatore-invii').textContent = righeVisibili;
+}
+
+// Mostra dettagli errore
+function mostraDettagliErrore(errore) {
+    document.getElementById('dettagli-errore').textContent = errore;
+    new bootstrap.Modal(document.getElementById('modalErrore')).show();
+}
+
+// Reinvia email
+async function reinviaEmail(firmaId, documentoId) {
+    if (!confirm('Sei sicuro di voler reinviare questa email?')) return;
+    
+    try {
+        const response = await fetch(`/ceo/documenti/${documentoId}/firma-ceo/${firmaId}/reinvia-email`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        });
+        
+        if (response.ok) {
+            mostraSuccesso('Email reinviata con successo');
+            caricaInvii(); // Ricarica dati
+        } else {
+            mostraErrore('Errore nel reinvio dell\'email');
+        }
+    } catch (error) {
+        console.error('Errore reinvio email:', error);
+        mostraErrore('Errore nel reinvio dell\'email');
+    }
+}
+
+// Setup eventi
+function setupEventi() {
+    // Auto-refresh ogni 30 secondi
+    setInterval(caricaInvii, 30000);
+}
+
+// Utility functions
+function mostraSuccesso(messaggio) {
+    // Implementa notifica successo
+    console.log('Successo:', messaggio);
+}
+
+function mostraErrore(messaggio) {
+    // Implementa notifica errore
+    console.error('Errore:', messaggio);
+}
+</script>
+{% endblock %} 

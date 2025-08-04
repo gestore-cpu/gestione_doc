@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}Dettaglio Documento - CEO{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('ceo.dashboard') }}">Dashboard CEO</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('ceo.documents_list') }}">Documenti</a></li>
+                    <li class="breadcrumb-item active">{{ document.title or document.original_filename }}</li>
+                </ol>
+            </nav>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">📄 {{ document.title or document.original_filename }}</h2>
+                </div>
+                <div class="card-body">
+                    <!-- Stato approvazione -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5>🔄 Stato Approvazione:</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="me-2">Admin:</span>
+                                        {% if document.validazione_admin %}
+                                            <span class="badge bg-success">🟢 Approvato</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">🟡 In attesa</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="me-2">CEO:</span>
+                                        {% if document.validazione_ceo %}
+                                            <span class="badge bg-success">🟢 Approvato</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">🟡 In attesa</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Informazioni documento -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>📋 Informazioni Documento</h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Uploader:</strong></td>
+                                    <td>{{ document.uploader_email }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Azienda:</strong></td>
+                                    <td>{{ document.company.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Reparto:</strong></td>
+                                    <td>{{ document.department.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Data Upload:</strong></td>
+                                    <td>{{ document.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                </tr>
+                                {% if document.description %}
+                                <tr>
+                                    <td><strong>Descrizione:</strong></td>
+                                    <td>{{ document.description }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if document.note %}
+                                <tr>
+                                    <td><strong>Note:</strong></td>
+                                    <td>{{ document.note }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>🔧 Azioni</h5>
+                            
+                            <!-- Pulsante approvazione CEO -->
+                            {% if not document.validazione_ceo and document.validazione_admin %}
+                            <div class="mb-3">
+                                <form method="post" action="{{ url_for('ceo.approva_documento_ceo', doc_id=document.id) }}">
+                                    <button type="submit" class="btn btn-success btn-lg">
+                                        👑 Approva come CEO
+                                    </button>
+                                    <small class="form-text text-muted d-block mt-1">
+                                        Il documento è già stato approvato dall'Admin. Ora puoi approvarlo come CEO.
+                                    </small>
+                                </form>
+                            </div>
+                            {% elif not document.validazione_admin %}
+                            <div class="alert alert-warning">
+                                <h6>⏳ In attesa di approvazione Admin</h6>
+                                <p>Il documento deve essere prima approvato dall'Admin prima che tu possa approvarlo come CEO.</p>
+                            </div>
+                            {% elif document.validazione_ceo %}
+                            <div class="alert alert-success">
+                                <h6>✅ Documento completamente approvato</h6>
+                                <p>Il documento è stato approvato sia dall'Admin che dal CEO ed è ora disponibile per l'uso.</p>
+                            </div>
+                            {% endif %}
+
+                            <!-- Download documento -->
+                            {% if document.validazione_admin and document.validazione_ceo %}
+                            <div class="mb-3">
+                                <a href="{{ url_for('download_file', filename=document.filename) }}" 
+                                   class="btn btn-primary">
+                                    📥 Scarica Documento
+                                </a>
+                            </div>
+                            {% endif %}
+
+                            <!-- Anteprima documento -->
+                            {% if document.filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.pdf')) %}
+                            <div class="mb-3">
+                                <h6>👁️ Anteprima</h6>
+                                {% if document.filename.lower().endswith('.pdf') %}
+                                <embed src="{{ url_for('download_file', filename=document.filename) }}" 
+                                       type="application/pdf" width="100%" height="400px">
+                                {% else %}
+                                <img src="{{ url_for('download_file', filename=document.filename) }}" 
+                                     class="img-fluid" alt="Anteprima documento">
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Cronologia attività -->
+                    {% if document.activity_logs %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h5>📝 Cronologia Attività</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Azione</th>
+                                            <th>Utente</th>
+                                            <th>Note</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for log in document.activity_logs %}
+                                        <tr>
+                                            <td>{{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                                            <td>{{ log.action }}</td>
+                                            <td>{{ log.user.username if log.user else 'Sistema' }}</td>
+                                            <td>{{ log.note or '-' }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

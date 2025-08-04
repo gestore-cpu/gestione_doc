@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}{{ document.title or document.original_filename }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header documento -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>📄 {{ document.title or document.original_filename }}</h2>
+                    <p class="text-muted">
+                        {{ document.company.name }} - {{ document.department.name }}
+                    </p>
+                </div>
+                <div>
+                    {% if document.downloadable %}
+                    <a href="{{ url_for('download_file', filename=document.filename) }}" 
+                       class="btn btn-primary">
+                        📥 Scarica
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informazioni documento -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📋 Informazioni Documento</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Titolo:</strong> {{ document.title or document.original_filename }}</p>
+                                    <p><strong>Descrizione:</strong> {{ document.description or 'N/A' }}</p>
+                                    <p><strong>Note:</strong> {{ document.note or 'N/A' }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Uploader:</strong> {{ document.uploader_email }}</p>
+                                    <p><strong>Data Upload:</strong> {{ document.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                                    <p><strong>Visibilità:</strong> 
+                                        <span class="badge bg-{{ 'success' if document.visibility == 'pubblico' else 'warning' }}">
+                                            {{ document.visibility }}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">✍️ Stato Firma</h5>
+                        </div>
+                        <div class="card-body">
+                            {% set ultima_versione = document.versioni|sort(attribute='data_caricamento', reverse=True)|first %}
+                            {% if ultima_versione %}
+                                <div class="alert alert-info mb-3">
+                                    <h6>📄 Versione Attuale</h6>
+                                    <p class="mb-1"><strong>{{ ultima_versione.numero_versione }}</strong></p>
+                                    <small>Caricata il {{ ultima_versione.data_caricamento.strftime('%d/%m/%Y') }}</small>
+                                </div>
+                            {% endif %}
+                            
+                            {% set user_firma = document.read_logs|selectattr('user_id', 'equalto', current_user.id)|first %}
+                            
+                            {% if not user_firma %}
+                                <!-- Utente non ha ancora firmato -->
+                                <div class="text-center">
+                                    <p class="text-muted mb-3">Non hai ancora firmato questo documento</p>
+                                    <form method="post" action="{{ url_for('docs.firma_documento', doc_id=document.id) }}">
+                                        <button type="submit" class="btn btn-success">
+                                            ✍️ Firma Documento
+                                        </button>
+                                    </form>
+                                    <small class="text-muted d-block mt-2">
+                                        La firma richiederà conferma via email
+                                    </small>
+                                </div>
+                            {% elif not user_firma.confermata %}
+                                <!-- Firma in attesa di conferma -->
+                                <div class="text-center">
+                                    <div class="alert alert-warning">
+                                        <h6>⏳ Firma in Attesa di Conferma</h6>
+                                        <p class="mb-2">Hai firmato il {{ user_firma.timestamp.strftime('%d/%m/%Y alle %H:%M') }}</p>
+                                        <small>Controlla la tua email per confermare la firma</small>
+                                    </div>
+                                    
+                                    <form method="post" action="{{ url_for('docs.riinvio_conferma_firma', doc_id=document.id) }}">
+                                        <button type="submit" class="btn btn-warning btn-sm">
+                                            📧 Rinvio Email Conferma
+                                        </button>
+                                    </form>
+                                    
+                                    {% if current_user.email.endswith('@pec.it') %}
+                                    <div class="mt-2">
+                                        <small class="text-info">
+                                            📧 Email PEC: {{ current_user.email }}
+                                        </small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <!-- Firma confermata -->
+                                <div class="text-center">
+                                    <div class="alert alert-success">
+                                        <h6>✅ Firma Confermata</h6>
+                                        <p class="mb-1">Firmato il {{ user_firma.timestamp.strftime('%d/%m/%Y alle %H:%M') }}</p>
+                                        <p class="mb-0">Confermato il {{ user_firma.data_conferma.strftime('%d/%m/%Y alle %H:%M') }}</p>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Approvazioni -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">✅ Stato Approvazioni</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Admin</h6>
+                                    {% if document.validazione_admin %}
+                                        <span class="badge bg-success">✅ Approvato</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">⏳ In Attesa</span>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>CEO</h6>
+                                    {% if document.validazione_ceo %}
+                                        <span class="badge bg-success">✅ Approvato</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">⏳ In Attesa</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Altre firme (se admin) -->
+            {% if current_user.is_admin %}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">👥 Altre Firme</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if document.read_logs %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Utente</th>
+                                            <th>Data Firma</th>
+                                            <th>Stato</th>
+                                            <th>Data Conferma</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for firma in document.read_logs %}
+                                        <tr>
+                                            <td>{{ firma.user.username }}</td>
+                                            <td>{{ firma.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                                            <td>
+                                                {% if firma.confermata %}
+                                                    <span class="badge bg-success">✅ Confermata</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">⏳ In Attesa</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if firma.data_conferma %}
+                                                    {{ firma.data_conferma.strftime('%d/%m/%Y %H:%M') }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">Nessuna firma registrata per questo documento.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Versioni del documento -->
+    {% if document.versioni %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📄 Versioni del Documento</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Versione</th>
+                                    <th>Data Caricamento</th>
+                                    <th>Note</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for versione in document.versioni|sort(attribute='data_caricamento', reverse=True) %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if versione.is_latest else 'secondary' }}">
+                                            {{ versione.numero_versione }}
+                                            {% if versione.is_latest %}(Attuale){% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ versione.data_caricamento.strftime('%d/%m/%Y %H:%M') }}</small>
+                                    </td>
+                                    <td>
+                                        {% if versione.note %}
+                                            <small>{{ versione.note[:50] }}{% if versione.note|length > 50 %}...{% endif %}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('docs.download_versione', version_id=versione.id) }}" 
+                                           class="btn btn-sm btn-primary">
+                                            📥 Scarica
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

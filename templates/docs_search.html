@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Ricerca Semantica Documenti - Gestione Documenti</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-12">
+      <!-- Header -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+          <i class="fas fa-search text-primary"></i> 
+          Ricerca Semantica Documenti
+        </h2>
+        <a href="{{ url_for('docs.docs_dashboard') }}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+        </a>
+      </div>
+
+      <!-- Form di ricerca -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i class="fas fa-brain"></i> 
+            Ricerca AI Semantica
+          </h5>
+        </div>
+        <div class="card-body">
+          <form method="GET" action="{{ url_for('docs.ricerca_semantica') }}" class="row g-3">
+            <div class="col-md-6">
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="fas fa-search"></i>
+                </span>
+                <input type="text" 
+                       name="query" 
+                       class="form-control form-control-lg" 
+                       placeholder="Es. manuale sicurezza alimentare, verbali danni muletti, documenti GDPR..."
+                       value="{{ query or '' }}"
+                       required>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <select name="modulo" class="form-select form-select-lg">
+                <option value="">📂 Tutti i moduli</option>
+                <option value="qms" {% if request.args.get('modulo') == 'qms' %}selected{% endif %}>
+                  📋 QMS
+                </option>
+                <option value="service" {% if request.args.get('modulo') == 'service' %}selected{% endif %}>
+                  🔧 Service
+                </option>
+                <option value="elevate" {% if request.args.get('modulo') == 'elevate' %}selected{% endif %}>
+                  📈 Elevate
+                </option>
+                <option value="acquisti" {% if request.args.get('modulo') == 'acquisti' %}selected{% endif %}>
+                  🛒 Acquisti
+                </option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <button type="submit" class="btn btn-primary btn-lg w-100">
+                <i class="fas fa-search"></i> 🔍 Cerca
+              </button>
+            </div>
+          </form>
+          
+          <!-- Esempi di ricerca -->
+          <div class="mt-3">
+            <small class="text-muted">
+              <strong>Esempi di ricerca:</strong><br>
+              • "Documenti che parlano di sicurezza alimentare"<br>
+              • "Manuale che spiega la tracciabilità dei prodotti"<br>
+              • "Verbali di danni a muletti"<br>
+              • "Documenti correlati al GDPR"
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risultati della ricerca -->
+      {% if query %}
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="fas fa-list"></i> 
+              Risultati per "{{ query }}"
+            </h5>
+            <span class="badge bg-primary">{{ risultati|length }} risultati</span>
+          </div>
+          <div class="card-body">
+            {% if risultati %}
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead class="table-light">
+                    <tr>
+                      <th>📄 Documento</th>
+                      <th>🏷️ Categoria</th>
+                      <th>📊 Rilevanza</th>
+                      <th>📅 Data</th>
+                      <th>👤 Uploader</th>
+                      <th>📥 Azioni</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for doc, score in risultati %}
+                      <tr>
+                        <td>
+                          <strong>{{ doc.title or doc.filename }}</strong>
+                          <br><small class="text-muted">{{ doc.filename }}</small>
+                          {% if doc.description %}
+                            <br><small class="text-muted">{{ doc.description[:100] }}{% if doc.description|length > 100 %}...{% endif %}</small>
+                          {% endif %}
+                          {% if doc.collegato_a_modulo %}
+                            <br><span class="badge bg-primary">{{ doc.collegato_a_modulo.upper() }}</span>
+                          {% endif %}
+                        </td>
+                        <td>
+                          {% if doc.categoria_ai %}
+                            <span class="badge bg-info">{{ doc.categoria_ai }}</span>
+                          {% endif %}
+                          {% if doc.tag %}
+                            <br><span class="badge bg-secondary">{{ doc.tag }}</span>
+                          {% endif %}
+                        </td>
+                        <td>
+                          <div class="d-flex align-items-center">
+                            <div class="progress me-2" style="width: 60px; height: 8px;">
+                              <div class="progress-bar bg-success" 
+                                   style="width: {{ (score * 100)|round }}%"></div>
+                            </div>
+                            <small class="text-muted">{{ "%.1f"|format(score * 100) }}%</small>
+                          </div>
+                        </td>
+                        <td>
+                          {{ doc.created_at.strftime('%d/%m/%Y') if doc.created_at else '-' }}
+                          <br><small class="text-muted">{{ doc.created_at.strftime('%H:%M') if doc.created_at else '' }}</small>
+                        </td>
+                        <td>
+                          <small class="text-muted">{{ doc.uploader_email }}</small>
+                        </td>
+                        <td>
+                          <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('docs.download_document', doc_id=doc.id) }}" 
+                               class="btn btn-outline-success" title="Download">
+                              <i class="fas fa-download"></i>
+                            </a>
+                            <a href="{{ url_for('admin.view_document', document_id=doc.id) }}" 
+                               class="btn btn-outline-primary" title="Visualizza">
+                              <i class="fas fa-eye"></i>
+                            </a>
+                            <button class="btn btn-outline-info" 
+                                    onclick="showDocumentPreview({{ doc.id }})" 
+                                    title="Anteprima">
+                              <i class="fas fa-search-plus"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="text-center py-4">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nessun risultato trovato</h5>
+                <p class="text-muted">
+                  Prova a modificare i termini di ricerca o utilizzare parole chiave diverse.
+                </p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Statistiche ricerca -->
+        {% if risultati %}
+          <div class="row mt-4">
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header">
+                  <h6 class="mb-0">
+                    <i class="fas fa-chart-pie"></i> 
+                    Distribuzione per Categoria
+                  </h6>
+                </div>
+                <div class="card-body">
+                  <div class="row">
+                    {% set categorie = {} %}
+                    {% for doc, score in risultati %}
+                      {% set _ = categorie.update({doc.categoria_ai or 'Non Specificato': categorie.get(doc.categoria_ai or 'Non Specificato', 0) + 1}) %}
+                    {% endfor %}
+                    {% for categoria, count in categorie.items() %}
+                      <div class="col-6 mb-2">
+                        <div class="d-flex justify-content-between">
+                          <span>{{ categoria }}</span>
+                          <span class="badge bg-primary">{{ count }}</span>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header">
+                  <h6 class="mb-0">
+                    <i class="fas fa-chart-bar"></i> 
+                    Rilevanza Media
+                  </h6>
+                </div>
+                <div class="card-body">
+                  {% set avg_score = (risultati|map(attribute=1)|sum / risultati|length * 100)|round(1) %}
+                  <div class="text-center">
+                    <h3 class="text-primary">{{ avg_score }}%</h3>
+                    <small class="text-muted">Rilevanza media dei risultati</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+
+      <!-- Informazioni sulla ricerca semantica -->
+      <div class="card mt-4">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i class="fas fa-info-circle"></i> 
+            Come funziona la ricerca semantica
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h6>🤖 AI Semantica</h6>
+              <p class="small text-muted">
+                L'AI analizza il contenuto dei documenti e trova corrispondenze semantiche, 
+                non solo per parole esatte ma anche per significato.
+              </p>
+            </div>
+            <div class="col-md-6">
+              <h6>📊 Score di Rilevanza</h6>
+              <p class="small text-muted">
+                Ogni risultato ha un punteggio di rilevanza (0-100%) che indica 
+                quanto il documento è correlato alla tua ricerca.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal anteprima documento -->
+<div class="modal fade" id="documentPreviewModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Anteprima Documento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="documentPreviewBody">
+        <!-- Contenuto dinamico -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+        <button type="button" class="btn btn-primary" id="downloadPreviewBtn">
+          <i class="fas fa-download"></i> Download
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+function showDocumentPreview(docId) {
+  // Implementazione per mostrare anteprima documento
+  document.getElementById('documentPreviewBody').innerHTML = `
+    <div class="text-center">
+      <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
+      <p class="mt-2">Caricamento anteprima...</p>
+    </div>
+  `;
+  
+  // Aggiorna il pulsante download
+  document.getElementById('downloadPreviewBtn').onclick = function() {
+    window.open(`/docs/download/${docId}`, '_blank');
+  };
+  
+  new bootstrap.Modal(document.getElementById('documentPreviewModal')).show();
+}
+
+// Focus automatico sul campo di ricerca
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.querySelector('input[name="query"]');
+  if (searchInput && !searchInput.value) {
+    searchInput.focus();
+  }
+});
+</script>
+
+</body>
+</html> 

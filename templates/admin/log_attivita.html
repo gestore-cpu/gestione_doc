@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Storico Attività Documenti</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <style>
+    body {
+      background-image: url("{{ url_for('static', filename='img/sfondo.png') }}");
+      background-size: cover;
+      background-attachment: fixed;
+      color: #fff;
+    }
+    .container {
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 2rem;
+      margin-top: 2rem;
+      border-radius: 15px;
+    }
+    table {
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <img src="{{ url_for('static', filename='logonew.png') }}" alt="Logo Mercury" style="height: 60px;">
+      <div>
+        <h2 class="text-center">🕵️‍♂️ Storico Attività Documenti</h2>
+        <p class="text-center">Solo per amministratori</p>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <input type="text" id="searchInput" class="form-control" placeholder="🔎 Cerca... (utente, documento, azione)">
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-bordered table-striped table-hover" id="logTable">
+        <thead class="table-dark">
+          <tr>
+            <th>🗓️ Data</th>
+            <th>📄 Documento</th>
+            <th>👤 Utente</th>
+            <th>⚙️ Azione</th>
+            <th>📝 Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td>{{ log.timestamp.strftime("%d/%m/%Y %H:%M") }}</td>
+            <td>{{ log.document.filename }}</td>
+            <td>{{ log.user.username }}</td>
+            <td>{{ log.action }}</td>
+            <td>{{ log.note or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const input = document.getElementById("searchInput");
+    input.addEventListener("keyup", function () {
+      const filter = input.value.toLowerCase();
+      const rows = document.querySelectorAll("#logTable tbody tr");
+      rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(filter) ? "" : "none";
+      });
+    });
+  </script>
+</body>
+</html> 

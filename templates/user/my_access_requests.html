@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container bg-white shadow rounded p-4">
+  <h2>📨 Le mie Richieste di Accesso</h2>
+  
+  {% if requests %}
+  <table class="table table-bordered table-hover mt-3">
+    <thead class="table-light">
+      <tr>
+        <th>Documento</th>
+        <th>Nota</th>
+        <th>Data Richiesta</th>
+        <th>Stato</th>
+        <th>Data Risposta</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for req in requests %}
+      <tr>
+        <td>
+          <strong>{{ req.document.title or req.document.original_filename }}</strong><br>
+          <small class="text-muted">{{ req.document.company.name if req.document.company else 'N/A' }} - {{ req.document.department.name if req.document.department else 'N/A' }}</small>
+        </td>
+        <td>
+          {% if req.note %}
+            {{ req.note }}
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+        <td>{{ req.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td>
+          {% if req.status == "pending" %}
+            <span class="badge bg-secondary">In attesa</span>
+          {% elif req.status == "approved" %}
+            <span class="badge bg-success">Approvata</span>
+          {% elif req.status == "denied" %}
+            <span class="badge bg-danger">Rifiutata</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">{{ req.status.capitalize() }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if req.resolved_at %}
+            {{ req.resolved_at.strftime('%d/%m/%Y %H:%M') }}
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="text-center py-5">
+    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+    <h4 class="text-muted">Nessuna richiesta di accesso</h4>
+    <p class="text-muted">Non hai ancora inviato richieste di accesso ai documenti.</p>
+  </div>
+  {% endif %}
+  
+  <div class="mt-4">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+      <i class="fas fa-arrow-left"></i> Torna alla Home
+    </a>
+  </div>
+</div>
+{% endblock %} 

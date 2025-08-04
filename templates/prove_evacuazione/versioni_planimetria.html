@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <h2>📋 Versioni Planimetrie - {{ prova.luogo }}</h2>
+            <p class="text-muted">Storico delle planimetrie caricate per questa prova di evacuazione</p>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>📊 Informazioni Prova</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>📅 Data:</strong> {{ prova.data.strftime('%d/%m/%Y') }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>🏢 Luogo:</strong> {{ prova.luogo }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>👤 Responsabile:</strong> {{ prova.responsabile }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>📝 Versioni:</strong> {{ prova.versioni_planimetrie|length }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if prova.versioni_planimetrie %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>📅 Data Upload</th>
+                            <th>👤 Caricato da</th>
+                            <th>📄 File</th>
+                            <th>📝 Note</th>
+                            <th>🔗 Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for versione in prova.versioni_planimetrie|sort(attribute='uploaded_at', reverse=true) %}
+                        <tr>
+                            <td>{{ versione.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ versione.uploaded_by }}</td>
+                            <td>
+                                <span class="badge bg-primary">{{ versione.filename.split('.')[-1].upper() }}</span>
+                                {{ versione.filename }}
+                            </td>
+                            <td>{{ versione.note or '—' }}</td>
+                            <td>
+                                <a href="{{ url_for('prove_evacuazione.download_file_prova', prova_id=prova.id, tipo='planimetria', filename=versione.filename) }}" 
+                                   class="btn btn-sm btn-outline-primary" target="_blank">
+                                    📥 Scarica
+                                </a>
+                                {% if versione.filename == prova.planimetria_filename %}
+                                <span class="badge bg-success ms-2">✅ Attuale</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <h5>📋 Nessuna versione planimetria</h5>
+                <p>Non sono state caricate versioni di planimetrie per questa prova.</p>
+            </div>
+            {% endif %}
+            
+            <div class="d-flex gap-2 mt-4">
+                <a href="{{ url_for('prove_evacuazione.modifica_prova_evacuazione', id=prova.id) }}" class="btn btn-primary">
+                    ✏️ Modifica Prova
+                </a>
+                <a href="{{ url_for('prove_evacuazione.dettaglio_prova_evacuazione', id=prova.id) }}" class="btn btn-outline-info">
+                    👁️ Dettagli Prova
+                </a>
+                <a href="{{ url_for('prove_evacuazione.lista_prove_evacuazione') }}" class="btn btn-secondary">
+                    📋 Lista Prove
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard CEO{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">👑 Dashboard CEO</h1>
+            
+            <!-- Statistiche generali -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">📊 Documenti Totali</h5>
+                            <h2 class="card-text">{{ total_docs }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">✅ Documenti Approvati</h5>
+                            <h2 class="card-text">{{ approved_docs }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <h5 class="card-title">⏳ In Attesa di Approvazione</h5>
+                            <h2 class="card-text">{{ pending_docs|length }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Documenti in attesa di approvazione CEO -->
+            {% if pending_docs %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Documenti in Attesa di Approvazione CEO</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Titolo</th>
+                                    <th>Uploader</th>
+                                    <th>Azienda</th>
+                                    <th>Reparto</th>
+                                    <th>Data Upload</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in pending_docs %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ doc.title or doc.original_filename }}</strong>
+                                        {% if doc.description %}
+                                        <br><small class="text-muted">{{ doc.description[:50] }}...</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ doc.uploader_email }}</td>
+                                    <td>{{ doc.company.name }}</td>
+                                    <td>{{ doc.department.name }}</td>
+                                    <td>{{ doc.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        <a href="{{ url_for('ceo.document_detail', doc_id=doc.id) }}" 
+                                           class="btn btn-sm btn-info">
+                                            👁️ Visualizza
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <h5>🎉 Nessun documento in attesa di approvazione!</h5>
+                <p>Tutti i documenti approvati dall'Admin sono stati già approvati dal CEO.</p>
+            </div>
+            {% endif %}
+
+            <!-- Link rapidi -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">📄 Gestione Documenti</h5>
+                            <p class="card-text">Visualizza e gestisci tutti i documenti del sistema.</p>
+                            <a href="{{ url_for('ceo.documents_list') }}" class="btn btn-primary">
+                                Vai ai Documenti
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">📊 Report e Statistiche</h5>
+                            <p class="card-text">Analizza le performance e le statistiche per reparto.</p>
+                            <a href="{{ url_for('ceo.reports') }}" class="btn btn-success">
+                                Visualizza Report
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gestione Guest | Mercury Surgelati</title>
+
+  <!-- Font Poppins -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+  <!-- CSS personalizzato -->
+  <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet" />
+
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: url('{{ url_for("static", filename="img/sfondo.png") }}') no-repeat center center fixed;
+      background-size: cover;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      padding: 2rem 1rem;
+      text-align: center;
+      color: #004aad;
+      background-color: rgba(255, 255, 255, 0.85);
+      margin-bottom: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 0.1);
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    header img.logo {
+      height: 80px;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    p.description {
+      font-weight: 400;
+      font-size: 1rem;
+      color: #666;
+    }
+    .container {
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 0 1rem 2rem;
+      background-color: rgba(255, 255, 255, 0.92);
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgb(0 0 0 / 0.1);
+    }
+    table.table {
+      font-size: 1rem;
+      width: 100%;
+    }
+    table.table th, table.table td {
+      padding: 0.7rem 0.8rem;
+    }
+    .bg-overlay { display: none; }
+    header, .container { position: relative; z-index: 1; }
+  </style>
+</head>
+<body>
+  <div class="bg-overlay"></div>
+
+<header>
+  <img src="{{ url_for('static', filename='logonew.png') }}" alt="Logo Mercury" class="logo">
+  <h1>Gestione Utenti Guest</h1>
+  <p class="description">Gestisci l’accesso, la scadenza e i permessi degli utenti guest</p>
+</header>
+
+<div class="container">
+  <!-- Contenuto pagina, tabella, bottoni ecc -->
+  <div class="mb-4 d-flex justify-content-between align-items-center">
+    <h2>Lista Guest Registrati</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGuestModal">➕ Nuovo Guest</button>
+  </div>
+
+  <table class="table table-striped table-bordered align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Nome</th>
+        <th>Cognome</th>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Scadenza Accesso</th>
+        <th>Autorizzato al Download</th>
+        <th>File Associati</th>
+        <th>Azioni</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for guest in guests %}
+      <tr>
+        <td>{{ guest.nome or '-' }}</td>
+        <td>{{ guest.cognome or '-' }}</td>
+        <td>{{ guest.username }}</td>
+        <td>{{ guest.email }}</td>
+        <td>{{ guest.access_expiration.strftime('%Y-%m-%d') if guest.access_expiration else '-' }}</td>
+        <td>{% if guest.can_download %}Sì{% else %}No{% endif %}</td>
+        <td>
+          {% if guest.documents %}
+            {% for doc in guest.documents %}
+              <span class="badge bg-info text-dark">{{ doc.title }}</span>
+            {% endfor %}
+          {% else %}
+            <em>Nessun file</em>
+          {% endif %}
+        </td>
+        <td>
+          <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editGuestModal{{ guest.id }}">✏️ Modifica</button>
+          <form method="POST" action="{{ url_for('admin.delete_user', user_id=guest.id) }}" class="d-inline" onsubmit="return confirm('Sei sicuro di voler eliminare questo guest?');">
+            <button type="submit" class="btn btn-sm btn-outline-danger">🗑️ Elimina</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Modal Creazione Guest -->
+  <div class="modal fade" id="createGuestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form method="POST" action="{{ url_for('admin.create_guest') }}">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title">Nuovo Utente Guest</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label>Nome</label>
+              <input type="text" name="nome" class="form-control" required />
+            </div>
+            <div class="mb-3">
+              <label>Cognome</label>
+              <input type="text" name="cognome" class="form-control" required />
+            </div>
+            <div class="mb-3">
+              <label>Username</label>
+              <input type="text" name="username" class="form-control" required minlength="3" pattern="^[a-zA-Z0-9_.-]+$" />
+            </div>
+            <div class="mb-3">
+              <label>Email</label>
+              <input type="email" name="email" class="form-control" required />
+            </div>
+            <div class="mb-3">
+              <label>Data di Scadenza Accesso</label>
+              <input type="date" name="access_expiration" class="form-control" />
+            </div>
+            <div class="form-check mb-3">
+              <input type="checkbox" name="can_download" class="form-check-input" id="canDownloadCreate" />
+              <label class="form-check-label" for="canDownloadCreate">Autorizzato al Download</label>
+            </div>
+            <div class="mb-3">
+              <label>Password provvisoria</label>
+              <input type="password" name="password" class="form-control" required minlength="8" />
+              <small class="form-text text-muted">La password provvisoria sarà inviata via email.</small>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-success">💾 Crea Guest</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modali Modifica Guest -->
+  {% for guest in guests %}
+  <div class="modal fade" id="editGuestModal{{ guest.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <form method="POST" action="{{ url_for('admin.update_user', user_id=guest.id) }}">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title">Modifica Utente Guest: {{ guest.username }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label>Nome</label>
+              <input type="text" name="nome" class="form-control" value="{{ guest.nome or '' }}">
+            </div>
+            <div class="mb-3">
+              <label>Cognome</label>
+              <input type="text" name="cognome" class="form-control" value="{{ guest.cognome or '' }}">
+            </div>
+            <div class="mb-3">
+              <label>Username</label>
+              <input type="text" name="username" class="form-control" value="{{ guest.username }}" required />
+            </div>
+            <div class="mb-3">
+              <label>Email</label>
+              <input type="email" name="email" class="form-control" value="{{ guest.email }}" required />
+            </div>
+            <div class="mb-3">
+              <label>Data di Scadenza Accesso</label>
+              <input type="date" name="access_expiration" class="form-control" value="{{ guest.access_expiration.strftime('%Y-%m-%d') if guest.access_expiration else '' }}" />
+            </div>
+            <div class="form-check mb-3">
+              <input type="checkbox" name="can_download" class="form-check-input" {% if guest.can_download %}checked{% endif %} />
+              <label class="form-check-label">Autorizzato al Download</label>
+            </div>
+            <label class="mb-2">Documenti Visibili</label>
+            <table class="table table-sm">
+              <thead>
+                <tr><th>📄 Nome</th><th>Azienda</th><th>Reparto</th><th>Revoca</th></tr>
+              </thead>
+              <tbody>
+                {% for doc in guest.documents %}
+                <tr>
+                  <td>{{ doc.title }}</td>
+                  <td>{{ doc.company.name }}</td>
+                  <td>{{ doc.department.name }}</td>
+                  <td><input type="checkbox" name="revoke_docs" value="{{ doc.id }}" /></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-success">💾 Salva</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
+

@@ -1,0 +1,69 @@
+{
+  "info": {
+    "_postman_id": "b1e1c1e0-1234-4a56-9abc-abcdef123456",
+    "name": "Notifiche CEO Bulk",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Segna notifiche come lette",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"mark_read\",\n  \"ids\": [1, 2, 3]\n}"
+        },
+        "url": {
+          "raw": "https://docs.mercurysurgelati.org/ceo/notifiche/bulk",
+          "protocol": "https",
+          "host": ["docs", "mercurysurgelati", "org"],
+          "path": ["ceo", "notifiche", "bulk"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Elimina notifiche",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"delete\",\n  \"ids\": [4, 5]\n}"
+        },
+        "url": {
+          "raw": "https://docs.mercurysurgelati.org/ceo/notifiche/bulk",
+          "protocol": "https",
+          "host": ["docs", "mercurysurgelati", "org"],
+          "path": ["ceo", "notifiche", "bulk"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Blocca tipo notifica (block_type)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"block_type\",\n  \"tipo\": \"lean_warning\"\n}"
+        },
+        "url": {
+          "raw": "https://docs.mercurysurgelati.org/ceo/notifiche/bulk",
+          "protocol": "https",
+          "host": ["docs", "mercurysurgelati", "org"],
+          "path": ["ceo", "notifiche", "bulk"]
+        }
+      },
+      "response": []
+    }
+  ]
+} 

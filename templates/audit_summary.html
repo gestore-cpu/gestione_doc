@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}🕵️ Riepilogo Audit - {{ document.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-search"></i> 🕵️ Riepilogo Audit</h1>
+                <a href="{{ url_for('admin.view_document', id=document.id) }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Torna al Documento
+                </a>
+            </div>
+            
+            <!-- Informazioni Documento -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📄 Informazioni Documento</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Nome:</strong> {{ document.name }}</p>
+                            <p><strong>Azienda:</strong> {{ document.company.name if document.company else 'N/A' }}</p>
+                            <p><strong>Reparto:</strong> {{ document.department.name if document.department else 'N/A' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Data creazione:</strong> {{ document.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                            <p><strong>Uploader:</strong> {{ document.uploader_email }}</p>
+                            <p><strong>Stato:</strong> 
+                                <span class="badge bg-{{ 'success' if document.archiviato else 'primary' }}">
+                                    {{ 'Archiviato' if document.archiviato else 'Attivo' }}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Statistiche Audit -->
+            {% if summary %}
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ summary.total_events }}</h3>
+                            <p class="mb-0">📊 Eventi Totali</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ summary.downloads }}</h3>
+                            <p class="mb-0">📥 Download</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ summary.approvals }}</h3>
+                            <p class="mb-0">✅ Approvazioni</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ summary.denied_access }}</h3>
+                            <p class="mb-0">🚫 Accessi Negati</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Dettagli Statistiche -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">📈 Statistiche Dettagliate</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li><strong>Upload:</strong> {{ summary.uploads }}</li>
+                                <li><strong>Firme:</strong> {{ summary.signatures }}</li>
+                                <li><strong>Eventi AI:</strong> {{ summary.ai_events }}</li>
+                                <li><strong>Utenti unici:</strong> {{ summary.unique_users }}</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">⏰ Ultima Attività</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if summary.last_activity %}
+                                <p class="mb-0">{{ summary.last_activity.strftime('%d/%m/%Y %H:%M') }}</p>
+                            {% else %}
+                                <p class="text-muted mb-0">Nessuna attività registrata</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Log di Audit -->
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> 📋 Log di Audit Completo
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if document.audit_logs %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Utente</th>
+                                    <th>Evento</th>
+                                    <th>Note AI</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in document.audit_logs %}
+                                <tr>
+                                    <td>{{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        {% if log.user %}
+                                            <span class="badge bg-primary">{{ log.user.email }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Sistema</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ log.evento }}</td>
+                                    <td>
+                                        {% if log.note_ai %}
+                                            <small class="text-muted">{{ log.note_ai }}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-info-circle text-info" style="font-size: 3rem;"></i>
+                        <h4 class="mt-3 text-info">📝 Nessun evento di audit</h4>
+                        <p class="text-muted">Non sono stati registrati eventi di audit per questo documento.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Azioni -->
+            {% if document.audit_logs %}
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-download"></i> 📥 Esportazione
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('docs.export_audit_csv', id=document.id) }}" 
+                           class="btn btn-outline-success">
+                            <i class="fas fa-file-csv"></i> 📊 Export CSV
+                        </a>
+                        <a href="{{ url_for('docs.export_audit_pdf', id=document.id) }}" 
+                           class="btn btn-outline-danger">
+                            <i class="fas fa-file-pdf"></i> 📄 Export PDF
+                        </a>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                        I file esportati contengono tutti gli eventi di audit del documento.
+                    </small>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

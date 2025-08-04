@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2>Modifica Azienda</h2>
+  <form method="POST" action="{{ url_for('company.edit_company', company_id=company.id) }}">
+    <div class="mb-3">
+      <label for="name" class="form-label">Nome Azienda</label>
+      <input type="text" class="form-control" id="name" name="name" value="{{ company.name }}" required>
+    </div>
+    <div class="mb-3">
+      <label for="description" class="form-label">Descrizione (opzionale)</label>
+      <textarea class="form-control" id="description" name="description" rows="3">{{ company.description }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-success">Aggiorna</button>
+    <a href="{{ url_for('company.list_companies') }}" class="btn btn-secondary ms-2">Annulla</a>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}📖 Dashboard Letture Documenti{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-book-open"></i> 📖 Dashboard Letture Documenti</h1>
+                <div>
+                    <a href="{{ url_for('ceo.dashboard') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Statistiche generali -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-file-alt"></i> Documenti Totali
+                            </h5>
+                            <h3>{{ docs|length }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-eye"></i> Letture Totali
+                            </h5>
+                            <h3>{{ docs|sum(attribute='stats.total_reads') }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-users"></i> Utenti Attivi
+                            </h5>
+                            <h3>{{ docs|sum(attribute='stats.unique_readers') }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-star"></i> Prime Letture
+                            </h5>
+                            <h3>{{ docs|sum(attribute='stats.first_reads') }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabella documenti -->
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-table"></i> Dettaglio Letture per Documento</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Documento</th>
+                                    <th>Letture Totali</th>
+                                    <th>Utenti Unici</th>
+                                    <th>Prime Letture</th>
+                                    <th>Riletture</th>
+                                    <th>Ultima Lettura</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in docs %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.document.title }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ item.document.uploader_email }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ item.stats.total_reads }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ item.stats.unique_readers }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">{{ item.stats.first_reads }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-warning">{{ item.stats.re_reads }}</span>
+                                    </td>
+                                    <td>
+                                        {% if item.document.read_logs %}
+                                            {% set last_read = item.document.read_logs|sort(attribute='timestamp', reverse=true)|first %}
+                                            <small>{{ last_read.timestamp.strftime('%d/%m/%Y %H:%M') }}</small>
+                                        {% else %}
+                                            <span class="text-muted">Nessuna lettura</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('docs.visualizza_documento', id=item.document.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> Visualizza
+                                        </a>
+                                        <a href="{{ url_for('docs.export_read_tracking_csv', id=item.document.id) }}" 
+                                           class="btn btn-sm btn-outline-success">
+                                            <i class="fas fa-download"></i> Export
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Documenti non letti -->
+            <div class="card mt-4">
+                <div class="card-header bg-warning text-white">
+                    <h5><i class="fas fa-exclamation-triangle"></i> Documenti Critici Non Letti</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Documento</th>
+                                    <th>Tipo</th>
+                                    <th>Data Creazione</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in docs %}
+                                    {% if item.stats.total_reads == 0 and item.document.is_critical %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ item.document.title }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ item.document.uploader_email }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger">Critico</span>
+                                        </td>
+                                        <td>
+                                            <small>{{ item.document.created_at.strftime('%d/%m/%Y') }}</small>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('docs.visualizza_documento', id=item.document.id) }}" 
+                                               class="btn btn-sm btn-warning">
+                                                <i class="fas fa-eye"></i> Leggi Ora
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

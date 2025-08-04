@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Admin{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f8f9fa;
+    }
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: 200px;
+      background-color: white;
+      padding-top: 30px;
+      border-right: 1px solid #ddd;
+    }
+    .sidebar button {
+      display: block;
+      width: 100%;
+      margin-bottom: 12px !important;
+      padding: 12px !important;
+      background-color: #e7f1ff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      color: #003366;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .sidebar-btn {
+      display: block;
+      width: 100%;
+      margin-bottom: 12px !important;
+      padding: 12px !important;
+      background-color: #e7f1ff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      color: #003366;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .sidebar button:hover {
+      background-color: #d0e4ff;
+    }
+    .sidebar-btn:hover {
+      background-color: #d0e4ff;
+    }
+    .main-content {
+      margin-left: 200px;
+      padding: 20px;
+    }
+    .logo {
+      display: block;
+      margin: 0 auto 20px auto;
+      max-width: 120px;
+    }
+  </style>
+</head>
+<body data-user-role="{{ current_user.role if current_user else 'USER' }}">
+
+  <div class="sidebar">
+    <img src="/static/logonew.png" class="logo" alt="Logo Mercury">
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.admin_dashboard') }}'">📊 Dashboard</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.user_management') }}'">👥 Gestione Utenti</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.guest_management') }}'">🙋‍♂️ Guest Access</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.company_management') }}'">🏢 Aziende</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.department_management') }}'">🏭 Reparti</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('upload.upload_to_drive') }}'">⬆️ Upload Documenti</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('welcome.download_page') }}'">⬇️ Download Documenti</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.admin_stats') }}'">📊 Statistiche</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.file_structure') }}'">🗂️ File Structure</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.ai_list_tasks') }}'">🤖 Task AI</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.audit_logs') }}'">📋 Audit Log</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.firme_documenti') }}'">🖋️ Log Firme</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.approval_stats') }}'">📊 Statistiche Approvazioni</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.approval_history') }}'">📋 Storico Approvazioni</button>
+    <button class="sidebar-btn" onclick="setJackEvento('apertura_docs'); location.href='{{ url_for('admin.doc_overview') }}'">📊 Panoramica Documentale</button>
+    <button class="sidebar-btn" onclick="setJackEvento('apertura_obeya'); location.href='{{ url_for('admin.obeya_map') }}'">🗺️ Mappa Obeya</button>
+    <button class="sidebar-btn" onclick="setJackEvento('apertura_kpi'); location.href='{{ url_for('admin.docs_kpi_dashboard') }}'">📈 KPI AI Documentali</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.docs_scadenziario') }}'">📅 Scadenziario</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('docs.registro_audit') }}'">📋 Registro Audit</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.calendar_instructions') }}'">📅 Calendario ICS</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.docs_abbandonati') }}'">🚨 Documenti Abbandonati</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.docs_help') }}'">📚 Guida DOCS</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.docs_screenshot_demo') }}'">📸 Screenshot Demo</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('visite_mediche.lista_visite') }}'">🩺 Visite Mediche</button>
+            <button class="sidebar-btn" onclick="location.href='{{ url_for('reminder.dashboard_reminder') }}'">🗓️ Reminder & Scadenze</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('firme_manuali.upload_firma_manuale') }}'">📝 Firme Manuali</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('prove_evacuazione.lista_prove_evacuazione') }}'">🧯 Prove Evacuazione</button>
+  </div>
+
+              <div class="main-content">
+              <!-- Area messaggi automatici Jack Synthia -->
+              <div id="jack-message-area" class="mb-3"></div>
+              
+              <!-- Componente Jack Synthia -->
+              {% include 'components/synthia_message.html' %}
+
+              {% block content %}{% endblock %}
+            </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Onboarding AI Interattivo - Jack Synthia -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/onboarding_jack.css') }}">
+  <script src="{{ url_for('static', filename='js/onboarding_jack.js') }}"></script>
+  
+  <!-- Tooltip Permanenti - Jack Synthia -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/jack_tooltips.css') }}">
+  <script src="{{ url_for('static', filename='js/jack_tooltips.js') }}"></script>
+  
+  <!-- Integrazione Jack Synthia - Tutti i Moduli -->
+  <script src="{{ url_for('static', filename='js/synthia_integration.js') }}"></script>
+  
+  <!-- Onboarding Jack Synthia - Modulo DOCS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/jack_onboarding.css') }}">
+  <script src="{{ url_for('static', filename='js/jack_onboarding.js') }}"></script>
+  
+  <!-- Componente Onboarding DOCS -->
+  {% include 'components/onboarding_docs.html' %}
+  
+  <!-- Componente Tooltip Jack -->
+  {% include 'components/jack_tooltips.html' %}
+  
+  <!-- Componente Messaggi Jack -->
+  {% include 'components/jack_messages.html' %}
+  
+  <!-- Script per messaggi automatici Jack Synthia -->
+  <script>
+    window.addEventListener('DOMContentLoaded', async () => {
+      const evento = sessionStorage.getItem("jack_evento") || "login";
+      sessionStorage.removeItem("jack_evento");
+      
+      // Determina il ruolo utente (in futuro verrà dal backend)
+      const userRole = "{{ current_user.role if current_user else 'USER' }}";
+      
+      try {
+        const res = await fetch(`/synthia/ai/evento/${evento}?user_role=${userRole}`);
+        const data = await res.json();
+        
+        if (data.messaggio) {
+          const msgContainer = document.createElement('div');
+          msgContainer.className = 'jack-message-container';
+          msgContainer.innerHTML = `
+            <div class="card shadow-sm p-3 mb-3 border-0" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+              <div class="d-flex align-items-center">
+                <img src="/static/img/jack_synthia_realistic.png" width="48" height="48" class="me-3 rounded-circle" style="border: 2px solid white;">
+                <div class="flex-grow-1">
+                  <p class="mb-2"><strong>🎙 Jack Synthia:</strong> ${data.messaggio}</p>
+                  ${data.azione_url ? `<a href="${data.azione_url}" class="btn btn-sm btn-outline-light">${data.azione_testo}</a>` : ''}
+                </div>
+                <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
+              </div>
+            </div>
+          `;
+          
+          const messageArea = document.querySelector("#jack-message-area");
+          if (messageArea) {
+            messageArea.prepend(msgContainer);
+            
+            // Auto-remove dopo 10 secondi
+            setTimeout(() => {
+              if (msgContainer.parentElement) {
+                msgContainer.remove();
+              }
+            }, 10000);
+          }
+        }
+      } catch (error) {
+        console.log('Errore nel caricamento messaggio Jack:', error);
+      }
+    });
+    
+    // Funzione per impostare eventi Jack prima della navigazione
+    function setJackEvento(evento) {
+      sessionStorage.setItem("jack_evento", evento);
+    }
+  </script>
+</body>
+</html> 

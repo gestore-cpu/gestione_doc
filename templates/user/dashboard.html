@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Dashboard Personale - {{ current_user.username }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .card-stats { transition: transform 0.2s; }
+        .card-stats:hover { transform: translateY(-2px); }
+        .chart-container { position: relative; height: 400px; }
+        .download-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            color: white;
+        }
+        .loading-spinner { display: none; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h3 mb-0">
+                            <i class="fas fa-user-circle text-primary"></i>
+                            Dashboard Personale
+                        </h1>
+                        <p class="text-muted mb-0">Benvenuto, {{ current_user.username }}!</p>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-outline-primary" onclick="refreshChart()">
+                            <i class="fas fa-sync-alt"></i> Aggiorna Grafico
+                        </button>
+                        <a href="{{ url_for('user.export_my_downloads_csv') }}" class="btn btn-outline-success">
+                            <i class="fas fa-download"></i> Esporta CSV
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistiche Rapide -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card card-stats bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="card-title mb-0" id="totalDownloads">-</h4>
+                                <p class="card-text">📥 Download Totali</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-download fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-stats bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="card-title mb-0" id="avgDownloads">-</h4>
+                                <p class="card-text">📊 Media Giornaliera</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-chart-line fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-stats bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="card-title mb-0" id="maxDownloads">-</h4>
+                                <p class="card-text">🔥 Record Giornaliero</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-fire fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-stats bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="card-title mb-0" id="maxDay">-</h4>
+                                <p class="card-text">📅 Giorno Record</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-calendar-alt fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sezione Download -->
+        <div class="download-section">
+            <div class="row">
+                <div class="col-12">
+                    <h2 class="mb-4">
+                        <i class="fas fa-chart-bar"></i>
+                        I Miei Download
+                    </h2>
+                    <p class="mb-4">Grafico dei tuoi download negli ultimi 30 giorni</p>
+                </div>
+            </div>
+            
+            <!-- Loading Spinner -->
+            <div class="loading-spinner" id="loadingSpinner">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">Caricamento...</span>
+                </div>
+                <p class="mt-2">Caricamento dati...</p>
+            </div>
+            
+            <!-- Grafico -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="downloadChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifiche AI -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-robot text-primary me-2"></i>
+                            Notifiche AI
+                            <span class="badge bg-primary ms-2" id="notificationCount">0</span>
+                        </h5>
+                        <div class="loading-spinner" id="notificationSpinner">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Caricamento...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="notificationsContainer">
+                            <!-- Notifiche AI verranno caricate qui -->
+                        </div>
+                        <div id="emptyNotifications" class="text-center text-muted" style="display: none;">
+                            <i class="fas fa-robot fa-2x mb-3"></i>
+                            <p>Nessuna notifica AI al momento</p>
+                            <small>Le notifiche intelligenti appariranno qui quando necessario</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Azioni Rapide -->
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-file-alt text-primary"></i>
+                            I Miei Documenti
+                        </h5>
+                        <p class="card-text">Visualizza i tuoi documenti caricati</p>
+                        <a href="{{ url_for('user.my_documents') }}" class="btn btn-primary">
+                            <i class="fas fa-eye"></i> Visualizza
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-users text-success"></i>
+                            I Miei Ospiti
+                        </h5>
+                        <p class="card-text">Gestisci accessi ospiti</p>
+                        <a href="{{ url_for('user.my_guests') }}" class="btn btn-success">
+                            <i class="fas fa-cog"></i> Gestisci
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-tasks text-info"></i>
+                            I Miei Task
+                        </h5>
+                        <p class="card-text">Gestisci i tuoi task personali</p>
+                        <a href="{{ url_for('user.my_tasks') }}" class="btn btn-info">
+                            <i class="fas fa-tasks"></i> Visualizza Task
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-robot text-primary"></i>
+                            I Miei Task AI
+                        </h5>
+                        <p class="card-text">Gestisci i tuoi task AI personali</p>
+                        <a href="{{ url_for('user.my_tasks_ai') }}" class="btn btn-primary">
+                            <i class="fas fa-robot"></i> Task AI
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-download text-warning"></i>
+                            Esporta Dati
+                        </h5>
+                        <p class="card-text">Scarica i tuoi download</p>
+                        <a href="{{ url_for('user.export_my_downloads_csv') }}" class="btn btn-warning">
+                            <i class="fas fa-file-csv"></i> Esporta CSV
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let downloadChart = null;
+        
+        function loadChartData() {
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const chartContainer = document.querySelector('.chart-container');
+            
+            loadingSpinner.style.display = 'block';
+            chartContainer.style.display = 'none';
+            
+            fetch('{{ url_for("user.my_downloads_chart") }}')
+                .then(response => response.json())
+                .then(data => {
+                    loadingSpinner.style.display = 'none';
+                    chartContainer.style.display = 'block';
+                    
+                    if (data.success) {
+                        document.getElementById('totalDownloads').textContent = data.stats.total_downloads;
+                        document.getElementById('avgDownloads').textContent = data.stats.avg_downloads;
+                        document.getElementById('maxDownloads').textContent = data.stats.max_downloads;
+                        document.getElementById('maxDay').textContent = data.stats.max_day || 'N/A';
+                        
+                        createChart(data.data);
+                    } else {
+                        showError('Errore nel caricamento dei dati');
+                    }
+                })
+                .catch(error => {
+                    loadingSpinner.style.display = 'none';
+                    chartContainer.style.display = 'block';
+                    showError('Errore di connessione');
+                });
+        }
+        
+        function createChart(chartData) {
+            const ctx = document.getElementById('downloadChart').getContext('2d');
+            
+            if (downloadChart) {
+                downloadChart.destroy();
+            }
+            
+            downloadChart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: 'white', font: { size: 14 } }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: 'white',
+                            bodyColor: 'white'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Data',
+                                color: 'white',
+                                font: { size: 14 }
+                            },
+                            ticks: { color: 'white', maxRotation: 45 },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Numero Download',
+                                color: 'white',
+                                font: { size: 14 }
+                            },
+                            ticks: { color: 'white', beginAtZero: true },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function refreshChart() {
+            const btn = event.target;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Aggiornamento...';
+            btn.disabled = true;
+            
+            loadChartData();
+            
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-sync-alt"></i> Aggiorna Grafico';
+                btn.disabled = false;
+            }, 2000);
+        }
+        
+        function showError(message) {
+            const chartContainer = document.querySelector('.chart-container');
+            chartContainer.innerHTML = `
+                <div class="text-center text-danger p-4">
+                    <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                    <h5>Errore</h5>
+                    <p>${message}</p>
+                    <button class="btn btn-primary" onclick="loadChartData()">
+                        <i class="fas fa-redo"></i> Riprova
+                    </button>
+                </div>
+            `;
+        }
+        
+        // Funzioni per le notifiche AI
+        function loadAINotifications() {
+            const spinner = document.getElementById('notificationSpinner');
+            const container = document.getElementById('notificationsContainer');
+            const emptyState = document.getElementById('emptyNotifications');
+            const countBadge = document.getElementById('notificationCount');
+            
+            spinner.style.display = 'block';
+            container.style.display = 'none';
+            emptyState.style.display = 'none';
+            
+            fetch('/api/tasks/ai/notifications/me')
+                .then(response => response.json())
+                .then(data => {
+                    spinner.style.display = 'none';
+                    
+                    if (data.success && data.data.length > 0) {
+                        container.style.display = 'block';
+                        countBadge.textContent = data.data.length;
+                        
+                        const notificationsHTML = data.data.map(notification => `
+                            <div class="notification-item mb-3 p-3 border rounded ${getNotificationClass(notification.priority)}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">
+                                            <i class="${getNotificationIcon(notification.type)} me-2"></i>
+                                            ${notification.title}
+                                        </h6>
+                                        <p class="mb-2 text-muted">${notification.message}</p>
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>
+                                            ${formatNotificationTime(notification.timestamp)}
+                                        </small>
+                                    </div>
+                                    <div class="ms-2">
+                                        <span class="badge ${getPriorityBadgeClass(notification.priority)}">
+                                            ${notification.priority}
+                                        </span>
+                                    </div>
+                                </div>
+                                ${notification.action_url ? `
+                                    <div class="mt-2">
+                                        <a href="${notification.action_url}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-arrow-right me-1"></i>
+                                            Vai ai Task
+                                        </a>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('');
+                        
+                        container.innerHTML = notificationsHTML;
+                    } else {
+                        emptyState.style.display = 'block';
+                        countBadge.textContent = '0';
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore nel caricamento notifiche AI:', error);
+                    spinner.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    countBadge.textContent = '0';
+                });
+        }
+        
+        function getNotificationClass(priority) {
+            const classes = {
+                'high': 'border-danger bg-light',
+                'medium': 'border-warning bg-light',
+                'low': 'border-success bg-light'
+            };
+            return classes[priority] || 'border-secondary bg-light';
+        }
+        
+        function getNotificationIcon(type) {
+            const icons = {
+                'warning': 'fas fa-exclamation-triangle text-warning',
+                'urgent': 'fas fa-fire text-danger',
+                'info': 'fas fa-info-circle text-info',
+                'success': 'fas fa-check-circle text-success',
+                'suggestion': 'fas fa-lightbulb text-primary',
+                'reminder': 'fas fa-bell text-warning'
+            };
+            return icons[type] || 'fas fa-robot text-primary';
+        }
+        
+        function getPriorityBadgeClass(priority) {
+            const classes = {
+                'high': 'bg-danger',
+                'medium': 'bg-warning',
+                'low': 'bg-success'
+            };
+            return classes[priority] || 'bg-secondary';
+        }
+        
+        function formatNotificationTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffMins < 1) return 'Adesso';
+            if (diffMins < 60) return `${diffMins} minuti fa`;
+            if (diffHours < 24) return `${diffHours} ore fa`;
+            if (diffDays < 7) return `${diffDays} giorni fa`;
+            
+            return date.toLocaleDateString('it-IT', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric'
+            });
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadChartData();
+            loadAINotifications();
+            setInterval(loadChartData, 300000); // Auto-refresh ogni 5 minuti
+            setInterval(loadAINotifications, 60000); // Auto-refresh notifiche ogni minuto
+        });
+    </script>
+</body>
+</html>
+

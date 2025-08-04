@@ -1,0 +1,50 @@
+Jul 11 06:24:10 documenti systemd[1]: gunicorn.service: Consumed 4.857s CPU time, 188.6M memory peak.
+Jul 11 06:24:10 documenti systemd[1]: Started gunicorn.service - gunicorn daemon.
+Jul 11 06:24:10 documenti gunicorn[1272314]: [2025-07-11 06:24:10 +0000] [1272314] [INFO] Starting gunicorn 23.0.0
+Jul 11 06:24:10 documenti gunicorn[1272314]: [2025-07-11 06:24:10 +0000] [1272314] [INFO] Listening at: unix:/var/www/gestione_doc/gunicorn.sock (1272314)
+Jul 11 06:24:10 documenti gunicorn[1272314]: [2025-07-11 06:24:10 +0000] [1272314] [INFO] Using worker: sync
+Jul 11 06:24:10 documenti gunicorn[1272315]: [2025-07-11 06:24:10 +0000] [1272315] [INFO] Booting worker with pid: 1272315
+Jul 11 06:24:10 documenti gunicorn[1272316]: [2025-07-11 06:24:10 +0000] [1272316] [INFO] Booting worker with pid: 1272316
+Jul 11 06:24:10 documenti gunicorn[1272317]: [2025-07-11 06:24:10 +0000] [1272317] [INFO] Booting worker with pid: 1272317
+Jul 11 06:24:13 documenti gunicorn[1272315]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+Jul 11 06:24:13 documenti gunicorn[1272316]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+Jul 11 06:24:13 documenti gunicorn[1272317]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+Jul 11 06:28:19 documenti gunicorn[1272314]: [2025-07-11 06:28:19 +0000] [1272314] [INFO] Handling signal: term
+Jul 11 06:28:19 documenti systemd[1]: Stopping gunicorn.service - gunicorn daemon...
+Jul 11 06:28:19 documenti gunicorn[1272315]: [2025-07-11 06:28:19 +0000] [1272315] [INFO] Worker exiting (pid: 1272315)
+Jul 11 06:28:19 documenti gunicorn[1272317]: [2025-07-11 06:28:19 +0000] [1272317] [INFO] Worker exiting (pid: 1272317)
+Jul 11 06:28:19 documenti gunicorn[1272316]: [2025-07-11 06:28:19 +0000] [1272316] [INFO] Worker exiting (pid: 1272316)
+Jul 11 06:28:19 documenti gunicorn[1272314]: [2025-07-11 06:28:19 +0000] [1272314] [ERROR] Worker (pid:1272317) was sent SIGTERM!
+Jul 11 06:28:19 documenti gunicorn[1272314]: [2025-07-11 06:28:19 +0000] [1272314] [INFO] Shutting down: Master
+Jul 11 06:28:19 documenti systemd[1]: gunicorn.service: Deactivated successfully.
+Jul 11 06:28:19 documenti systemd[1]: Stopped gunicorn.service - gunicorn daemon.
+Jul 11 06:28:19 documenti systemd[1]: gunicorn.service: Consumed 3.954s CPU time, 188.9M memory peak.
+Jul 11 06:28:19 documenti systemd[1]: Started gunicorn.service - gunicorn daemon.
+Jul 11 06:28:20 documenti gunicorn[1272539]: [2025-07-11 06:28:20 +0000] [1272539] [INFO] Starting gunicorn 23.0.0
+Jul 11 06:28:20 documenti gunicorn[1272539]: [2025-07-11 06:28:20 +0000] [1272539] [INFO] Listening at: unix:/var/www/gestione_doc/gunicorn.sock (1272539)
+Jul 11 06:28:20 documenti gunicorn[1272539]: [2025-07-11 06:28:20 +0000] [1272539] [INFO] Using worker: sync
+Jul 11 06:28:20 documenti gunicorn[1272541]: [2025-07-11 06:28:20 +0000] [1272541] [INFO] Booting worker with pid: 1272541
+Jul 11 06:28:20 documenti gunicorn[1272542]: [2025-07-11 06:28:20 +0000] [1272542] [INFO] Booting worker with pid: 1272542
+Jul 11 06:28:20 documenti gunicorn[1272543]: [2025-07-11 06:28:20 +0000] [1272543] [INFO] Booting worker with pid: 1272543
+Jul 11 06:28:23 documenti gunicorn[1272541]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+Jul 11 06:28:23 documenti gunicorn[1272542]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+Jul 11 06:28:23 documenti gunicorn[1272543]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+Jul 11 06:30:15 documenti gunicorn[1272539]: [2025-07-11 06:30:15 +0000] [1272539] [INFO] Handling signal: term
+Jul 11 06:30:15 documenti systemd[1]: Stopping gunicorn.service - gunicorn daemon...
+Jul 11 06:30:15 documenti gunicorn[1272542]: [2025-07-11 06:30:15 +0000] [1272542] [INFO] Worker exiting (pid: 1272542)
+Jul 11 06:30:15 documenti gunicorn[1272541]: [2025-07-11 06:30:15 +0000] [1272541] [INFO] Worker exiting (pid: 1272541)
+Jul 11 06:30:15 documenti gunicorn[1272543]: [2025-07-11 06:30:15 +0000] [1272543] [INFO] Worker exiting (pid: 1272543)
+Jul 11 06:30:16 documenti gunicorn[1272539]: [2025-07-11 06:30:16 +0000] [1272539] [INFO] Shutting down: Master
+Jul 11 06:30:16 documenti systemd[1]: gunicorn.service: Deactivated successfully.
+Jul 11 06:30:16 documenti systemd[1]: Stopped gunicorn.service - gunicorn daemon.
+Jul 11 06:30:16 documenti systemd[1]: gunicorn.service: Consumed 4.629s CPU time, 196.6M memory peak.
+Jul 11 06:30:16 documenti systemd[1]: Started gunicorn.service - gunicorn daemon.
+Jul 11 06:30:16 documenti gunicorn[1272647]: [2025-07-11 06:30:16 +0000] [1272647] [INFO] Starting gunicorn 23.0.0
+Jul 11 06:30:16 documenti gunicorn[1272647]: [2025-07-11 06:30:16 +0000] [1272647] [INFO] Listening at: unix:/var/www/gestione_doc/gunicorn.sock (1272647)
+Jul 11 06:30:16 documenti gunicorn[1272647]: [2025-07-11 06:30:16 +0000] [1272647] [INFO] Using worker: sync
+Jul 11 06:30:16 documenti gunicorn[1272648]: [2025-07-11 06:30:16 +0000] [1272648] [INFO] Booting worker with pid: 1272648
+Jul 11 06:30:16 documenti gunicorn[1272649]: [2025-07-11 06:30:16 +0000] [1272649] [INFO] Booting worker with pid: 1272649
+Jul 11 06:30:16 documenti gunicorn[1272650]: [2025-07-11 06:30:16 +0000] [1272650] [INFO] Booting worker with pid: 1272650
+Jul 11 06:30:20 documenti gunicorn[1272648]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+Jul 11 06:30:20 documenti gunicorn[1272649]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+Jul 11 06:30:20 documenti gunicorn[1272650]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0

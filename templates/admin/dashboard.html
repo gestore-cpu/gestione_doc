@@ -1,0 +1,335 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block content %}
+<!-- === SEZIONE ALERT AUTOMATICI AI === -->
+{% if alerts %}
+<div class="alert-section mb-4">
+  <h3 class="text-danger mb-3">⚠️ Alert Download Negati</h3>
+  {% for alert in alerts %}
+  <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <strong>{{ alert.user.email }}</strong>
+        <br>
+        <small class="text-muted">{{ alert.reason }}</small>
+        <br>
+        <span class="badge bg-warning text-dark">{{ alert.count }} tentativi</span>
+        {% if alert.type == 'critical_document_denials' %}
+        <span class="badge bg-danger ms-1">Documento Critico</span>
+        {% endif %}
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- === SEZIONE TASK AI === -->
+<div class="ai-tasks-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-primary mb-0">🤖 Task AI Automatici</h3>
+    <a href="{{ url_for('admin.ai_tasks') }}" class="btn btn-outline-primary btn-sm">
+      📋 Visualizza Tutti i Task
+    </a>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-4">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4>Task AI</h4>
+          <p class="mb-0">Gestione automatica richieste firma</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === SEZIONE AI ASSISTANT INSIGHT === -->
+<div class="ai-insights-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-info mb-0">🧠 AI Assistant - Insight Strategici</h3>
+    <a href="{{ url_for('admin.ai_insights') }}" class="btn btn-outline-info btn-sm">
+      🔍 Visualizza Tutti gli Insight
+    </a>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-4">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4 id="ai-insights-total">-</h4>
+          <p class="mb-0">📊 Insight Attivi</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-danger text-white">
+        <div class="card-body text-center">
+          <h4 id="ai-insights-critical">-</h4>
+          <p class="mb-0">🔴 Critici</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-warning text-dark">
+        <div class="card-body text-center">
+          <h4 id="ai-insights-attention">-</h4>
+          <p class="mb-0">🟡 Attenzione</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-3">
+    <div class="col-12">
+      <div class="card bg-light">
+        <div class="card-body">
+          <h5 class="card-title">🎯 Insight Recenti</h5>
+          <div id="ai-insights-list">
+            <p class="text-muted">Caricamento insight AI...</p>
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-info btn-sm me-2" onclick="generateAIInsights()">
+              🔄 Genera Nuovi Insight
+            </button>
+            <a href="{{ url_for('admin.ai_insights') }}" class="btn btn-outline-info btn-sm">
+              📋 Gestisci Insight
+            </a>
+                                <a href="{{ url_for('admin.suggerimenti_ai') }}" class="btn btn-outline-warning btn-sm">
+                      💡 Suggerimenti AI
+                    </a>
+                    <a href="{{ url_for('admin.ai_analysis_dashboard') }}" class="btn btn-outline-info btn-sm">
+                    <a href="{{ url_for('admin.documenti_inviati') }}" class="btn btn-outline-success btn-sm">
+                      📧 Documenti Inviati
+                    </a>
+                      🧠 Analisi AI
+                    </a>
+                    <a href="{{ url_for('admin.ai_analysis_log') }}" class="btn btn-outline-success btn-sm">
+                      📜 Registro Storico AI
+                    </a>
+                    <a href="{{ url_for('admin.ai_alerts') }}" class="btn btn-outline-danger btn-sm">
+                      🚨 Alert AI Sicurezza
+                    </a>
+                    <a href="{{ url_for('admin.download_logs') }}" class="btn btn-outline-primary btn-sm">
+                      📥 Log Download
+                    </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === SEZIONE STATISTICHE DOWNLOAD NEGATI === -->
+<div class="denied-stats-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-danger mb-0">📊 Statistiche Download Negati</h3>
+    <a href="{{ url_for('admin.statistiche') }}" class="btn btn-outline-danger btn-sm">
+      📈 Statistiche Complete
+    </a>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-3">
+      <div class="card bg-danger text-white">
+        <div class="card-body text-center">
+          <h4 id="denied-today-dash">-</h4>
+          <p class="mb-0">🔴 Negati Oggi</p>
+          <small id="denied-change-dash">-</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-warning text-dark">
+        <div class="card-body text-center">
+          <h4 id="top-user-dash">-</h4>
+          <p class="mb-0">👤 Utente Top</p>
+          <small id="top-user-name-dash">-</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4 id="top-reason-dash">-</h4>
+          <p class="mb-0">📄 Motivo Top</p>
+          <small id="top-reason-name-dash">-</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-secondary text-white">
+        <div class="card-body text-center">
+          <h4 id="total-denied-dash">-</h4>
+          <p class="mb-0">📊 Totale Settimana</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-graph-wrapper">
+  <h1 class="dashboard-title mb-2 text-center">Dashboard Admin</h1>
+  <div class="d-flex justify-content-center mb-2">
+    <select class="form-select dashboard-interval-select" style="max-width: 220px;">
+      <option selected>Ultimi 7 giorni</option>
+      <option>Ultimi 30 giorni</option>
+      <option>Anno corrente</option>
+    </select>
+  </div>
+  <div class="dashboard-grid">
+    <div class="graph-box">
+      <h5 class="mb-3">📊 Tipi Documenti</h5>
+      <canvas id="barChart"></canvas>
+    </div>
+    <div class="graph-box">
+      <h5 class="mb-3">🍩 Distribuzione Documenti</h5>
+      <canvas id="pieChart"></canvas>
+    </div>
+    <div class="graph-box graph-box-wide">
+      <h5 class="mb-3">📈 Attività Upload/Download</h5>
+      <canvas id="lineChart"></canvas>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Esempio: i dati reali vanno passati dal backend
+  const barChart = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: {{ doc_types|tojson }},
+      datasets: [{
+        label: 'Distribuzione',
+        data: {{ doc_counts|tojson }},
+        backgroundColor: '#3e95cd'
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  const pieChart = new Chart(document.getElementById('pieChart'), {
+    type: 'doughnut',
+    data: {
+      labels: {{ pie_labels|tojson }},
+      datasets: [{
+        data: {{ pie_values|tojson }},
+        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#7AC36A']
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  const lineChart = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels: {{ labels|tojson }},
+      datasets: [
+        {
+          label: 'Upload',
+          data: {{ uploads|tojson }},
+          borderColor: '#007bff',
+          fill: false
+        },
+        {
+          label: 'Download',
+          data: {{ downloads|tojson }},
+          borderColor: '#28a745',
+          fill: false
+        }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+  
+  // Carica statistiche download negati per dashboard
+  function loadDeniedStatsDashboard() {
+    fetch('/admin/api/log_download_denied/stats')
+      .then(response => response.json())
+      .then(data => {
+        // Aggiorna box statistiche dashboard
+        document.getElementById('denied-today-dash').textContent = data.today_count;
+        document.getElementById('denied-change-dash').textContent = data.change_percentage;
+        document.getElementById('top-user-dash').textContent = data.top_user.count;
+        document.getElementById('top-user-name-dash').textContent = data.top_user.name;
+        document.getElementById('top-reason-dash').textContent = data.top_reason.count;
+        document.getElementById('top-reason-name-dash').textContent = data.top_reason.name;
+        document.getElementById('total-denied-dash').textContent = data.total_week;
+      })
+      .catch(error => {
+        console.error('Errore caricamento statistiche dashboard:', error);
+        document.getElementById('denied-today-dash').textContent = 'Errore';
+      });
+  }
+  
+  // Carica dati al caricamento pagina
+  document.addEventListener('DOMContentLoaded', function() {
+    loadDeniedStatsDashboard();
+    loadAIInsightsSummary();
+  });
+  
+  // Funzione per caricare riepilogo insight AI
+  function loadAIInsightsSummary() {
+    fetch('/admin/api/ai_insights/summary')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('ai-insights-total').textContent = data.total_active;
+        document.getElementById('ai-insights-critical').textContent = data.critical_count;
+        document.getElementById('ai-insights-attention').textContent = data.attention_count;
+        
+        // Mostra insight recenti
+        const insightsList = document.getElementById('ai-insights-list');
+        if (data.recent_insights.length > 0) {
+          let html = '';
+          data.recent_insights.slice(0, 3).forEach(insight => {
+            const severityClass = insight.severity === 'critico' ? 'danger' : 'warning';
+            html += `
+              <div class="alert alert-${severityClass} alert-sm mb-2">
+                <small><strong>${insight.type.toUpperCase()}</strong> - ${insight.created_at}</small>
+                <br>
+                <small>${insight.text}</small>
+              </div>
+            `;
+          });
+          insightsList.innerHTML = html;
+        } else {
+          insightsList.innerHTML = '<p class="text-muted">Nessun insight attivo</p>';
+        }
+      })
+      .catch(error => {
+        console.error('Errore caricamento insight AI:', error);
+        document.getElementById('ai-insights-total').textContent = 'Errore';
+      });
+  }
+  
+  // Funzione per generare nuovi insight AI
+  function generateAIInsights() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '⏳ Generazione...';
+    button.disabled = true;
+    
+    fetch('/admin/api/ai_insights/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert(`Generati ${data.insights_generated} nuovi insight AI!`);
+        loadAIInsightsSummary(); // Ricarica i dati
+      } else {
+        alert('Errore: ' + data.error);
+      }
+    })
+    .catch(error => {
+      console.error('Errore:', error);
+      alert('Errore durante la generazione degli insight');
+    })
+    .finally(() => {
+      button.innerHTML = originalText;
+      button.disabled = false;
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,86 @@
+<!--
+ATTENZIONE: Questo file è un mockup/non collegato. Può essere eliminato o usato solo come esempio di struttura.
+-->
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestione Utenti - Mercury Surgelati</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    h3 { color: #333; }
+    #admin-section, #profilo-section { margin-bottom: 30px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; }
+    button { margin-right: 10px; }
+    ul { list-style-type: none; padding-left: 0; }
+    li { margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+  <h2>Gestione Utenti</h2>
+
+  <!-- Sezione visibile solo agli Admin -->
+  <div id="admin-section" style="display: none;">
+    <h3>🔧 Amministrazione Utenti</h3>
+    <button onclick="caricaNuovoUtente()">➕ Carica Nuovo Utente</button>
+    <button onclick="visualizzaUtenti()">📋 Visualizza Utenti</button>
+    <div id="lista-utenti"></div>
+  </div>
+
+  <!-- Sezione visibile a tutti i ruoli -->
+  <div id="profilo-section">
+    <h3>👤 Il Mio Profilo</h3>
+
+    <label>🔐 Cambia Password</label><br>
+    <input type="password" placeholder="Nuova password" id="newPassword"><br><br>
+
+    <label>🖼️ Carica Foto Profilo</label><br>
+    <input type="file" id="uploadFoto"><br><br>
+
+    <label>📝 Promemoria Personale</label><br>
+    <textarea id="note" rows="4" cols="40" placeholder="Scrivi un promemoria..."></textarea>
+  </div>
+
+  <script>
+    // 👉 Simulazione ruolo utente (sostituisci con valore dinamico da backend)
+    const ruoloUtente = "admin"; // Cambia in "user" o "guest" se vuoi testare
+
+    window.onload = function () {
+      if (ruoloUtente === "admin") {
+        document.getElementById("admin-section").style.display = "block";
+      }
+    };
+
+    function caricaNuovoUtente() {
+      alert("Funzione per caricare un nuovo utente (da implementare)");
+    }
+
+    function visualizzaUtenti() {
+      const utenti = [
+        { nome: "Mario Rossi", ruolo: "guest" },
+        { nome: "Lucia Verdi", ruolo: "user" },
+        { nome: "Admin System", ruolo: "admin" }
+      ];
+
+      let html = "<ul>";
+      utenti.forEach(u => {
+        html += `<li><strong>${u.nome}</strong> (${u.ruolo}) 
+        <button onclick="modificaUtente('${u.nome}')">Modifica</button> 
+        <button onclick="eliminaUtente('${u.nome}')">Elimina</button></li>`;
+      });
+      html += "</ul>";
+
+      document.getElementById("lista-utenti").innerHTML = html;
+    }
+
+    function modificaUtente(nome) {
+      alert("Modifica utente: " + nome);
+    }
+
+    function eliminaUtente(nome) {
+      alert("Elimina utente: " + nome);
+    }
+  </script>
+
+</body>
+</html>

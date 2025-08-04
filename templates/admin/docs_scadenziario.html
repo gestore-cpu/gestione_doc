@@ -1,0 +1,354 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>📅 Scadenziario Documenti</h2>
+                    <p class="text-muted mb-0">Gestione scadenze documentali con promemoria automatici</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-outline-secondary">
+                        📄 Panoramica Documenti
+                    </a>
+                </div>
+            </div>
+
+            <!-- STATISTICHE RAPIDE -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-white bg-warning">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">⚠️ In Scadenza</h6>
+                            <h4>{{ stats.in_scadenza }}</h4>
+                            <small>Entro 30 giorni</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-danger">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">🚨 Scaduti</h6>
+                            <h4>{{ stats.scaduti }}</h4>
+                            <small>Oltre la data limite</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-info">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">📋 Ignorati</h6>
+                            <h4>{{ stats.ignorati }}</h4>
+                            <small>60+ giorni incompleti</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">📊 Totali</h6>
+                            <h4>{{ stats.totali }}</h4>
+                            <small>Documenti da gestire</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DOCUMENTI IN SCADENZA -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">⚠️ Documenti in Scadenza ({{ documenti_in_scadenza|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if documenti_in_scadenza %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Titolo</th>
+                                    <th>Azienda</th>
+                                    <th>Reparto</th>
+                                    <th>Data Scadenza</th>
+                                    <th>Giorni Rimanenti</th>
+                                    <th>Stato AI</th>
+                                    <th>Task</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in documenti_in_scadenza %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ doc.title or doc.original_filename }}</strong>
+                                        {% if doc.is_critical %}
+                                            <span class="badge bg-danger ms-1">Critico</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ doc.company.name if doc.company else 'N/A' }}</td>
+                                    <td>{{ doc.department.name if doc.department else 'N/A' }}</td>
+                                    <td>{{ doc.expiry_date.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        {% set giorni = (doc.expiry_date.date() - oggi).days %}
+                                        {% if giorni <= 7 %}
+                                            <span class="badge bg-danger">{{ giorni }} giorni</span>
+                                        {% elif giorni <= 14 %}
+                                            <span class="badge bg-warning">{{ giorni }} giorni</span>
+                                        {% else %}
+                                            <span class="badge bg-info">{{ giorni }} giorni</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if doc.ai_status == 'completo' %}
+                                            <span class="badge bg-success">✅ Completo</span>
+                                        {% elif doc.ai_status == 'incompleto' %}
+                                            <span class="badge bg-warning">⚠️ Incompleto</span>
+                                        {% elif doc.ai_status == 'scaduto' %}
+                                            <span class="badge bg-danger">❌ Scaduto</span>
+                                        {% elif doc.ai_status == 'manca_firma' %}
+                                            <span class="badge bg-danger">❌ Manca Firma</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">📄 Non Analizzato</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if doc.ai_task_id %}
+                                            <span class="badge bg-info">🎯 Task #{{ doc.ai_task_id }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('admin.view_document', doc_id=doc.id) }}" 
+                                               class="btn btn-outline-primary" title="Visualizza">
+                                                👁️
+                                            </a>
+                                            <button onclick="analyzeAI({{ doc.id }})" 
+                                                    class="btn btn-outline-info" title="Analizza AI">
+                                                🧠
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                        <h5>Nessun documento in scadenza</h5>
+                        <p>Tutti i documenti sono aggiornati!</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- DOCUMENTI SCADUTI -->
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">🚨 Documenti Scaduti ({{ documenti_scaduti|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if documenti_scaduti %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Titolo</th>
+                                    <th>Azienda</th>
+                                    <th>Reparto</th>
+                                    <th>Data Scadenza</th>
+                                    <th>Giorni Scaduto</th>
+                                    <th>Stato AI</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in documenti_scaduti %}
+                                <tr class="table-danger">
+                                    <td>
+                                        <strong>{{ doc.title or doc.original_filename }}</strong>
+                                        {% if doc.is_critical %}
+                                            <span class="badge bg-danger ms-1">Critico</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ doc.company.name if doc.company else 'N/A' }}</td>
+                                    <td>{{ doc.department.name if doc.department else 'N/A' }}</td>
+                                    <td>{{ doc.expiry_date.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        {% set giorni = (oggi - doc.expiry_date.date()).days %}
+                                        <span class="badge bg-danger">Scaduto da {{ giorni }} giorni</span>
+                                    </td>
+                                    <td>
+                                        {% if doc.ai_status == 'completo' %}
+                                            <span class="badge bg-success">✅ Completo</span>
+                                        {% elif doc.ai_status == 'incompleto' %}
+                                            <span class="badge bg-warning">⚠️ Incompleto</span>
+                                        {% elif doc.ai_status == 'scaduto' %}
+                                            <span class="badge bg-danger">❌ Scaduto</span>
+                                        {% elif doc.ai_status == 'manca_firma' %}
+                                            <span class="badge bg-danger">❌ Manca Firma</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">📄 Non Analizzato</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('admin.view_document', doc_id=doc.id) }}" 
+                                               class="btn btn-outline-primary" title="Visualizza">
+                                                👁️
+                                            </a>
+                                            <button onclick="analyzeAI({{ doc.id }})" 
+                                                    class="btn btn-outline-info" title="Analizza AI">
+                                                🧠
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                        <h5>Nessun documento scaduto</h5>
+                        <p>Ottimo! Tutti i documenti sono aggiornati.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- DOCUMENTI IGNORATI -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📋 Documenti Ignorati ({{ documenti_ignorati|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if documenti_ignorati %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Titolo</th>
+                                    <th>Azienda</th>
+                                    <th>Reparto</th>
+                                    <th>Ultimo Aggiornamento</th>
+                                    <th>Giorni Ignorato</th>
+                                    <th>Stato AI</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in documenti_ignorati %}
+                                <tr class="table-warning">
+                                    <td>
+                                        <strong>{{ doc.title or doc.original_filename }}</strong>
+                                    </td>
+                                    <td>{{ doc.company.name if doc.company else 'N/A' }}</td>
+                                    <td>{{ doc.department.name if doc.department else 'N/A' }}</td>
+                                    <td>{{ doc.last_updated.strftime('%d/%m/%Y') if doc.last_updated else 'N/A' }}</td>
+                                    <td>
+                                        {% if doc.last_updated %}
+                                            {% set giorni = (oggi - doc.last_updated.date()).days %}
+                                            <span class="badge bg-warning">Ignorato da {{ giorni }} giorni</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if doc.ai_status == 'incompleto' %}
+                                            <span class="badge bg-warning">⚠️ Incompleto</span>
+                                        {% elif doc.ai_status == 'scaduto' %}
+                                            <span class="badge bg-danger">❌ Scaduto</span>
+                                        {% elif doc.ai_status == 'manca_firma' %}
+                                            <span class="badge bg-danger">❌ Manca Firma</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">📄 Non Analizzato</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('admin.view_document', doc_id=doc.id) }}" 
+                                               class="btn btn-outline-primary" title="Visualizza">
+                                                👁️
+                                            </a>
+                                            <button onclick="analyzeAI({{ doc.id }})" 
+                                                    class="btn btn-outline-info" title="Analizza AI">
+                                                🧠
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                        <h5>Nessun documento ignorato</h5>
+                        <p>Tutti i documenti sono stati aggiornati recentemente.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- LINK DI NAVIGAZIONE -->
+            <div class="mt-4">
+                <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-secondary">
+                    ← Torna alla Panoramica
+                </a>
+                <a href="{{ url_for('admin.docs_kpi_dashboard') }}" class="btn btn-outline-primary ms-2">
+                    📊 KPI AI Documentali
+                </a>
+                <a href="{{ url_for('admin.obeya_map') }}" class="btn btn-outline-info ms-2">
+                    🗺️ Mappa Obeya
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// === FUNZIONE ANALISI AI ===
+function analyzeAI(docId) {
+    if (confirm("Analizzare questo documento con Document Intelligence AI?")) {
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = "🔄 Analizzando...";
+        button.disabled = true;
+        
+        fetch('/docs/analyze-pdf', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ document_id: docId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`✅ Analisi completata!\n\nStato: ${data.status}\nMotivo: ${data.explain}`);
+                location.reload();
+            } else {
+                alert("❌ Errore nell'analisi AI: " + data.message);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error("Errore AI:", error);
+            alert("❌ Errore durante l'analisi AI");
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+}
+</script>
+
+{% endblock %} 

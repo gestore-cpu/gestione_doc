@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Registrazione Ospite</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: url('{{ url_for("static", filename="img/sfondo.png") }}') no-repeat center center fixed;
+            background-size: cover;
+        }
+
+        .logo-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .logo-container img {
+            width: 35%;
+            max-width: 250px;
+        }
+
+        .form-container {
+            background: rgba(255, 255, 255, 0.88);
+            max-width: 450px;
+            margin: 30px auto 60px;
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 0 12px rgba(0,0,0,0.15);
+        }
+
+        h2 {
+            text-align: center;
+            color: #083463;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+            font-size: 1rem;
+            color: #083463;
+        }
+
+        input[type="email"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px 12px;
+            margin-top: 6px;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+
+        #strength-bar {
+            height: 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+            background-color: #ddd;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .emoji {
+            margin-right: 5px;
+        }
+
+        p {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .alert {
+            margin-bottom: 20px;
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        ul#password-rules {
+            list-style: none;
+            padding: 0;
+            font-size: 0.85rem;
+            margin-top: 10px;
+        }
+
+        ul#password-rules li {
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- LOGO -->
+    <div class="logo-container">
+        <img src="{{ url_for('static', filename='logonew.png') }}" alt="Logo Mercury">
+    </div>
+
+    <!-- FORM -->
+    <div class="form-container">
+
+        <!-- FLASH MESSAGES -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- TITOLO -->
+        <h2><span class="emoji">📝</span>Registrazione Ospite</h2>
+
+        <!-- FORM -->
+        <form method="POST">
+            {{ form.hidden_tag() }}
+
+            <label><span class="emoji">📧</span>Email:</label>
+            <input type="email" name="email" required>
+
+            <label><span class="emoji">🔑</span>Password:</label>
+            <input type="password" name="password" id="password" required onkeyup="checkPasswordStrength()">
+            <div id="strength-bar"></div>
+            <ul id="password-rules">
+                <li id="rule-length">🔸 Minimo 8 caratteri</li>
+                <li id="rule-uppercase">🔸 Almeno una maiuscola</li>
+                <li id="rule-lowercase">🔸 Almeno una minuscola</li>
+                <li id="rule-number">🔸 Almeno un numero</li>
+                <li id="rule-symbol">🔸 Almeno un simbolo speciale</li>
+            </ul>
+
+            <label><span class="emoji">🔁</span>Conferma password:</label>
+            <input type="password" name="confirm" required>
+
+            <button type="submit">Registrati</button>
+
+            <p>
+                Hai già un account?
+                <a href="{{ url_for('guest.guest_access') }}">Accedi qui</a>
+            </p>
+        </form>
+    </div>
+
+    <script>
+        function checkPasswordStrength() {
+            const pwd = document.getElementById('password').value;
+            const bar = document.getElementById('strength-bar');
+
+            const rules = {
+                length: pwd.length >= 8,
+                upper: /[A-Z]/.test(pwd),
+                lower: /[a-z]/.test(pwd),
+                number: /[0-9]/.test(pwd),
+                symbol: /[!@#$%^&*(),.?":{}|<>]/.test(pwd)
+            };
+
+            document.getElementById('rule-length').style.color = rules.length ? 'green' : 'red';
+            document.getElementById('rule-uppercase').style.color = rules.upper ? 'green' : 'red';
+            document.getElementById('rule-lowercase').style.color = rules.lower ? 'green' : 'red';
+            document.getElementById('rule-number').style.color = rules.number ? 'green' : 'red';
+            document.getElementById('rule-symbol').style.color = rules.symbol ? 'green' : 'red';
+
+            const score = Object.values(rules).filter(v => v).length;
+            let color = 'red';
+            if (score >= 4) color = 'orange';
+            if (score === 5) color = 'green';
+
+            bar.style.width = `${score * 20}%`;
+            bar.style.backgroundColor = color;
+        }
+    </script>
+
+</body>
+</html>

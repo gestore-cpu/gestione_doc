@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Firma Grafica Documento - Gestione Documenti</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    .signature-container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    #canvas {
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      background: #f8f9fa;
+      cursor: crosshair;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .canvas-controls {
+      margin: 15px 0;
+      text-align: center;
+    }
+    
+    .btn-signature {
+      margin: 5px;
+      padding: 8px 16px;
+      border-radius: 20px;
+    }
+    
+    .signature-info {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    
+    .document-details {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    
+    .signature-preview {
+      margin-top: 20px;
+      text-align: center;
+    }
+    
+    .preview-image {
+      max-width: 200px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+
+<div class="container mt-4">
+  <div class="signature-container">
+    
+    <!-- Header -->
+    <div class="text-center mb-4">
+      <h2>
+        <i class="fas fa-signature text-primary"></i> 
+        Firma Grafica Documento
+      </h2>
+      <p class="text-muted">
+        Disegna la tua firma nel riquadro sottostante
+      </p>
+    </div>
+
+    <!-- Informazioni documento -->
+    <div class="document-details">
+      <h5>
+        <i class="fas fa-file-alt"></i> 
+        Documento: {{ documento.title or documento.filename }}
+      </h5>
+      <p class="mb-1">
+        <strong>Filename:</strong> {{ documento.filename }}
+      </p>
+      <p class="mb-1">
+        <strong>Categoria:</strong> {{ documento.categoria_ai or "Non specificata" }}
+      </p>
+      <p class="mb-0">
+        <strong>Uploader:</strong> {{ documento.uploader_email }}
+      </p>
+    </div>
+
+    <!-- Istruzioni -->
+    <div class="signature-info">
+      <h6>
+        <i class="fas fa-info-circle"></i> 
+        Istruzioni
+      </h6>
+      <ul class="mb-0">
+        <li>Usa il mouse o il touch per disegnare la tua firma</li>
+        <li>La firma verrà salvata come immagine PNG</li>
+        <li>Puoi cancellare e ridisegnare quante volte vuoi</li>
+        <li>Una volta salvata, la firma sarà visibile nel documento</li>
+      </ul>
+    </div>
+
+    <!-- Canvas firma -->
+    <div class="text-center">
+      <h5 class="mb-3">
+        <i class="fas fa-pen"></i> 
+        Disegna la tua firma
+      </h5>
+      
+      <canvas id="canvas" width="500" height="200"></canvas>
+      
+      <div class="canvas-controls">
+        <button class="btn btn-outline-secondary btn-signature" onclick="clearCanvas()">
+          <i class="fas fa-eraser"></i> Pulisci
+        </button>
+        <button class="btn btn-outline-warning btn-signature" onclick="undoLastStroke()">
+          <i class="fas fa-undo"></i> Annulla
+        </button>
+        <button class="btn btn-outline-info btn-signature" onclick="changeColor()">
+          <i class="fas fa-palette"></i> Cambia Colore
+        </button>
+        <button class="btn btn-outline-secondary btn-signature" onclick="changeThickness()">
+          <i class="fas fa-pen-nib"></i> Spessore
+        </button>
+      </div>
+    </div>
+
+    <!-- Anteprima firma -->
+    <div class="signature-preview" id="previewContainer" style="display: none;">
+      <h6>Anteprima firma:</h6>
+      <img id="previewImage" class="preview-image" alt="Anteprima firma">
+    </div>
+
+    <!-- Form per salvare -->
+    <form id="firmaForm" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="firma_dati" id="firma_dati">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      
+      <div class="text-center mt-4">
+        <button type="button" class="btn btn-success btn-lg" onclick="salvaFirma()">
+          <i class="fas fa-save"></i> Salva Firma
+        </button>
+        <a href="{{ url_for('docs.view_document', document_id=documento.id) }}" 
+           class="btn btn-outline-secondary btn-lg ms-2">
+          <i class="fas fa-times"></i> Annulla
+        </a>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// Variabili globali
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let disegnando = false;
+let lastX = 0;
+let lastY = 0;
+let strokeHistory = [];
+let currentStroke = [];
+let currentColor = "#000000";
+let currentThickness = 3;
+
+// Inizializzazione canvas
+ctx.strokeStyle = currentColor;
+ctx.lineWidth = currentThickness;
+ctx.lineCap = "round";
+ctx.lineJoin = "round";
+
+// Eventi mouse
+canvas.addEventListener("mousedown", startDrawing);
+canvas.addEventListener("mousemove", draw);
+canvas.addEventListener("mouseup", stopDrawing);
+canvas.addEventListener("mouseout", stopDrawing);
+
+// Eventi touch
+canvas.addEventListener("touchstart", handleTouchStart);
+canvas.addEventListener("touchmove", handleTouchMove);
+canvas.addEventListener("touchend", handleTouchEnd);
+
+function startDrawing(e) {
+  disegnando = true;
+  const rect = canvas.getBoundingClientRect();
+  lastX = e.clientX - rect.left;
+  lastY = e.clientY - rect.top;
+  currentStroke = [{x: lastX, y: lastY}];
+}
+
+function draw(e) {
+  if (!disegnando) return;
+  
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  
+  lastX = x;
+  lastY = y;
+  currentStroke.push({x: x, y: y});
+}
+
+function stopDrawing() {
+  if (disegnando) {
+    disegnando = false;
+    if (currentStroke.length > 1) {
+      strokeHistory.push([...currentStroke]);
+    }
+  }
+}
+
+// Gestione touch
+function handleTouchStart(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent("mousedown", {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  canvas.dispatchEvent(mouseEvent);
+}
+
+function handleTouchMove(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent("mousemove", {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  canvas.dispatchEvent(mouseEvent);
+}
+
+function handleTouchEnd(e) {
+  e.preventDefault();
+  const mouseEvent = new MouseEvent("mouseup", {});
+  canvas.dispatchEvent(mouseEvent);
+}
+
+// Funzioni di controllo
+function clearCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  strokeHistory = [];
+  hidePreview();
+}
+
+function undoLastStroke() {
+  if (strokeHistory.length > 0) {
+    strokeHistory.pop();
+    redrawCanvas();
+  }
+}
+
+function changeColor() {
+  const colors = ["#000000", "#0000FF", "#FF0000", "#008000", "#800080"];
+  const currentIndex = colors.indexOf(currentColor);
+  const nextIndex = (currentIndex + 1) % colors.length;
+  currentColor = colors[nextIndex];
+  ctx.strokeStyle = currentColor;
+  
+  // Mostra notifica
+  showNotification(`Colore cambiato in ${currentColor}`, "info");
+}
+
+function changeThickness() {
+  const thicknesses = [1, 2, 3, 5, 8];
+  const currentIndex = thicknesses.indexOf(currentThickness);
+  const nextIndex = (currentIndex + 1) % thicknesses.length;
+  currentThickness = thicknesses[nextIndex];
+  ctx.lineWidth = currentThickness;
+  
+  // Mostra notifica
+  showNotification(`Spessore cambiato in ${currentThickness}px`, "info");
+}
+
+function redrawCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  for (let stroke of strokeHistory) {
+    if (stroke.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(stroke[0].x, stroke[0].y);
+      
+      for (let i = 1; i < stroke.length; i++) {
+        ctx.lineTo(stroke[i].x, stroke[i].y);
+      }
+      
+      ctx.stroke();
+    }
+  }
+}
+
+function showPreview() {
+  const previewContainer = document.getElementById("previewContainer");
+  const previewImage = document.getElementById("previewImage");
+  
+  const dataURL = canvas.toDataURL("image/png");
+  previewImage.src = dataURL;
+  previewContainer.style.display = "block";
+}
+
+function hidePreview() {
+  document.getElementById("previewContainer").style.display = "none";
+}
+
+function showNotification(message, type) {
+  const alertDiv = document.createElement("div");
+  alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+  alertDiv.style.top = "20px";
+  alertDiv.style.right = "20px";
+  alertDiv.style.zIndex = "9999";
+  alertDiv.innerHTML = `
+    ${message}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  `;
+  
+  document.body.appendChild(alertDiv);
+  
+  setTimeout(() => {
+    if (alertDiv.parentNode) {
+      alertDiv.parentNode.removeChild(alertDiv);
+    }
+  }, 3000);
+}
+
+function salvaFirma() {
+  // Verifica che ci sia una firma
+  if (strokeHistory.length === 0) {
+    showNotification("Disegna prima una firma!", "warning");
+    return;
+  }
+  
+  // Mostra anteprima
+  showPreview();
+  
+  // Conferma salvataggio
+  if (confirm("Salvare questa firma?")) {
+    const dati = canvas.toDataURL("image/png");
+    document.getElementById("firma_dati").value = dati;
+    document.getElementById("firmaForm").submit();
+  }
+}
+
+// Inizializzazione
+document.addEventListener("DOMContentLoaded", function() {
+  // Mostra istruzioni iniziali
+  showNotification("Disegna la tua firma nel riquadro!", "info");
+});
+</script>
+
+</body>
+</html> 

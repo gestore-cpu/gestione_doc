@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>I miei documenti</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f9f9f9 url('/static/img/sfondo.png') no-repeat center center fixed;
+      background-size: cover;
+    }
+  </style>
+</head>
+<body class="p-4">
+  <div class="container bg-white shadow rounded p-4">
+
+    <h3 class="mb-4 text-center">📄 I miei documenti</h3>
+
+    {% if suggestions %}
+    <div class="alert alert-info">
+      <strong>💡 Suggeriti dall’AI:</strong>
+      <ul class="mb-0">
+        {% for doc in suggestions %}
+        <li>
+          {{ doc.original_filename }} – 
+          <a href="{{ url_for('admin.download_document', document_id=doc.id) }}" class="btn btn-sm btn-outline-primary ms-2">Scarica</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- Documenti accessibili -->
+    <h5>✅ Documenti disponibili</h5>
+    <table class="table table-hover mb-4">
+      <thead class="table-light">
+        <tr>
+          <th>Nome</th>
+          <th>Azienda</th>
+          <th>Reparto</th>
+          <th>Data</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in access_docs %}
+        <tr>
+          <td>{{ doc.original_filename }}</td>
+          <td>{{ doc.company.name if doc.company else '—' }}</td>
+          <td>{{ doc.department.name if doc.department else '—' }}</td>
+          <td>{{ doc.uploaded_at.strftime('%d/%m/%Y') }}</td>
+          <td>
+            <a href="{{ url_for('admin.download_document', document_id=doc.id) }}" class="btn btn-sm btn-success">Scarica</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center">Nessun documento disponibile</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Richieste in attesa -->
+    <h5>🕓 Richieste inviate</h5>
+    <table class="table table-bordered">
+      <thead class="table-light">
+        <tr>
+          <th>Documento</th>
+          <th>Messaggio</th>
+          <th>Data</th>
+          <th>Stato</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for req in requests %}
+        <tr>
+          <td>{{ req.document.original_filename }}</td>
+          <td>{{ req.message }}</td>
+          <td>{{ req.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td>
+            {% if req.status == "approved" %}
+              <span class="badge bg-success">Approvata</span>
+            {% elif req.status == "rejected" %}
+              <span class="badge bg-danger">Rifiutata</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">In attesa</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center">Nessuna richiesta inviata</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if hidden_suggestions %}
+    <h5 class="mt-4">🔐 Documenti nascosti suggeriti dall’AI</h5>
+    <p class="text-muted">L’AI ha identificato questi documenti come potenzialmente rilevanti per te. Puoi richiedere l’accesso con un clic.</p>
+    <table class="table table-sm table-striped">
+      <thead class="table-light">
+        <tr>
+          <th>Nome</th>
+          <th>Azienda</th>
+          <th>Reparto</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in hidden_suggestions %}
+        <tr>
+          <td>{{ doc.original_filename }}</td>
+          <td>{{ doc.company.name if doc.company else '—' }}</td>
+          <td>{{ doc.department.name if doc.department else '—' }}</td>
+          <td>
+            <form method="POST" action="{{ url_for('welcome.request_access', document_id=doc.id) }}" class="d-inline">
+              <input type="hidden" name="message" value="Suggerito dall’AI">
+              <button type="submit" class="btn btn-sm btn-warning">Chiedi accesso</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+  </div>
+</body>
+</html> 

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Benvenuto in Mercury Surgelati</title>
+  <style>
+    body { font-family: 'Poppins', Arial, sans-serif; background-color: #f7f9fc; color: #222; }
+    .container { background: #fff; border-radius: 8px; padding: 24px; max-width: 500px; margin: 40px auto; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    h1 { color: #007bff; }
+    .info { background: #f1f3f6; border-radius: 6px; padding: 12px; margin: 18px 0; }
+    .footer { color: #888; font-size: 0.95em; margin-top: 32px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Benvenuto in Mercury Surgelati!</h1>
+    <p>Ciao {{ user.nome or user.username }} {{ user.cognome or '' }},</p>
+    <p>Il tuo account guest è stato creato con successo. Ora puoi accedere alla piattaforma documentale Mercury Surgelati.</p>
+    <div class="info">
+      <strong>Nome:</strong> {{ user.nome or '-' }}<br>
+      <strong>Cognome:</strong> {{ user.cognome or '-' }}<br>
+      <strong>Username:</strong> {{ user.username }}<br>
+      <strong>Email:</strong> {{ user.email }}<br>
+      <strong>Password provvisoria:</strong> {{ password }}<br>
+    </div>
+    <p>Ti consigliamo di cambiare la password al primo accesso.</p>
+    <p>Accedi qui: <a href="https://docs.mercurysurgelati.org/guest/access">https://docs.mercurysurgelati.org/guest/access</a></p>
+    <div class="footer">
+      <p>Se non hai richiesto questo account o hai bisogno di assistenza, contatta l'amministratore.</p>
+      <p>Mercury Surgelati &copy; {{ now().year }}</p>
+    </div>
+  </div>
+</body>
+</html> 

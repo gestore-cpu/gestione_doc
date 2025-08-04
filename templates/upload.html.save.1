@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Upload Documento</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: url('{{ url_for("static", filename="img/sfondo.png") }}') no-repeat center center fixed;
+      background-size: cover;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .form-container {
+      max-width: 850px;
+      margin: 40px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+
+    #progress-wrapper {
+      display: none;
+      margin-top: 10px;
+    }
+
+    #drop-zone {
+      border: 2px dashed #007bff;
+      padding: 20px;
+      text-align: center;
+      color: #888;
+      background-color: #f1f1f1;
+      cursor: pointer;
+      border-radius: 8px;
+    }
+
+    #drop-zone.dragover {
+      background-color: #e3f1ff;
+      border-color: #0056b3;
+      color: #000;
+    }
+
+    .logo {
+      max-width: 180px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="text-center mt-4">
+    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" class="logo">
+  </div>
+
+  <div class="form-container">
+    <h3 class="mb-4 text-center text-primary">Carica un Documento</h3>
+
+    <form id="upload-form" enctype="multipart/form-data">
+      <!-- Destinazione -->
+      <div class="mb-3">
+        <label class="form-label">Destinazione:</label>
+        <select id="storage" name="storage" class="form-select" required>
+          <option value="/upload">🖥️ Locale (server)</option>
+          <option value="/gcs/upload">☁️ Google Cloud Storage</option>
+        </select>
+      </div>
+
+      <!-- Autore -->
+      <div class="mb-3">
+        <label>Autore:</label>
+        <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
+      </div>
+
+      <!-- Titolo e descrizione -->
+      <div class="mb-3">
+        <label for="title">Titolo:</label>
+        <input type="text" id="title" name="title" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label for="description">Descrizione:</label>
+        <input type="text" id="description" name="description" class="form-control">
+      </div>
+
+      <!-- Campo note -->
+      <div class="mb-3">
+        <label for="note">Note (facoltative):</label>
+        <textarea name="note" id="note" class="form-control" rows="3" placeholder="Inserisci eventuali note..."></textarea>
+      </div>
+
+      <!-- Visibilità -->
+      <div class="mb-3">
+        <label for="visibility">Visibilità:</label>
+        <select name="visibility" id="visibility" class="form-select" required>
+        <select name="visibility" id="visibility" class="form-select" required>
+  <option value="privato">Privato</option>
+  <option value="protetto">Protetto da password</option>
+  <option value="condividi">Condiviso via email</option>
+  <option value="aziendale">Visibile a tutti gli utenti</option>
+  <option value="reparto">Visibile solo al mio reparto</option>
+</select>
+
+           <option value="privato">Privato</option>
+          <option value="protetto">Protetto da password</option>
+          <option value="condividi">Condiviso via email</option>
+        </select>
+      </div>
+
+      <div id="password-field" class="mb-3" style="display: none;">
+        <label for="password">Password:</label>
+        <input type="password" name="password" id="password" class="form-control">
+      </div>
+
+      <div id="shared-fields" class="mb-3" style="display: none;">
+        <label for="shared_email">Email destinatari (separate da ;):</label>
+        <input type="text" name="shared_email" id="shared_email" class="form-control">
+      </div>
+
+      <!-- Selezione multipla aziende -->
+      <div class="mb-3">
+        <label>Seleziona aziende (max 2):</label>
+        <select name="target_companies" id="target_companies" class="form-select" multiple size="4">
+          {% for company in all_companies %}
+          <option value="{{ company.id }}">{{ company.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Selezione multipla reparti -->
+      <div class="mb-3">
+        <label>Seleziona reparti (max 2):</label>
+        <select name="target_departments" id="target_departments" class="form-select" multiple size="4">
+          {% for dept in all_departments %}
+          <option value="{{ dept.id }}">{{ dept.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- File upload -->
+      <div class="mb-3">
+        <div id="drop-zone">Trascina qui il file o clicca per selezionarlo</div>
+        <input type="file" name="file" id="file" class="form-control" style="display: none;" required>
+      </div>
+
+      <!-- Progress bar -->
+      <div id="progress-wrapper">
+        <label>Avanzamento upload:</label>
+        <div class="progress">
+          <div id="upload-progress" class="progress-bar" style="width: 0%">0%</div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="d-grid mt-3">
+        <button type="submit" class="btn btn-primary">Carica</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const dropZone = document.getElementById("drop-zone");
+  const fileInput = document.getElementById("file");
+  const uploadForm = document.getElementById("upload-form");
+  const storageSelect = document.getElementById("storage");
+  const progressWrapper = document.getElementById("progress-wrapper");
+  const progressBar = document.getElementById("upload-progress");
+
+  // Mostra campi condizionali
+  document.getElementById("visibility").addEventListener("change", function () {
+    document.getElementById("password-field").style.display = this.value === "protetto" ? "block" : "none";
+    document.getElementById("shared-fields").style.display = this.value === "condividi" ? "block" : "none";
+  });
+
+  // Drag & Drop
+  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    if (e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+    }
+  });
+
+  // Validazione estensione
+  function isAllowedExtension(filename) {
+    const allowed = ['pdf', 'doc', 'docx', 'txt'];
+    const ext = filename.split('.').pop().toLowerCase();
+    return allowed.includes(ext);
+  }
+
+  // Limita selezione multipla a 2
+  function limitSelection(id, max) {
+    const select = document.getElementById(id);
+    select.addEventListener('change', function () {
+      if (select.selectedOptions.length > max) {
+        alert(`Puoi selezionare al massimo ${max} elementi`);
+        select.options[select.selectedIndex].selected = false;
+      }
+    });
+  }
+  limitSelection('target_companies', 2);
+  limitSelection('target_departments', 2);
+
+  // Upload con validazione peso file
+  uploadForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    const file = fileInput.files[0];
+
+    if (!file || !isAllowedExtension(file.name)) {
+      alert("❌ Formato file non valido. Ammessi: .pdf, .doc, .docx, .txt");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert("❌ File troppo grande. Massimo consentito: 10MB");
+      return;
+    }
+
+    const actionUrl = storageSelect.value;
+    const formData = new FormData(uploadForm);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", actionUrl, true);
+
+    xhr.upload.onprogress = function (e) {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 100);
+        progressBar.style.width = percent + "%";
+        progressBar.innerText = percent + "%";
+        progressWrapper.style.display = "block";
+      }
+    };
+
+    xhr.onload = function () {
+      if (xhr.status === 200) {
+        window.location.href = "/my_documents";
+      } else {
+        alert("❌ Errore durante l'upload: " + xhr.statusText);
+      }
+    };
+
+    xhr.onerror = function () {
+      alert("❌ Errore di rete durante l'upload.");
+    };
+
+    xhr.send(formData);
+  });
+</script>
+</body>
+</html>
+

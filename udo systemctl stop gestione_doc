@@ -1,0 +1,24 @@
+[0;1;32m●[0m gestione_doc.service - Gunicorn instance to serve gestione_doc
+     Loaded: loaded (]8;;file://documenti/etc/systemd/system/gestione_doc.service/etc/systemd/system/gestione_doc.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Fri 2025-05-30 07:48:42 UTC; 7s ago
+ Invocation: cc36e8889b79481c8ed4bbb7733551e0
+   Main PID: 266661 (gunicorn)
+      Tasks: 4 (limit: 1110)
+     Memory: 145M (peak: 145.1M)
+        CPU: 2.599s
+     CGroup: /system.slice/gestione_doc.service
+             ├─[0;38;5;245m266661 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn -w 3 -b 127.0.0.1:8000 app:app[0m
+             ├─[0;38;5;245m266662 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn -w 3 -b 127.0.0.1:8000 app:app[0m
+             ├─[0;38;5;245m266663 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn -w 3 -b 127.0.0.1:8000 app:app[0m
+             └─[0;38;5;245m266664 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn -w 3 -b 127.0.0.1:8000 app:app[0m
+
+May 30 07:48:42 documenti gunicorn[266661]: [2025-05-30 07:48:42 +0000] [266661] [INFO] Using worker: sync
+May 30 07:48:42 documenti gunicorn[266662]: [2025-05-30 07:48:42 +0000] [266662] [INFO] Booting worker with pid: 266662
+May 30 07:48:42 documenti gunicorn[266663]: [2025-05-30 07:48:42 +0000] [266663] [INFO] Booting worker with pid: 266663
+May 30 07:48:42 documenti gunicorn[266664]: [2025-05-30 07:48:42 +0000] [266664] [INFO] Booting worker with pid: 266664
+May 30 07:48:44 documenti gunicorn[266662]: /var/www/gestione_doc/venv/lib/python3.12/site-packages/flask_sqlalchemy/model.py:144: SAWarning: This declarative base already contains a class with the same class name and module name as app.Company, and will be replaced in the string-lookup table.
+May 30 07:48:44 documenti gunicorn[266662]:   super().__init__(name, bases, d, **kwargs)
+May 30 07:48:44 documenti gunicorn[266663]: /var/www/gestione_doc/venv/lib/python3.12/site-packages/flask_sqlalchemy/model.py:144: SAWarning: This declarative base already contains a class with the same class name and module name as app.Company, and will be replaced in the string-lookup table.
+May 30 07:48:44 documenti gunicorn[266663]:   super().__init__(name, bases, d, **kwargs)
+May 30 07:48:44 documenti gunicorn[266664]: /var/www/gestione_doc/venv/lib/python3.12/site-packages/flask_sqlalchemy/model.py:144: SAWarning: This declarative base already contains a class with the same class name and module name as app.Company, and will be replaced in the string-lookup table.
+May 30 07:48:44 documenti gunicorn[266664]:   super().__init__(name, bases, d, **kwargs)

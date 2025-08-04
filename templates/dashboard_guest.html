@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Gestione Ospiti{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">
+                        <i class="fas fa-users"></i> 👥 Gestione Ospiti
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <!-- Sezione AI Suggerimenti -->
+                    {% if suggerimenti_ai or raccomandazioni_ai %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card border-0 bg-light">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-brain"></i> 🧠 Suggerimenti AI
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if suggerimenti_ai %}
+                                    <div class="mb-3">
+                                        <h6><i class="fas fa-exclamation-triangle"></i> Azioni Immediate</h6>
+                                        <ul class="list-unstyled">
+                                            {% for suggerimento in suggerimenti_ai %}
+                                            <li class="mb-2">
+                                                <span class="badge bg-{{ suggerimento.severita }} me-2">
+                                                    {% if suggerimento.tipo == 'scaduto' %}❌
+                                                    {% elif suggerimento.tipo == 'in_scadenza' %}⏳
+                                                    {% elif suggerimento.tipo == 'non_registrato' %}⚠️
+                                                    {% elif suggerimento.tipo == 'statistica' %}📊
+                                                    {% elif suggerimento.tipo == 'positivo' %}✅
+                                                    {% else %}💡{% endif %}
+                                                </span>
+                                                {{ suggerimento.messaggio }}
+                                                {% if suggerimento.access_id %}
+                                                <a href="#" class="btn btn-sm btn-outline-primary ms-2" 
+                                                   onclick="apriModale({{ suggerimento.access_id }})">
+                                                    <i class="fas fa-edit"></i> Gestisci
+                                                </a>
+                                                {% endif %}
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if raccomandazioni_ai %}
+                                    <div class="mb-3">
+                                        <h6><i class="fas fa-chart-line"></i> Raccomandazioni Strategiche</h6>
+                                        <ul class="list-unstyled">
+                                            {% for raccomandazione in raccomandazioni_ai %}
+                                            <li class="mb-2">
+                                                <span class="badge bg-{{ raccomandazione.severita }} me-2">
+                                                    {% if raccomandazione.tipo == 'pulizia' %}🧹
+                                                    {% elif raccomandazione.tipo == 'inviti' %}📧
+                                                    {% elif raccomandazione.tipo == 'sicurezza' %}🔒
+                                                    {% elif raccomandazione.tipo == 'attivita' %}📈
+                                                    {% else %}💡{% endif %}
+                                                </span>
+                                                {{ raccomandazione.messaggio }}
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if analisi_pattern %}
+                                    <div class="row mt-3">
+                                        <div class="col-md-3">
+                                            <div class="text-center">
+                                                <h4 class="text-primary">{{ analisi_pattern.totali }}</h4>
+                                                <small class="text-muted">Totali</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="text-center">
+                                                <h4 class="text-success">{{ analisi_pattern.attivi }}</h4>
+                                                <small class="text-muted">Attivi</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="text-center">
+                                                <h4 class="text-warning">{{ analisi_pattern.scaduti }}</h4>
+                                                <small class="text-muted">Scaduti</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="text-center">
+                                                <h4 class="text-info">{{ analisi_pattern.non_registrati }}</h4>
+                                                <small class="text-muted">Non Registrati</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <!-- Azioni Rapide AI -->
+                                    {% if suggerimenti_ai or raccomandazioni_ai %}
+                                    <div class="mt-3">
+                                        <h6><i class="fas fa-bolt"></i> Azioni Rapide</h6>
+                                        <div class="btn-group" role="group">
+                                            <form action="{{ url_for('docs.bulk_guest_actions') }}" method="POST" style="display:inline;">
+                                                <input type="hidden" name="action" value="cleanup_expired">
+                                                <button type="submit" class="btn btn-sm btn-danger" 
+                                                        onclick="return confirm('Eliminare tutti gli accessi scaduti?')">
+                                                    <i class="fas fa-trash"></i> 🧹 Pulizia Scaduti
+                                                </button>
+                                            </form>
+                                            
+                                            <form action="{{ url_for('docs.bulk_guest_actions') }}" method="POST" style="display:inline;">
+                                                <input type="hidden" name="action" value="resend_invites">
+                                                <button type="submit" class="btn btn-sm btn-warning">
+                                                    <i class="fas fa-paper-plane"></i> 📧 Reinvia Inviti
+                                                </button>
+                                            </form>
+                                            
+                                            <form action="{{ url_for('docs.bulk_guest_actions') }}" method="POST" style="display:inline;">
+                                                <input type="hidden" name="action" value="extend_expiring">
+                                                <button type="submit" class="btn btn-sm btn-info">
+                                                    <i class="fas fa-clock"></i> ⏰ Estendi Scadenze
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if accessi %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th><i class="fas fa-envelope"></i> Email</th>
+                                        <th><i class="fas fa-file-alt"></i> Documento</th>
+                                        <th><i class="fas fa-calendar-alt"></i> Scadenza</th>
+                                        <th><i class="fas fa-key"></i> Permesso</th>
+                                        <th><i class="fas fa-user-check"></i> Registrazione</th>
+                                        <th><i class="fas fa-cogs"></i> Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for access in accessi %}
+                                    <tr class="{% if access.expires_at and access.expires_at < now %}table-warning{% endif %}">
+                                        <td>
+                                            <strong>{{ access.guest.email }}</strong>
+                                            {% if access.expires_at and access.expires_at < now %}
+                                                <span class="badge bg-warning ms-2">Scaduto</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <i class="fas fa-file-pdf text-danger"></i>
+                                            {{ access.document.name }}
+                                        </td>
+                                        <td>
+                                            {% if access.expires_at %}
+                                                <span class="{% if access.expires_at < now %}text-danger{% endif %}">
+                                                    {{ access.expires_at.strftime('%d/%m/%Y') }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">Nessuna scadenza</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if access.can_download %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-download"></i> Download
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-info">
+                                                    <i class="fas fa-eye"></i> Solo Vista
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if access.guest.password %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check"></i> Completata
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-clock"></i> In attesa
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-primary" 
+                                                        onclick="apriModale({{ access.id }}, '{{ access.guest.email }}', '{{ access.document.name }}', '{{ access.expires_at.strftime('%Y-%m-%d') if access.expires_at else '' }}', {{ 'true' if access.can_download else 'false' }})">
+                                                    <i class="fas fa-edit"></i> ✏️
+                                                </button>
+                                                
+                                                {% if not access.guest.password %}
+                                                <form action="{{ url_for('docs.resend_guest_invitation', id=access.id) }}" method="POST" style="display:inline;">
+                                                    <button class="btn btn-sm btn-info" type="submit" onclick="return confirm('Reinviare l\'invito?')">
+                                                        <i class="fas fa-paper-plane"></i> 🔁
+                                                    </button>
+                                                </form>
+                                                {% endif %}
+                                                
+                                                <form action="{{ url_for('docs.delete_guest_access', id=access.id) }}" method="POST" style="display:inline;">
+                                                    <button class="btn btn-sm btn-danger" type="submit" onclick="return confirm('Eliminare questo accesso?')">
+                                                        <i class="fas fa-trash"></i> ❌
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">Nessun ospite trovato</h4>
+                            <p class="text-muted">Non ci sono ancora ospiti registrati per i tuoi documenti.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modale per modifica accesso -->
+<div class="modal fade" id="modificaAccessoModal" tabindex="-1" aria-labelledby="modificaAccessoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modificaAccessoModalLabel">
+                    <i class="fas fa-edit"></i> Modifica Accesso Ospite
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formModificaAccesso" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label"><i class="fas fa-envelope"></i> Email Ospite</label>
+                        <input type="email" class="form-control" id="emailOspite" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><i class="fas fa-file-alt"></i> Documento</label>
+                        <input type="text" class="form-control" id="nomeDocumento" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="scadenza" class="form-label">
+                            <i class="fas fa-calendar-alt"></i> Data di Scadenza
+                        </label>
+                        <input type="date" class="form-control" id="scadenza" name="expires_at">
+                        <div class="form-text">Lascia vuoto per accesso senza scadenza</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="permessoDownload" name="can_download">
+                            <label class="form-check-label" for="permessoDownload">
+                                <i class="fas fa-download"></i> Consenti Download
+                            </label>
+                        </div>
+                        <div class="form-text">Se non selezionato, l'ospite potrà solo visualizzare il documento</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salva Modifiche
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * Apre il modale per modificare un accesso guest.
+ * 
+ * @param {number} accessId - ID dell'accesso da modificare
+ * @param {string} email - Email dell'ospite
+ * @param {string} documentName - Nome del documento
+ * @param {string} expiresAt - Data di scadenza (formato YYYY-MM-DD)
+ * @param {boolean} canDownload - Se l'ospite può scaricare
+ */
+function apriModale(accessId, email, documentName, expiresAt, canDownload) {
+    // Popola i campi del modale
+    document.getElementById('emailOspite').value = email;
+    document.getElementById('nomeDocumento').value = documentName;
+    document.getElementById('scadenza').value = expiresAt;
+    document.getElementById('permessoDownload').checked = canDownload === 'true';
+    
+    // Imposta l'action del form
+    document.getElementById('formModificaAccesso').action = `/guest_access/${accessId}/update`;
+    
+    // Mostra il modale
+    const modal = new bootstrap.Modal(document.getElementById('modificaAccessoModal'));
+    modal.show();
+}
+
+// Inizializzazione quando il documento è pronto
+document.addEventListener('DOMContentLoaded', function() {
+    // Aggiungi animazioni alle righe della tabella
+    const tableRows = document.querySelectorAll('tbody tr');
+    tableRows.forEach((row, index) => {
+        row.style.animationDelay = `${index * 0.1}s`;
+        row.classList.add('animate__animated', 'animate__fadeInUp');
+    });
+    
+    // Gestione conferma eliminazione
+    const deleteButtons = document.querySelectorAll('form[action*="/delete"] button');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            if (!confirm('Sei sicuro di voler eliminare questo accesso? Questa azione non può essere annullata.')) {
+                e.preventDefault();
+            }
+        });
+    });
+});
+</script>
+
+<style>
+.table-responsive {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.table th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    font-weight: 600;
+}
+
+.table tbody tr:hover {
+    background-color: rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
+    transition: all 0.3s ease;
+}
+
+.badge {
+    font-size: 0.8em;
+    padding: 0.4em 0.6em;
+}
+
+.btn-group .btn {
+    margin-right: 2px;
+}
+
+.modal-content {
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    border-radius: 12px 12px 0 0;
+}
+
+.animate__fadeInUp {
+    animation-duration: 0.6s;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.9em;
+    }
+    
+    .btn-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 2px;
+        margin-right: 0;
+    }
+}
+</style>
+{% endblock %} 

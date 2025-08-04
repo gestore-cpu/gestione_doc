@@ -1,0 +1,41 @@
+ * Serving Flask app 'app.py'
+ * Debug mode: off
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://138.68.80.169:5000
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:10:35] "GET /login?next=/my_guests HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:10:35] "[36mGET /static/sfondo.jpg HTTP/1.1[0m" 304 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:10:36] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:10:36] "GET /static/style.css HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:10:36] "GET /static/logonew.png HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:10:36] "GET /static/sfondo.jpg HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:10:39] "GET /login HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:10:40] "[36mGET /static/sfondo.jpg HTTP/1.1[0m" 304 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:01] "POST /login HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:01] "[36mGET /static/sfondo.jpg HTTP/1.1[0m" 304 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:10] "GET /login HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:10] "[36mGET /static/sfondo.jpg HTTP/1.1[0m" 304 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:11] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:11] "[36mGET /static/style.css HTTP/1.1[0m" 304 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:11] "[36mGET /static/logonew.png HTTP/1.1[0m" 304 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:11] "[36mGET /static/sfondo.jpg HTTP/1.1[0m" 304 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:13] "[32mGET /upload HTTP/1.1[0m" 302 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:13] "GET /login?next=/upload HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:11:13] "[36mGET /static/sfondo.jpg HTTP/1.1[0m" 304 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:18:54] "POST /login?next=/my_guests HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:18:54] "[36mGET /static/sfondo.jpg HTTP/1.1[0m" 304 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:43:52] "POST /login?next=/my_guests HTTP/1.1" 200 -
+INFO:werkzeug:146.0.208.26 - - [03/Jun/2025 13:43:52] "[36mGET /static/sfondo.jpg HTTP/1.1[0m" 304 -
+INFO:werkzeug:127.0.0.1 - - [03/Jun/2025 13:59:42] "HEAD / HTTP/1.1" 200 -
+ * Serving Flask app 'app'
+ * Debug mode: on
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://138.68.80.169:5000
+[33mPress CTRL+C to quit[0m
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 935-685-715

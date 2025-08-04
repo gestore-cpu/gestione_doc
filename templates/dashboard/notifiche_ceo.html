@@ -1,0 +1,94 @@
+<h2>📬 Notifiche AI – CEO</h2>
+<div class="d-flex justify-content-between mb-2">
+  <form method="get" action="/ceo/notifiche">
+    <input type="date" name="start"> - <input type="date" name="end">
+    <select name="canale">
+      <option value="">Tutti</option>
+      <option value="email">Email</option>
+      <option value="whatsapp">WhatsApp</option>
+    </select>
+    <button class="btn btn-sm btn-primary">Filtra</button>
+  </form>
+  <div>
+    <select id="azione-bulk" class="form-select d-inline-block w-auto">
+      <option value="segna_lette">Segna come lette</option>
+      <option value="archivia">Archivia</option>
+      <option value="elimina">Elimina</option>
+    </select>
+    <button type="button" onclick="eseguiAzioneBulk()" class="btn btn-primary ms-2">Applica</button>
+    <button type="button" class="btn btn-sm btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#modalDel">🗑️ Cancella vecchie</button>
+    <a href="/ceo/notifiche/export" class="btn btn-sm btn-success ms-2">⬇️ Esporta CSV</a>
+  </div>
+</div>
+
+<!-- Modale conferma cancellazione -->
+<div class="modal fade" id="modalDel" tabindex="-1" aria-labelledby="modalDelLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalDelLabel">Conferma cancellazione</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Vuoi cancellare tutte le notifiche più vecchie di 30 giorni?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-danger" id="btnDelOld">Conferma</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<table class="table table-sm">
+  <thead>
+    <tr><th><input type="checkbox" id="check-all" onclick="toggleAllNotifiche(this)"></th><th>ID</th><th>Utente</th><th>Messaggio</th><th>Canale</th><th>Data</th><th>Azioni</th></tr>
+  </thead>
+  <tbody>
+    {% for n in notifiche %}
+    <tr>
+      <td><input type="checkbox" class="notifica-checkbox" value="{{ n.id }}"></td>
+      <td>{{ n.id }}</td>
+      <td>{{ n.utente_email }}</td>
+      <td>{{ n.messaggio }}</td>
+      <td>{{ n.canale }}</td>
+      <td>{{ n.data_invio.strftime('%d/%m/%Y %H:%M') }}</td>
+      <td>
+        {% if not n.letta %}
+        <button class="btn btn-sm btn-outline-success" onclick="segnalet({{ n.id }}, this)">Segna ✅</button>
+        {% else %}
+        <span class="badge bg-success">Letta</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+function segnalet(id, btn) {
+  fetch(`/ceo/notifiche/${id}/letta`, {method: 'PATCH'}).then(r => r.json()).then(data => {
+    if(data.ok) {
+      btn.outerHTML = '<span class="badge bg-success">Letta</span>';
+    }
+  });
+}
+function toggleAllNotifiche(cb) {
+  document.querySelectorAll('.notifica-checkbox').forEach(x => x.checked = cb.checked);
+}
+function eseguiAzioneBulk() {
+  const ids = Array.from(document.querySelectorAll('.notifica-checkbox:checked')).map(cb => parseInt(cb.value));
+  const azione = document.getElementById("azione-bulk").value;
+  if (ids.length === 0) return alert("Seleziona almeno una notifica.");
+  fetch("/ceo/notifiche/bulk", {
+    method: "PATCH",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ ids, azione })
+  }).then(() => location.reload());
+}
+document.getElementById('btnDelOld').onclick = function() {
+  fetch('/ceo/notifiche/old', {method: 'DELETE'}).then(r => r.json()).then(data => {
+    if(data.ok) location.reload();
+  });
+};
+</script> 

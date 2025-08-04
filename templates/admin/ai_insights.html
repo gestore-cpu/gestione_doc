@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}AI Assistant - Insight Strategici{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🤖 AI Assistant - Insight Strategici</h1>
+                <button class="btn btn-primary" onclick="generateNewInsights()">
+                    🔄 Genera Nuovi Insight
+                </button>
+            </div>
+
+            <!-- Riepilogo Insight -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h3 id="total-insights">{{ active_insights|length }}</h3>
+                            <p class="mb-0">📊 Insight Attivi</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h3 id="critical-insights">{{ active_insights|selectattr('severity', 'equalto', 'critico')|list|length }}</h3>
+                            <p class="mb-0">🔴 Critici</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <h3 id="attention-insights">{{ active_insights|selectattr('severity', 'equalto', 'attenzione')|list|length }}</h3>
+                            <p class="mb-0">🟡 Attenzione</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h3 id="resolved-insights">{{ resolved_insights|length }}</h3>
+                            <p class="mb-0">✅ Risolti</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insight Attivi -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>📋 Insight Attivi</h3>
+                </div>
+                <div class="card-body">
+                    {% if active_insights %}
+                        <div id="active-insights-container">
+                            {% for insight in active_insights %}
+                            <div class="alert alert-{{ 'danger' if insight.severity == 'critico' else 'warning' }} alert-dismissible fade show mb-3" role="alert">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <span class="badge bg-{{ 'danger' if insight.severity == 'critico' else 'warning' }} me-2">
+                                                {{ insight.insight_type.upper() }}
+                                            </span>
+                                            <small class="text-muted">{{ insight.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                                        </div>
+                                        <p class="mb-2">{{ insight.insight_text }}</p>
+                                        {% if insight.pattern_data %}
+                                        <details class="mt-2">
+                                            <summary class="text-muted">📊 Dettagli Pattern</summary>
+                                            <pre class="mt-2 small">{{ insight.pattern_data }}</pre>
+                                        </details>
+                                        {% endif %}
+                                    </div>
+                                    <div class="ms-3">
+                                        <button class="btn btn-sm btn-success me-1" onclick="resolveInsight({{ insight.id }})">
+                                            ✅ Risolvi
+                                        </button>
+                                        <button class="btn btn-sm btn-secondary me-1" onclick="ignoreInsight({{ insight.id }})">
+                                            ❌ Ignora
+                                        </button>
+                                        {% if not insight.trasformato_in_task %}
+                                        <button class="btn btn-sm btn-outline-primary" onclick="trasformaInTask({{ insight.id }})">
+                                            📝 Trasforma in Task
+                                        </button>
+                                        {% else %}
+                                        <span class="badge bg-info">✅ Già trasformato</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <p class="text-muted">🎉 Nessun insight attivo! Il sistema funziona correttamente.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Insight Risolti -->
+            {% if resolved_insights %}
+            <div class="card">
+                <div class="card-header">
+                    <h3>✅ Insight Risolti</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th>Severità</th>
+                                    <th>Insight</th>
+                                    <th>Risolto da</th>
+                                    <th>Azione</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for insight in resolved_insights %}
+                                <tr>
+                                    <td>{{ insight.resolved_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ insight.insight_type }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 'danger' if insight.severity == 'critico' else 'warning' }}">
+                                            {{ insight.severity }}
+                                        </span>
+                                    </td>
+                                    <td>{{ insight.insight_text[:100] }}...</td>
+                                    <td>{{ insight.resolved_by }}</td>
+                                    <td>
+                                        {% if insight.action_taken %}
+                                            <small class="text-muted">{{ insight.action_taken }}</small>
+                                        {% else %}
+                                            <span class="badge bg-success">Risolto</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal per dettagli insight -->
+<div class="modal fade" id="insightModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">📊 Dettagli Insight AI</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="insightModalBody">
+                <!-- Contenuto dinamico -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Funzione per generare nuovi insight
+function generateNewInsights() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '⏳ Generazione...';
+    button.disabled = true;
+    
+    fetch('/admin/api/ai_insights/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Ricarica la pagina per mostrare i nuovi insight
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la generazione degli insight');
+    })
+    .finally(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+// Funzione per risolvere un insight
+function resolveInsight(insightId) {
+    if (!confirm('Confermi di voler marcare questo insight come risolto?')) {
+        return;
+    }
+    
+    fetch(`/admin/api/ai_insights/${insightId}/resolve`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Rimuovi l'elemento dalla pagina
+            const element = document.querySelector(`[onclick="resolveInsight(${insightId})"]`).closest('.alert');
+            element.remove();
+            
+            // Aggiorna i contatori
+            updateCounters();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la risoluzione dell\'insight');
+    });
+}
+
+// Funzione per ignorare un insight
+function ignoreInsight(insightId) {
+    if (!confirm('Confermi di voler ignorare questo insight?')) {
+        return;
+    }
+    
+    fetch(`/admin/api/ai_insights/${insightId}/ignore`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Rimuovi l'elemento dalla pagina
+            const element = document.querySelector(`[onclick="ignoreInsight(${insightId})"]`).closest('.alert');
+            element.remove();
+            
+            // Aggiorna i contatori
+            updateCounters();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante l\'ignoramento dell\'insight');
+    });
+}
+
+// Funzione per trasformare insight in task
+function trasformaInTask(insightId) {
+    if (!confirm('Sei sicuro di voler trasformare questo insight in un task?')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '⏳ Trasformazione...';
+    button.disabled = true;
+    
+    fetch(`/admin/api/ai_insights/${insightId}/task`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`✅ Insight trasformato in task ID: ${data.task_id}!`);
+            location.reload();
+        } else {
+            alert('❌ Errore: ' + data.error);
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('❌ Errore durante la trasformazione in task');
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+// Funzione per aggiornare i contatori
+function updateCounters() {
+    const activeInsights = document.querySelectorAll('#active-insights-container .alert').length;
+    const criticalInsights = document.querySelectorAll('#active-insights-container .alert-danger').length;
+    const attentionInsights = document.querySelectorAll('#active-insights-container .alert-warning').length;
+    
+    document.getElementById('total-insights').textContent = activeInsights;
+    document.getElementById('critical-insights').textContent = criticalInsights;
+    document.getElementById('attention-insights').textContent = attentionInsights;
+}
+
+// Carica riepilogo insight al caricamento pagina
+document.addEventListener('DOMContentLoaded', function() {
+    // Aggiorna contatori iniziali
+    updateCounters();
+});
+</script>
+{% endblock %} 

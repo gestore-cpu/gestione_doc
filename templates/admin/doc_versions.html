@@ -1,0 +1,277 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>📄 Gestione Versioni - {{ doc.title }}</h2>
+                    <p class="text-muted mb-0">Tracciamento versioni e confronto AI automatico tra revisioni.</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('docs.view_document', document_id=doc.id) }}" class="btn btn-outline-primary">
+                        ← Torna al Documento
+                    </a>
+                </div>
+            </div>
+
+            <!-- Form Upload Nuova Versione -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📤 Carica Nuova Versione</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('docs.upload_version', doc_id=doc.id) }}" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="file" class="form-label">📁 Seleziona File</label>
+                                    <input type="file" class="form-control" id="file" name="file" accept=".pdf,.doc,.docx" required>
+                                    <div class="form-text">Formati supportati: PDF, DOC, DOCX</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="notes" class="form-label">📝 Note sulla Versione</label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                              placeholder="Descrivi le modifiche principali di questa versione..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">
+                                🚀 Carica e Analizza con AI
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tabella Versioni -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📊 Storico Versioni</h5>
+                </div>
+                <div class="card-body">
+                    {% if versioni %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Versione</th>
+                                        <th>Data</th>
+                                        <th>Caricato da</th>
+                                        <th>Note</th>
+                                        <th>🧠 AI Diff</th>
+                                        <th>Stato</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for v in versioni %}
+                                    <tr class="{% if v.is_active %}table-success{% endif %}">
+                                        <td>
+                                            <strong>v{{ v.version_number }}</strong>
+                                            {% if v.is_active %}
+                                                <span class="badge bg-success ms-1">✅ Attiva</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ v.uploaded_at_formatted }}</td>
+                                        <td>{{ v.uploaded_by }}</td>
+                                        <td>
+                                            {% if v.notes %}
+                                                <span data-bs-toggle="tooltip" title="{{ v.notes }}">
+                                                    {{ v.notes[:50] }}{% if v.notes|length > 50 %}...{% endif %}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if v.diff_ai %}
+                                                <button class="btn btn-sm btn-outline-info" 
+                                                        data-bs-toggle="collapse" 
+                                                        data-bs-target="#diff{{ v.id }}">
+                                                    🔍 Vedi Diff
+                                                </button>
+                                                <div id="diff{{ v.id }}" class="collapse mt-2">
+                                                    <div class="card card-body bg-light">
+                                                        <h6>📋 Analisi AI delle Differenze</h6>
+                                                        <pre class="mb-0">{{ v.diff_ai }}</pre>
+                                                    </div>
+                                                </div>
+                                            {% elif v.has_ai_analysis %}
+                                                <span class="badge bg-warning text-dark">🔄 Analisi in corso...</span>
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if v.is_active %}
+                                                <span class="badge bg-success">✅ Attiva</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">📄 Storico</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="{{ url_for('docs.download_version', doc_id=doc.id, version_id=v.id) }}" 
+                                                   class="btn btn-outline-primary" 
+                                                   title="Scarica versione">
+                                                    ⬇️
+                                                </a>
+                                                {% if not v.is_active %}
+                                                    <button class="btn btn-outline-success" 
+                                                            onclick="restoreVersion({{ v.id }})"
+                                                            title="Ripristina questa versione">
+                                                        🔄
+                                                    </button>
+                                                {% endif %}
+                                                {% if v.has_ai_analysis %}
+                                                    <button class="btn btn-outline-info" 
+                                                            onclick="showAIAnalysis({{ v.id }})"
+                                                            title="Analisi AI dettagliata">
+                                                        🧠
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-3x mb-3"></i>
+                            <h5>Nessuna versione trovata</h5>
+                            <p>Carica la prima versione del documento per iniziare.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Statistiche Versioni -->
+            {% if versioni %}
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">📊 Versioni Totali</h5>
+                            <p class="card-text fs-4">{{ versioni|length }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-success">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">✅ Versione Attiva</h5>
+                            <p class="card-text fs-4">
+                                {% for v in versioni %}
+                                    {% if v.is_active %}v{{ v.version_number }}{% endif %}
+                                {% endfor %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-white bg-info">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">🧠 Analisi AI</h5>
+                            <p class="card-text fs-4">
+                                {{ versioni|selectattr('has_ai_analysis')|list|length }}/{{ versioni|length }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Link di navigazione -->
+            <div class="mt-4">
+                <a href="{{ url_for('docs.view_document', document_id=doc.id) }}" class="btn btn-secondary">
+                    ← Torna al Documento
+                </a>
+                <a href="{{ url_for('admin.documents_overview') }}" class="btn btn-outline-primary ms-2">
+                    📊 Panoramica Documenti
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per Analisi AI Dettagliata -->
+<div class="modal fade" id="aiAnalysisModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🧠 Analisi AI Dettagliata</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="aiAnalysisContent">
+                <!-- Contenuto dinamico -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// === Funzione per ripristinare una versione ===
+function restoreVersion(versionId) {
+    if (confirm("Sei sicuro di voler ripristinare questa versione? La versione attuale diventerà storica.")) {
+        fetch(`/document/version/${versionId}/restore`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert("❌ Errore nel ripristino: " + data.message);
+            }
+        })
+        .catch(error => {
+            console.error("Errore:", error);
+            alert("❌ Errore durante il ripristino.");
+        });
+    }
+}
+
+// === Funzione per mostrare analisi AI dettagliata ===
+function showAIAnalysis(versionId) {
+    // Per ora mostra un messaggio di esempio
+    // In produzione, caricherebbe i dati reali via AJAX
+    const content = `
+        <div class="alert alert-info">
+            <h6>📋 Analisi AI Versione ${versionId}</h6>
+            <p>Questa funzionalità mostrerà l'analisi AI dettagliata della versione.</p>
+            <ul>
+                <li>Confronto semantico con versione precedente</li>
+                <li>Identificazione modifiche rilevanti</li>
+                <li>Valutazione coerenza documentale</li>
+            </ul>
+        </div>
+    `;
+    
+    document.getElementById('aiAnalysisContent').innerHTML = content;
+    new bootstrap.Modal(document.getElementById('aiAnalysisModal')).show();
+}
+
+// === Inizializza tooltip Bootstrap ===
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+
+{% endblock %} 

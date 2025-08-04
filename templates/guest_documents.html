@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Documenti condivisi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h2 class="card-title mb-4">
+                Documenti condivisi con <strong>{{ guest_email }}</strong>
+            </h2>
+
+            {% if documents %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Titolo</th>
+                                <th>Descrizione</th>
+                                <th>Scadenza</th>
+                                <th>Download</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in documents %}
+                                <tr>
+                                    <td>{{ doc.title }}</td>
+                                    <td>{{ doc.description or '—' }}</td>
+                                    <td>
+                                        {% if doc.expiration_date and doc.expiration_date < now %}
+                                            <span class="badge bg-danger">Scaduto</span>
+                                        {% else %}
+                                            {{ doc.expiration_date.strftime('%d/%m/%Y') if doc.expiration_date else '—' }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if doc.downloadable and (not doc.expiration_date or doc.expiration_date >= now) %}
+                                            <a href="{{ url_for('guest_download', doc_id=doc.id, email=guest_email) }}"
+                                               class="btn btn-sm btn-primary">
+                                                Scarica
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">Non disponibile</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">Nessun documento disponibile.</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

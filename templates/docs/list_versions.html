@@ -1,0 +1,345 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>📋 Versioni Documento</h2>
+                    <p class="text-muted mb-0">{{ document.title or document.original_filename }}</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-outline-secondary">
+                        📄 Panoramica Documenti
+                    </a>
+                </div>
+            </div>
+
+            <!-- INFORMAZIONI DOCUMENTO -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📄 Informazioni Documento</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Titolo:</strong> {{ document.title or document.original_filename }}</p>
+                            <p><strong>Azienda:</strong> {{ document.company.name if document.company else 'N/A' }}</p>
+                            <p><strong>Reparto:</strong> {{ document.department.name if document.department else 'N/A' }}</p>
+                            <p><strong>Caricato da:</strong> {{ document.uploader_email }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Data creazione:</strong> {{ document.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                            <p><strong>Stato AI:</strong> 
+                                {% if document.ai_status == 'completo' %}
+                                    <span class="badge bg-success">✅ Completo</span>
+                                {% elif document.ai_status == 'incompleto' %}
+                                    <span class="badge bg-warning">⚠️ Incompleto</span>
+                                {% elif document.ai_status == 'scaduto' %}
+                                    <span class="badge bg-danger">❌ Scaduto</span>
+                                {% elif document.ai_status == 'manca_firma' %}
+                                    <span class="badge bg-danger">❌ Manca Firma</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">📄 Non Analizzato</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Task AI:</strong> 
+                                {% if document.ai_task_id %}
+                                    <span class="badge bg-info">🎯 Task #{{ document.ai_task_id }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REVISIONE PERIODICA -->
+            {% if document.frequenza_revisione %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔄 Revisione Periodica</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <p><strong>Frequenza:</strong> 
+                                <span class="badge bg-info">{{ document.frequenza_revisione|title }}</span>
+                            </p>
+                            <p><strong>Ultima Revisione:</strong> 
+                                {% if document.data_ultima_revisione %}
+                                    {{ document.data_ultima_revisione.strftime('%d/%m/%Y') }}
+                                {% else %}
+                                    <span class="text-muted">Non specificata</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Prossima Scadenza:</strong> 
+                                {% if document.prossima_revisione %}
+                                    {% set giorni = (document.prossima_revisione - oggi).days %}
+                                    {% if giorni <= 0 %}
+                                        <span class="badge bg-danger">Scaduta</span>
+                                    {% elif giorni <= 30 %}
+                                        <span class="badge bg-warning">{{ giorni }} giorni</span>
+                                    {% else %}
+                                        <span class="badge bg-success">{{ giorni }} giorni</span>
+                                    {% endif %}
+                                    ({{ document.prossima_revisione.strftime('%d/%m/%Y') }})
+                                {% else %}
+                                    <span class="text-muted">Non calcolata</span>
+                                {% endif %}
+                            </p>
+                            {% if document.revisione_task_id %}
+                            <p><strong>Task Revisione:</strong> 
+                                <span class="badge bg-warning">🔄 Task #{{ document.revisione_task_id }}</span>
+                            </p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 text-end">
+                            {% if document.prossima_revisione and (document.prossima_revisione - oggi).days <= 0 %}
+                            <form action="{{ url_for('docs.completa_revisione', doc_id=document.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-success">
+                                    ✅ Completa Revisione
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- LISTA VERSIONI -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📋 Versioni ({{ versions|length }})</h5>
+                    <button class="btn btn-primary btn-sm" onclick="uploadNewVersion()">
+                        📤 Carica Nuova Versione
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if versions %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Versione</th>
+                                    <th>Caricata da</th>
+                                    <th>Data Upload</th>
+                                    <th>Note</th>
+                                    <th>Analisi AI</th>
+                                    <th>Firme</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in versions %}
+                                <tr>
+                                    <td>
+                                        <strong>v{{ v.version_number }}</strong>
+                                        {% if v.is_active %}
+                                            <span class="badge bg-success ms-1">Attiva</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ v.uploaded_by or 'Sistema' }}</td>
+                                    <td>{{ v.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        {% if v.notes %}
+                                            <small class="text-muted">{{ v.notes[:50] }}{% if v.notes|length > 50 %}...{% endif %}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if v.ai_summary %}
+                                            <small class="text-muted">{{ v.ai_summary[:50] }}{% if v.ai_summary|length > 50 %}...{% endif %}</small>
+                                        {% else %}
+                                            <span class="text-muted">Non analizzata</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if v.signatures %}
+                                            <div class="d-flex flex-column gap-1">
+                                                {% for sig in v.signatures %}
+                                                <div class="d-flex align-items-center">
+                                                    <span class="badge bg-success me-1">✅</span>
+                                                    <small>{{ sig.signed_by }} ({{ sig.role }})</small>
+                                                    <small class="text-muted ms-1">{{ sig.created_at.strftime('%d/%m') }}</small>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">Nessuna firma</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('docs.download_version', version_id=v.id) }}" 
+                                               class="btn btn-outline-primary" title="Scarica">
+                                                📥
+                                            </a>
+                                            <button onclick="analyzeVersion({{ v.id }})" 
+                                                    class="btn btn-outline-info" title="Analizza AI">
+                                                🧠
+                                            </button>
+                                            
+                                            <!-- FIRMA SICURA -->
+                                            {% if current_user.role in ['ceo', 'rspp', 'dirigente', 'admin'] %}
+                                            <div class="dropdown d-inline">
+                                                <button class="btn btn-outline-success dropdown-toggle" 
+                                                        type="button" data-bs-toggle="dropdown" title="Firma Sicura">
+                                                    🔐
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    <li>
+                                                        <a class="dropdown-item" href="{{ url_for('docs.richiedi_token_firma', version_id=v.id) }}">
+                                                            📩 Richiedi Token
+                                                        </a>
+                                                    </li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <form action="{{ url_for('docs.conferma_firma', version_id=v.id) }}" 
+                                                              method="POST" class="p-2">
+                                                            <div class="mb-2">
+                                                                <input type="text" name="token" 
+                                                                       class="form-control form-control-sm" 
+                                                                       placeholder="Token 6 cifre" required>
+                                                            </div>
+                                                            <div class="mb-2">
+                                                                <textarea name="note" class="form-control form-control-sm" 
+                                                                          placeholder="Note firma (opzionale)" rows="2"></textarea>
+                                                            </div>
+                                                            <button type="submit" class="btn btn-success btn-sm w-100">
+                                                                ✅ Firma con Token
+                                                            </button>
+                                                        </form>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-file-upload fa-3x mb-3"></i>
+                        <h5>Nessuna versione disponibile</h5>
+                        <p>Carica la prima versione del documento.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- FIRME DETTAGLIATE -->
+            {% if versions and versions|selectattr('signatures')|list|length > 0 %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔐 Firme Digitali</h5>
+                </div>
+                <div class="card-body">
+                    {% for v in versions %}
+                        {% if v.signatures %}
+                        <div class="mb-3">
+                            <h6>Versione v{{ v.version_number }}</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Firmatario</th>
+                                            <th>Ruolo</th>
+                                            <th>Data/Ora</th>
+                                            <th>Token</th>
+                                            <th>Hash SHA256</th>
+                                            <th>Note</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for sig in v.signatures %}
+                                        <tr>
+                                            <td><strong>{{ sig.signed_by }}</strong></td>
+                                            <td><span class="badge bg-info">{{ sig.role }}</span></td>
+                                            <td>{{ sig.created_at_formatted }}</td>
+                                            <td><code>{{ sig.token_used or 'N/A' }}</code></td>
+                                            <td><code class="small">{{ sig.hash_sha256[:16] }}...</code></td>
+                                            <td>
+                                                {% if sig.signature_note %}
+                                                    <small>{{ sig.signature_note }}</small>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- LINK DI NAVIGAZIONE -->
+            <div class="mt-4">
+                <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-secondary">
+                    ← Torna alla Panoramica
+                </a>
+                <a href="{{ url_for('admin.view_document', doc_id=document.id) }}" class="btn btn-outline-primary ms-2">
+                    👁️ Visualizza Documento
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// === FUNZIONE ANALISI VERSIONE ===
+function analyzeVersion(versionId) {
+    if (confirm("Analizzare questa versione con Document Intelligence AI?")) {
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = "🔄 Analizzando...";
+        button.disabled = true;
+        
+        fetch('/docs/analyze-version', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ version_id: versionId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`✅ Analisi completata!\n\nRiepilogo: ${data.summary}\nDifferenze: ${data.diff}`);
+                location.reload();
+            } else {
+                alert("❌ Errore nell'analisi AI: " + data.message);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error("Errore AI:", error);
+            alert("❌ Errore durante l'analisi AI");
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+}
+
+// === FUNZIONE UPLOAD NUOVA VERSIONE ===
+function uploadNewVersion() {
+    // TODO: Implementare modal per upload nuova versione
+    alert("Funzionalità di upload nuova versione in sviluppo");
+}
+</script>
+
+{% endblock %} 

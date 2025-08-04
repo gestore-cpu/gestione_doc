@@ -1,0 +1,10 @@
+Jun 27 05:33:20 documenti systemd[1]: Started gunicorn.service - gunicorn daemon.
+Jun 27 05:33:20 documenti gunicorn[619971]: [2025-06-27 05:33:20 +0000] [619971] [INFO] Starting gunicorn 23.0.0
+Jun 27 05:33:20 documenti gunicorn[619971]: [2025-06-27 05:33:20 +0000] [619971] [INFO] Listening at: unix:/var/www/gestione_doc/gunicorn.sock (619971)
+Jun 27 05:33:20 documenti gunicorn[619971]: [2025-06-27 05:33:20 +0000] [619971] [INFO] Using worker: sync
+Jun 27 05:33:20 documenti gunicorn[619972]: [2025-06-27 05:33:20 +0000] [619972] [INFO] Booting worker with pid: 619972
+Jun 27 05:33:20 documenti gunicorn[619973]: [2025-06-27 05:33:20 +0000] [619973] [INFO] Booting worker with pid: 619973
+Jun 27 05:33:21 documenti gunicorn[619974]: [2025-06-27 05:33:21 +0000] [619974] [INFO] Booting worker with pid: 619974
+Jun 27 05:33:24 documenti gunicorn[619972]: [2025-06-27 05:33:24,562] WARNING in app: Variabile GOOGLE_APPLICATION_CREDENTIALS non trovata.
+Jun 27 05:33:24 documenti gunicorn[619973]: [2025-06-27 05:33:24,563] WARNING in app: Variabile GOOGLE_APPLICATION_CREDENTIALS non trovata.
+Jun 27 05:33:24 documenti gunicorn[619974]: [2025-06-27 05:33:24,572] WARNING in app: Variabile GOOGLE_APPLICATION_CREDENTIALS non trovata.

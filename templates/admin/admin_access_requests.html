@@ -1,0 +1,50 @@
+{% extends "admin/base.html" %}
+{% block content %}
+<h2 class="text-center mb-4">📩 Richieste Accesso Documenti</h2>
+
+<table class="table table-bordered table-striped">
+    <thead>
+        <tr>
+            <th>Utente</th>
+            <th>Documento</th>
+            <th>Messaggio</th>
+            <th>Stato</th>
+            <th>Data</th>
+            <th>Azioni</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for req in requests %}
+        <tr>
+            <td>{{ req.user.username }} ({{ req.user.email }})</td>
+            <td>{{ req.document.filename }}</td>
+            <td>{{ req.message or '—' }}</td>
+            <td>
+                {% if req.status == 'pending' %}
+                    <span class="badge bg-warning text-dark">In attesa</span>
+                {% elif req.status == 'approved' %}
+                    <span class="badge bg-success">Approvata</span>
+                {% else %}
+                    <span class="badge bg-danger">Rifiutata</span>
+                {% endif %}
+            </td>
+            <td>{{ req.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+            <td>
+                {% if req.status == 'pending' %}
+                <form action="{{ url_for('admin.handle_access_request', req_id=req.id) }}" method="post" class="d-inline">
+                    <input type="hidden" name="action" value="approve">
+                    <button class="btn btn-sm btn-success">✅ Approva</button>
+                </form>
+                <form action="{{ url_for('admin.handle_access_request', req_id=req.id) }}" method="post" class="d-inline">
+                    <input type="hidden" name="action" value="deny">
+                    <button class="btn btn-sm btn-danger">❌ Rifiuta</button>
+                </form>
+                {% else %}
+                <em>Nessuna azione</em>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %} 

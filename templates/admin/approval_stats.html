@@ -1,0 +1,230 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>📊 Statistiche Approvazioni Documenti</h2>
+                <div>
+                    <a href="{{ url_for('admin.documents_overview') }}" class="btn btn-outline-secondary">
+                        📄 Torna ai Documenti
+                    </a>
+                </div>
+            </div>
+
+            <!-- Box riepilogo KPI -->
+            <div class="row my-4">
+                <div class="col-md-3">
+                    <div class="card text-white bg-success mb-3">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">✅ Approvati</h5>
+                            <p class="card-text fs-4">{{ approvati|length }}</p>
+                            <small>Documenti approvati</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-danger mb-3">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">❌ Respinti</h5>
+                            <p class="card-text fs-4">{{ respinti|length }}</p>
+                            <small>Documenti respinti</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-warning mb-3">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">⏳ In attesa</h5>
+                            <p class="card-text fs-4">{{ in_attesa|length }}</p>
+                            <small>Documenti in attesa</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-info mb-3">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">⏱️ Tempo Medio (h)</h5>
+                            <p class="card-text fs-4">{{ tempo_medio }}</p>
+                            <small>Ore per approvazione</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grafici e statistiche -->
+            <div class="row">
+                <!-- Grafico approvazioni per giorno -->
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📈 Approvazioni per Giorno</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="chart-approvazioni" height="100"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistiche utenti -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">👤 Performance Utenti</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if media_utenti %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Utente</th>
+                                                <th>Tempo Medio (h)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for user, ore in media_utenti.items() %}
+                                            <tr class="{{ 'table-warning' if ore > 48 else 'table-success' if ore < 12 else '' }}">
+                                                <td>{{ user }}</td>
+                                                <td>
+                                                    <span class="badge bg-{{ 'danger' if ore > 48 else 'success' if ore < 12 else 'warning' }}">
+                                                        {{ ore }}h
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">Nessun dato disponibile</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insight AI -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🧠 Insight AI</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-group list-group-flush">
+                                {% for msg in insight_ai %}
+                                    <li class="list-group-item">
+                                        <i class="fas fa-robot me-2"></i>
+                                        {{ msg }}
+                                    </li>
+                                {% else %}
+                                    <li class="list-group-item text-muted">
+                                        <i class="fas fa-check me-2"></i>
+                                        Nessuna anomalia rilevata.
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Documenti in ritardo -->
+            {% if ritardi %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">⚠️ Documenti in Ritardo (>3 giorni)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Titolo</th>
+                                            <th>Creato da</th>
+                                            <th>Data Creazione</th>
+                                            <th>Giorni in Attesa</th>
+                                            <th>Azioni</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for doc in ritardi %}
+                                        <tr>
+                                            <td><strong>{{ doc.title }}</strong></td>
+                                            <td>{{ doc.uploader.email if doc.uploader else 'N/D' }}</td>
+                                            <td>{{ doc.created_at.strftime('%d/%m/%Y') if doc.created_at else 'N/D' }}</td>
+                                            <td>
+                                                <span class="badge bg-danger">
+                                                    {{ ((now - doc.created_at).days if doc.created_at else 0) }} giorni
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('admin.view_document', document_id=doc.id) }}" 
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    👁️ Visualizza
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Link di navigazione -->
+            <div class="mt-4">
+                <a href="{{ url_for('admin.documents_overview') }}" class="btn btn-secondary">
+                    ← Torna ai Documenti
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Grafico approvazioni per giorno
+    const ctx = document.getElementById('chart-approvazioni').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {{ approvazioni_per_giorno.keys()|list|tojson }},
+            datasets: [{
+                label: 'Documenti approvati',
+                data: {{ approvazioni_per_giorno.values()|list|tojson }},
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { 
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

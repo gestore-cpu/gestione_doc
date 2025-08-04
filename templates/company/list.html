@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4">Elenco Aziende</h2>
+  <a href="{{ url_for('company.create_company') }}" class="btn btn-primary mb-3">+ Nuova Azienda</a>
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Descrizione</th>
+          <th>Creato il</th>
+          <th>Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in companies %}
+        <tr>
+          <td>{{ c.name }}</td>
+          <td>{{ c.description or '-' }}</td>
+          <td>{{ c.created_at.strftime('%d/%m/%Y') }}</td>
+          <td>
+            <a href="{{ url_for('company.edit_company', company_id=c.id) }}" class="btn btn-sm btn-warning">Modifica</a>
+            <form action="{{ url_for('company.delete_company', company_id=c.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Sei sicuro di voler eliminare questa azienda?');">
+              <button type="submit" class="btn btn-sm btn-danger">Elimina</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" class="text-center">Nessuna azienda presente.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

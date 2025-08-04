@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mercury | Gestione Documenti</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Animate.css -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: url('{{ url_for('static', filename='sfondo.jpg') }}') no-repeat center center fixed;
+      background-size: cover;
+    }
+
+    .quote-marquee {
+      overflow: hidden;
+      white-space: nowrap;
+      animation: scroll-left 15s linear infinite;
+      font-size: 2rem;
+      font-weight: 700;
+      font-style: italic;
+      color: #fff;
+      text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.6);
+    }
+
+    @keyframes scroll-left {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+  </style>
+</head>
+
+<body class="h-screen overflow-hidden flex items-center justify-center px-4">
+  <div class="text-center max-w-3xl w-full h-full flex flex-col justify-between animate__animated animate__fadeInUp pt-6 pb-6">
+
+    <!-- CITAZIONE + METEO + DATA -->
+    <div class="mb-10 space-y-5">
+      {% if quote %}
+        <div class="quote-marquee">
+          “{{ quote }}”
+        </div>
+      {% endif %}
+
+      <div class="text-white font-bold space-y-2 drop-shadow-lg text-[1.6rem]">
+        {% if today %}
+          <p class="drop-shadow">📅 Data: {{ today }}</p>
+        {% endif %}
+        <p id="meteo" class="drop-shadow">☁️ Caricamento meteo...</p>
+      </div>
+    </div>
+
+    <!-- LOGO -->
+    <img src="{{ url_for('static', filename='logonew.png') }}"
+         alt="Logo Mercury"
+         class="mx-auto mb-10 w-[320px] h-[320px] object-contain animate__animated animate__fadeInDown" />
+
+    <!-- TITOLO -->
+    <h1 class="text-4xl sm:text-5xl font-bold text-blue-600 drop-shadow mt-2">
+      Benvenuto nella Gestione Documenti
+    </h1>
+
+    <!-- STATO UTENTE -->
+    {% if current_user.is_authenticated %}
+      <p class="text-white mt-4 text-xl">
+        ✅ Bentornato, <strong>{{ current_user.username }}</strong>!
+      </p>
+      <a href="{{ url_for('auth.logout') }}"
+         class="mt-4 inline-block px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
+        🔓 Logout
+      </a>
+    {% else %}
+      <p class="text-white mt-4 text-xl">🔐 Non sei loggato</p>
+    {% endif %}
+
+    <!-- PULSANTI -->
+    <div class="flex flex-col sm:flex-row justify-center gap-6 mt-6">
+      <a href="{{ url_for('auth.login') }}"
+         class="px-8 py-4 text-lg bg-blue-600 text-white rounded-xl shadow hover:scale-105 hover:bg-blue-700 transition">
+         🔐 Accedi
+      </a>
+      <a href="/guest/guest_access"
+         class="px-8 py-4 text-lg bg-white text-blue-600 border border-blue-300 rounded-xl shadow hover:scale-105 transition">
+         👤 Accesso Ospite
+      </a>
+    </div>
+  </div>
+
+  <!-- METEO SCRIPT -->
+  <script>
+    const apiKey = "0160ebed9e701ce52384f54e4f9d0d4d";
+    const city = "Treviso";
+    const meteoDiv = document.getElementById("meteo");
+
+    fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=it`)
+      .then(response => response.json())
+      .then(data => {
+        const temp = data.main.temp.toFixed(1);
+        const desc = data.weather[0].description;
+        const name = data.name;
+        meteoDiv.innerHTML = `📍 ${name} – 🌤️ ${temp}°C, ${desc}`;
+      })
+      .catch(() => {
+        meteoDiv.innerHTML = "⚠️ Meteo non disponibile";
+      });
+  </script>
+</body>

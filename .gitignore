@@ -1,0 +1,40 @@
+# ⚙️ Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# 🐍 Virtualenv
+.venv/
+venv/
+ENV/
+
+# 🔐 Configurazioni e credenziali
+.env
+instance/
+
+# 🧪 Test database o SQLite locale
+*.db
+*.sqlite3
+
+# 📁 Uploads o file utente
+static/uploads/
+media/
+uploads/
+
+# 📄 Documenti e report
+*.pdf
+*.xls
+*.xlsx
+*.docx
+
+# 💻 VS Code / IDE
+.vscode/
+.idea/
+
+# 🧪 Pytest o coverage
+htmlcov/
+.tox/
+.coverage
+.cache/

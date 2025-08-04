@@ -1,0 +1,381 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Dettagli Prova di Evacuazione - SYNTHIA DOCS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>🧯 Dettagli Prova di Evacuazione</h2>
+                <div>
+                    <a href="{{ url_for('prove_evacuazione.lista_prove_evacuazione') }}" class="btn btn-secondary">
+                        ← Torna alla Lista
+                    </a>
+                    <a href="{{ url_for('prove_evacuazione.export_prova_pdf', prova_id=prova.id) }}" 
+                       class="btn btn-outline-dark">
+                        📄 Export PDF
+                    </a>
+                    {% if current_user.role == 'admin' %}
+                    <form method="POST" 
+                          action="{{ url_for('prove_evacuazione.elimina_prova_evacuazione', prova_id=prova.id) }}" 
+                          style="display: inline;"
+                          onsubmit="return confirm('⚠️ Sei sicuro di voler eliminare questa prova di evacuazione?')">
+                        <button type="submit" class="btn btn-danger">
+                            🗑️ Elimina
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Informazioni principali -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📋 Informazioni Prova</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>📅 Data:</strong> {{ prova.data_display }}</p>
+                            <p><strong>🏢 Luogo:</strong> {{ prova.luogo }}</p>
+                            <p><strong>👤 Responsabile:</strong> {{ prova.responsabile }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>📝 Note:</strong></p>
+                            <div class="border rounded p-3 bg-light">
+                                {% if prova.note %}
+                                    {{ prova.note|nl2br }}
+                                {% else %}
+                                    <em class="text-muted">Nessuna nota</em>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📊 Dettagli</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>🆔 ID:</strong> {{ prova.id }}</p>
+                    <p><strong>👤 Creato da:</strong> {{ prova.user.nome if prova.user else 'Sistema' }}</p>
+                    <p><strong>📅 Registrato il:</strong> {{ prova.created_at_display }}</p>
+                    
+                    {% if prova.is_recente %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i>
+                            <strong>Prova recente</strong> (≤30 giorni)
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Allegati -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">📎 Allegati</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Planimetria -->
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="mb-0">🗺️ Planimetria</h6>
+                                </div>
+                                <div class="card-body text-center">
+                                    {% if prova.has_planimetria %}
+                                        <div class="mb-3">
+                                            <i class="fas fa-map fa-3x text-info"></i>
+                                        </div>
+                                        <p class="text-muted">{{ prova.planimetria_filename }}</p>
+                                        <a href="{{ url_for('prove_evacuazione.download_file_prova', prova_id=prova.id, tipo='planimetria') }}" 
+                                           class="btn btn-outline-info btn-sm">
+                                            📥 Scarica
+                                        </a>
+                                    {% else %}
+                                        <div class="mb-3">
+                                            <i class="fas fa-map fa-3x text-muted"></i>
+                                        </div>
+                                        <p class="text-muted">Nessuna planimetria</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Verbale -->
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="mb-0">📄 Verbale</h6>
+                                </div>
+                                <div class="card-body text-center">
+                                    {% if prova.has_verbale %}
+                                        <div class="mb-3">
+                                            <i class="fas fa-file-alt fa-3x text-warning"></i>
+                                        </div>
+                                        <p class="text-muted">{{ prova.verbale_filename }}</p>
+                                        <a href="{{ url_for('prove_evacuazione.download_file_prova', prova_id=prova.id, tipo='verbale') }}" 
+                                           class="btn btn-outline-warning btn-sm">
+                                            📥 Scarica
+                                        </a>
+                                    {% else %}
+                                        <div class="mb-3">
+                                            <i class="fas fa-file-alt fa-3x text-muted"></i>
+                                        </div>
+                                        <p class="text-muted">Nessun verbale</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Foto -->
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="mb-0">📸 Foto</h6>
+                                </div>
+                                <div class="card-body text-center">
+                                    {% if prova.has_foto %}
+                                        <div class="mb-3">
+                                            <i class="fas fa-camera fa-3x text-success"></i>
+                                        </div>
+                                        <p class="text-muted">{{ prova.foto_filename }}</p>
+                                        <a href="{{ url_for('prove_evacuazione.download_file_prova', prova_id=prova.id, tipo='foto') }}" 
+                                           class="btn btn-outline-success btn-sm">
+                                            📥 Scarica
+                                        </a>
+                                    {% else %}
+                                        <div class="mb-3">
+                                            <i class="fas fa-camera fa-3x text-muted"></i>
+                                        </div>
+                                        <p class="text-muted">Nessuna foto</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Anteprima planimetria se presente -->
+    {% if prova.has_planimetria and prova.planimetria_filename.lower().endswith(('.png', '.jpg', '.jpeg')) %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🖼️ Anteprima Planimetria</h5>
+                </div>
+                <div class="card-body text-center">
+                    <img src="{{ url_for('static', filename='uploads/evacuazione/planimetrie/' + prova.planimetria_filename) }}" 
+                         class="img-fluid" 
+                         style="max-height: 400px;"
+                         alt="Planimetria evacuazione">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Punti mappa interattivi se presenti -->
+    {% if prova.punti_mappa %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">🎯 Punti Mappa Interattivi</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3 rounded"><code>{{ prova.punti_mappa|tojson(indent=2) }}</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+                {% if prova.link_fleetfix %}
+                <div class="mb-3">
+                    <strong>🔗 Link FleetFix:</strong>
+                    <a href="{{ prova.link_fleetfix }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                        Apri FleetFix
+                    </a>
+                </div>
+                {% endif %}
+                
+                <!-- === SEZIONE FIRME DIGITALI === -->
+                <div class="mt-4">
+                    <h5>✍️ Firme Digitali</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6>👤 Firma Responsabile</h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if prova.has_firma_responsabile %}
+                                    <div class="alert alert-success">
+                                        <strong>✅ Firma Presente</strong>
+                                        <br><small>Caricata il {{ prova.audit_trails|selectattr('campo_modificato', 'equalto', 'firma_responsabile')|first|attr('timestamp')|strftime('%d/%m/%Y %H:%M') if prova.audit_trails else 'N/A' }}</small>
+                                    </div>
+                                    <a href="{{ url_for('prove_evacuazione.download_firma_responsabile', prova_id=prova.id) }}" class="btn btn-sm btn-outline-primary">
+                                        📥 Scarica Firma
+                                    </a>
+                                    {% else %}
+                                    <div class="alert alert-warning">
+                                        <strong>⚠️ Firma Assente</strong>
+                                        <br><small>Il responsabile deve caricare la firma digitale</small>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if current_user.role in ['admin', 'quality'] %}
+                                    <form method="POST" action="{{ url_for('prove_evacuazione.firma_responsabile', prova_id=prova.id) }}" enctype="multipart/form-data" class="mt-2">
+                                        <div class="input-group">
+                                            <input type="file" class="form-control form-control-sm" name="firma" accept=".sig,.p7s,.pdf" required>
+                                            <button type="submit" class="btn btn-sm btn-primary">📤 Carica Firma</button>
+                                        </div>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6>🤖 Firma AI Simulata</h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if prova.has_firma_ai %}
+                                    <div class="alert alert-info">
+                                        <strong>🤖 AI Attivata</strong>
+                                        <br><small>Firma AI simulata attiva per test</small>
+                                    </div>
+                                    {% else %}
+                                    <div class="alert alert-secondary">
+                                        <strong>⏸️ AI Non Attiva</strong>
+                                        <br><small>Firma AI simulata non ancora attivata</small>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if current_user.role == 'admin' %}
+                                    <form method="POST" action="{{ url_for('prove_evacuazione.attiva_firma_ai', prova_id=prova.id) }}" class="mt-2">
+                                        <button type="submit" class="btn btn-sm btn-outline-info">
+                                            🤖 Attiva Firma AI
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- === SEZIONE AUDIT TRAIL === -->
+                <div class="mt-4">
+                    <h5>📋 Audit Trail</h5>
+                    <div class="card">
+                        <div class="card-body">
+                            <p class="text-muted">Storico delle modifiche apportate a questa prova</p>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <strong>📝 Modifiche:</strong> {{ prova.audit_trails|length }}
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>👤 Utenti:</strong> {{ prova.audit_trails|map(attribute='modificato_da')|unique|list|length }}
+                                </div>
+                                <div class="col-md-3">
+                                    <strong>🔧 Campi:</strong> {{ prova.audit_trails|map(attribute='campo_modificato')|unique|list|length }}
+                                </div>
+                                <div class="col-md-3">
+                                    <a href="{{ url_for('prove_evacuazione.audit_trail_prova', prova_id=prova.id) }}" class="btn btn-sm btn-outline-secondary">
+                                        📋 Visualizza Audit
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+</div>
+
+<!-- 🔐 Modale Firma Digitale -->
+<div class="modal fade" id="modalFirma" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">✍️ Firma Digitale Responsabile</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong>📝 Istruzioni:</strong> Disegna la tua firma nell'area sottostante. 
+                    Usa il mouse per disegnare la firma digitale.
+                </div>
+                <div class="text-center">
+                    <canvas id="firmaCanvas" width="600" height="150" style="border:2px solid #ccc; border-radius: 5px; cursor: crosshair;"></canvas>
+                </div>
+                <div class="mt-3">
+                    <small class="text-muted">
+                        💡 Suggerimento: Disegna la firma come se fosse su carta. 
+                        La firma verrà salvata in formato digitale e associata alla prova.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="clearFirma()">
+                    🗑️ Cancella
+                </button>
+                <button type="button" class="btn btn-primary" onclick="salvaFirma()">
+                    💾 Salva Firma
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Includi JavaScript -->
+<script src="{{ url_for('static', filename='js/evacuazione.js') }}"></script>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Conferma eliminazione
+    const deleteForm = document.querySelector('form[onsubmit*="confirm"]');
+    if (deleteForm) {
+        deleteForm.addEventListener('submit', function(e) {
+            if (!confirm('⚠️ Sei sicuro di voler eliminare questa prova di evacuazione?\n\nQuesta azione non può essere annullata e eliminerà tutti i file associati.')) {
+                e.preventDefault();
+            }
+        });
+    }
+    
+    // Animazioni per i pulsanti download
+    const downloadButtons = document.querySelectorAll('.btn-outline-info, .btn-outline-warning, .btn-outline-success');
+    downloadButtons.forEach(button => {
+        button.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.05)';
+        });
+        button.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+});
+</script>
+{% endblock %} 

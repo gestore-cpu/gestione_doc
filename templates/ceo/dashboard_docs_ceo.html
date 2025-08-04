@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard CEO Documentale - Gestione Documenti</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-light">
+
+<div class="container-fluid mt-4">
+  <div class="row">
+    <div class="col-12">
+      <!-- Header -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+          <i class="fas fa-chart-line text-primary"></i> 
+          Dashboard CEO Documentale
+        </h2>
+        <div>
+          <a href="{{ url_for('ceo.export_dashboard_ceo') }}" class="btn btn-outline-primary">
+            <i class="fas fa-download"></i> Esporta CSV
+          </a>
+          <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary ms-2">
+            <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+          </a>
+        </div>
+      </div>
+
+      <!-- Filtro Modulo -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h6 class="mb-0">
+            <i class="fas fa-filter"></i> 
+            Filtro per Modulo
+          </h6>
+        </div>
+        <div class="card-body">
+          <form method="GET" class="row g-3">
+            <div class="col-md-4">
+              <label for="modulo" class="form-label">Seleziona Modulo:</label>
+              <select name="modulo" id="modulo" class="form-select" onchange="this.form.submit()">
+                <option value="">📂 Tutti i moduli</option>
+                <option value="qms" {% if request.args.get('modulo') == 'qms' %}selected{% endif %}>
+                  📋 QMS (Certificazioni, Manuali, Audit)
+                </option>
+                <option value="service" {% if request.args.get('modulo') == 'service' %}selected{% endif %}>
+                  🔧 Service (Danni, Manutenzioni, Polizze)
+                </option>
+                <option value="elevate" {% if request.args.get('modulo') == 'elevate' %}selected{% endif %}>
+                  📈 Elevate (Regolamenti, Policy, HR)
+                </option>
+                <option value="acquisti" {% if request.args.get('modulo') == 'acquisti' %}selected{% endif %}>
+                  🛒 Acquisti (Fatture, Contratti, Fornitori)
+                </option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">&nbsp;</label>
+              <div>
+                <button type="submit" class="btn btn-primary">
+                  <i class="fas fa-search"></i> Filtra
+                </button>
+                <a href="{{ url_for('ceo.dashboard_docs_ceo') }}" class="btn btn-secondary">
+                  <i class="fas fa-times"></i> Reset
+                </a>
+              </div>
+            </div>
+            {% if request.args.get('modulo') %}
+            <div class="col-md-4">
+              <div class="alert alert-info mb-0">
+                <i class="fas fa-info-circle"></i> 
+                Filtro attivo: <strong>{{ request.args.get('modulo').upper() }}</strong>
+              </div>
+            </div>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+
+      <!-- Alert AI -->
+      {% if alert_ai %}
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+          <h6><i class="fas fa-brain"></i> Alert AI</h6>
+          <ul class="mb-0">
+            {% for alert in alert_ai %}
+              <li>{{ alert }}</li>
+            {% endfor %}
+          </ul>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endif %}
+
+      <!-- Statistiche principali -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">📄 Totali</h5>
+              <h3>{{ documenti_totali }}</h3>
+              <small>Documenti</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+              <h5 class="card-title">🛠️ Danni</h5>
+              <h3>{{ documenti_danni }}</h3>
+              <small>Documentati</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-info text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">📘 QMS</h5>
+              <h3>{{ documenti_qms }}</h3>
+              <small>Documenti</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">🚨 Critici</h5>
+              <h3>{{ documenti_critici }}</h3>
+              <small>Non approvati</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seconda riga statistiche -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card bg-success text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">📋 Policy</h5>
+              <h3>{{ documenti_policy }}</h3>
+              <small>Documenti</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+              <h5 class="card-title">✍️ Firme</h5>
+              <h3>{{ firme_mancanti }}</h3>
+              <small>Mancanti</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-secondary text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">📅 Scaduti</h5>
+              <h3>{{ documenti_scaduti }}</h3>
+              <small>Documenti</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-info text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">📈 Settimana</h5>
+              <h3>{{ documenti_ultima_settimana }}</h3>
+              <small>Nuovi</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grafici -->
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="fas fa-chart-pie"></i> 
+                Distribuzione per Modulo
+              </h6>
+            </div>
+            <div class="card-body">
+              <canvas id="moduliChart" width="400" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="fas fa-chart-bar"></i> 
+                Trend Settimanale
+              </h6>
+            </div>
+            <div class="card-body">
+              <canvas id="trendChart" width="400" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Statistiche Moduli -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="fas fa-chart-area"></i> 
+                Statistiche per Modulo
+              </h6>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-3 text-center">
+                  <div class="border rounded p-3">
+                    <h4 class="text-primary">{{ moduli_stats.qms }}</h4>
+                    <small class="text-muted">📋 QMS</small>
+                    <br><small class="text-muted">Certificazioni, Manuali, Audit</small>
+                  </div>
+                </div>
+                <div class="col-md-3 text-center">
+                  <div class="border rounded p-3">
+                    <h4 class="text-success">{{ moduli_stats.service }}</h4>
+                    <small class="text-muted">🔧 Service</small>
+                    <br><small class="text-muted">Danni, Manutenzioni, Polizze</small>
+                  </div>
+                </div>
+                <div class="col-md-3 text-center">
+                  <div class="border rounded p-3">
+                    <h4 class="text-warning">{{ moduli_stats.elevate }}</h4>
+                    <small class="text-muted">📈 Elevate</small>
+                    <br><small class="text-muted">Regolamenti, Policy, HR</small>
+                  </div>
+                </div>
+                <div class="col-md-3 text-center">
+                  <div class="border rounded p-3">
+                    <h4 class="text-info">{{ moduli_stats.acquisti }}</h4>
+                    <small class="text-muted">🛒 Acquisti</small>
+                    <br><small class="text-muted">Fatture, Contratti, Fornitori</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documenti senza firme -->
+      {% if documenti_senza_firme %}
+        <div class="card mb-4">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="fas fa-exclamation-triangle text-warning"></i> 
+              Documenti Obbligatori Senza Firme ({{ documenti_senza_firme|length }})
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>📄 Documento</th>
+                    <th>🏷️ Tag</th>
+                    <th>👤 Uploader</th>
+                    <th>📅 Data</th>
+                    <th>🔧 Azioni</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for doc in documenti_senza_firme %}
+                    <tr>
+                      <td>
+                        <strong>{{ doc.title or doc.filename }}</strong>
+                        <br><small class="text-muted">{{ doc.filename }}</small>
+                      </td>
+                      <td>
+                        <span class="badge bg-secondary">{{ doc.tag or "N/A" }}</span>
+                      </td>
+                      <td>
+                        {{ doc.uploader_email }}
+                      </td>
+                      <td>
+                        {{ doc.created_at.strftime('%d/%m/%Y') if doc.created_at else 'N/A' }}
+                      </td>
+                      <td>
+                        <a href="{{ url_for('docs.view_document', document_id=doc.id) }}" 
+                           class="btn btn-sm btn-outline-primary">
+                          <i class="fas fa-eye"></i> Visualizza
+                        </a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Documenti recenti -->
+      {% if documenti_recenti %}
+        <div class="card mb-4">
+          <div class="card-header">
+            <h6 class="mb-0">
+              <i class="fas fa-clock"></i> 
+              Documenti Recenti (Ultima Settimana)
+            </h6>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              {% for doc in documenti_recenti %}
+                <div class="col-md-6 mb-3">
+                  <div class="card border-light">
+                    <div class="card-body">
+                      <h6 class="card-title">{{ doc.title or doc.filename }}</h6>
+                                             <p class="card-text">
+                         <small class="text-muted">
+                           <strong>Tag:</strong> {{ doc.tag or "N/A" }}<br>
+                           <strong>Modulo:</strong> 
+                           {% if doc.collegato_a_modulo %}
+                             <span class="badge bg-primary">{{ doc.collegato_a_modulo.upper() }}</span>
+                           {% else %}
+                             N/A
+                           {% endif %}<br>
+                           <strong>Uploader:</strong> {{ doc.uploader_email }}<br>
+                           <strong>Data:</strong> {{ doc.created_at.strftime('%d/%m/%Y %H:%M') if doc.created_at else 'N/A' }}
+                         </small>
+                       </p>
+                      <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                          {% if doc.validazione_admin and doc.validazione_ceo %}
+                            <span class="badge bg-success">✅ Approvato</span>
+                          {% elif doc.validazione_admin %}
+                            <span class="badge bg-warning">⏳ In attesa CEO</span>
+                          {% else %}
+                            <span class="badge bg-secondary">⏳ In attesa Admin</span>
+                          {% endif %}
+                        </div>
+                        <a href="{{ url_for('docs.view_document', document_id=doc.id) }}" 
+                           class="btn btn-sm btn-outline-primary">
+                          <i class="fas fa-eye"></i>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Statistiche aggiuntive -->
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="fas fa-chart-area"></i> 
+                Statistiche Aggiuntive
+              </h6>
+            </div>
+            <div class="card-body">
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between">
+                  <span>📥 Download negati (settimana):</span>
+                  <span class="badge bg-danger">{{ download_negati }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                  <span>📅 Documenti in scadenza (30gg):</span>
+                  <span class="badge bg-warning">{{ documenti_in_scadenza }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                  <span>🔧 Documenti Service:</span>
+                  <span class="badge bg-info">{{ moduli_stats.service }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                  <span>📈 Documenti Elevate:</span>
+                  <span class="badge bg-primary">{{ moduli_stats.elevate }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between">
+                  <span>🛒 Documenti Acquisti:</span>
+                  <span class="badge bg-secondary">{{ moduli_stats.acquisti }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h6 class="mb-0">
+                <i class="fas fa-tasks"></i> 
+                Azioni Rapide
+              </h6>
+            </div>
+            <div class="card-body">
+              <div class="d-grid gap-2">
+                <a href="{{ url_for('docs.documenti_da_firmare') }}" class="btn btn-outline-warning">
+                  <i class="fas fa-signature"></i> Visualizza Documenti da Firmare
+                </a>
+                <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-primary">
+                  <i class="fas fa-cog"></i> Gestione Admin
+                </a>
+                <a href="{{ url_for('docs.ricerca_semantica') }}" class="btn btn-outline-info">
+                  <i class="fas fa-search"></i> Ricerca Semantica
+                </a>
+                <a href="{{ url_for('admin.report_firme') }}" class="btn btn-outline-success">
+                  <i class="fas fa-chart-bar"></i> Report Firme
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// Grafico distribuzione moduli
+const moduliCtx = document.getElementById('moduliChart').getContext('2d');
+const moduliChart = new Chart(moduliCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ['QMS', 'Service', 'Elevate', 'Acquisti'],
+    datasets: [{
+      data: [
+        {{ moduli_stats.qms }},
+        {{ moduli_stats.service }},
+        {{ moduli_stats.elevate }},
+        {{ moduli_stats.acquisti }}
+      ],
+      backgroundColor: [
+        '#007bff',
+        '#28a745',
+        '#ffc107',
+        '#6c757d'
+      ]
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'bottom'
+      }
+    }
+  }
+});
+
+// Grafico trend settimanale
+const trendCtx = document.getElementById('trendChart').getContext('2d');
+const trendChart = new Chart(trendCtx, {
+  type: 'line',
+  data: {
+    labels: ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'],
+    datasets: [{
+      label: 'Nuovi Documenti',
+      data: [{{ documenti_ultima_settimana }}, 0, 0, 0, 0, 0, 0], // Placeholder
+      borderColor: '#007bff',
+      backgroundColor: 'rgba(0, 123, 255, 0.1)',
+      tension: 0.4
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top'
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true
+      }
+    }
+  }
+});
+
+// Auto-refresh ogni 5 minuti
+setTimeout(function() {
+  location.reload();
+}, 300000);
+</script>
+
+</body>
+</html> 

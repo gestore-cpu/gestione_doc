@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Area Ospite | Mercury</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: url('{{ url_for('static', filename='sfondo.jpg') }}') no-repeat center center fixed;
+      background-size: cover;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-white/90 backdrop-blur-sm px-4 py-6">
+
+  <div class="max-w-5xl mx-auto bg-white p-6 rounded-xl shadow-md">
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="bg-{{ 'green' if category == 'success' else 'red' }}-100 text-{{ 'green' if category == 'success' else 'red' }}-800 px-4 py-2 mb-4 rounded">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <h1 class="text-3xl font-bold mb-2">Documenti condivisi con: {{ session['guest_email'] }}</h1>
+    <p class="text-sm text-gray-500 mb-6">Solo i documenti attivi e autorizzati saranno visibili.</p>
+
+    <!-- Tabella documenti -->
+    <form method="POST" action="{{ url_for('download_multiple') }}">
+      <table class="w-full table-auto border rounded overflow-hidden mb-6">
+        <thead class="bg-blue-100 text-left">
+          <tr>
+            <th class="p-3"><input type="checkbox" onclick="toggleAll(this)" aria-label="Seleziona tutti" /></th>
+            <th class="p-3">Titolo</th>
+            <th class="p-3">Scadenza</th>
+            <th class="p-3">Permesso</th>
+            <th class="p-3">Azione</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white">
+          {% for doc in documents %}
+          <tr class="border-b">
+            <td class="p-3"><input type="checkbox" name="doc_ids[]" value="{{ doc.id }}" aria-label="Seleziona {{ doc.title }}"></td>
+            <td class="p-3">{{ doc.title }}</td>
+            <td class="p-3">
+              {% if doc.expiry_date and doc.expiry_date < now %}
+                <span class="text-red-600 font-bold">❌ Scaduto</span>
+              {% else %}
+                {{ doc.expiry_date.strftime('%d/%m/%Y') if doc.expiry_date else '—' }}
+              {% endif %}
+            </td>
+            <td class="p-3">
+              {% if doc.guest_permission == 'view' %}
+                👁️ Solo vista
+              {% elif doc.guest_permission == 'download' %}
+                ⬇️ Scaricabile
+              {% endif %}
+            </td>
+            <td class="p-3">
+              <a href="{{ url_for('download_doc', id=doc.id) }}" class="text-blue-600 underline">Apri</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">⬇️ Scarica selezionati</button>
+    </form>
+
+    <!-- Commento -->
+    <div class="mt-10">
+      <h2 class="text-xl font-semibold mb-2">🗨️ Invia un commento al proprietario</h2>
+      <form method="POST" action="{{ url_for('guest_comment') }}">
+        <textarea name="message" rows="3" class="w-full border rounded p-3 mb-3" required></textarea>
+        <input type="hidden" name="email" value="{{ session['guest_email'] }}">
+        <button class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-black">Invia</button>
+      </form>
+    </div>
+
+    <!-- Registro Attività -->
+    <div class="mt-10">
+      <h2 class="text-xl font-semibold mb-2">📊 Ultime attività</h2>
+      <ul class="space-y-2 text-sm">
+        {% for act in activities %}
+          <li>📌 {{ act.timestamp.strftime('%d/%m/%Y %H:%M') }} — {{ act.action }} → Documento ID {{ act.document_id }}</li>
+        {% else %}
+          <li class="text-gray-500">Nessuna attività recente.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+  </div>
+
+<script>
+function toggleAll(source) {
+  const checkboxes = document.querySelectorAll('input[name="doc_ids[]"]');
+  checkboxes.forEach(cb => cb.checked = source.checked);
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,183 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Checklist Approvazione - {{ document.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- === HEADER === -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0">📝 Checklist Approvazione</h2>
+                    <p class="text-muted mb-0">
+                        <strong>{{ document.title }}</strong>
+                        <span class="badge bg-secondary ms-2">{{ document.stato_approvazione }}</span>
+                    </p>
+                </div>
+                <a href="{{ url_for('admin.view_document', doc_id=document.id) }}" 
+                   class="btn btn-outline-primary">
+                    👁️ Visualizza Documento
+                </a>
+            </div>
+
+            <!-- === CHECKLIST TABLE === -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Checklist Step di Approvazione</h5>
+                    {% if active_step %}
+                    <div class="alert alert-info mt-2 mb-0">
+                        <strong>🎯 Step Attivo:</strong> {{ active_step.step_name }}
+                        {% if active_step.approver_role %}
+                            (Ruolo richiesto: {{ active_step.approver_role }})
+                        {% endif %}
+                        <br>
+                        <small class="text-muted">
+                            ⚠️ Solo lo step attivo può essere approvato. Gli step futuri sono bloccati fino al completamento del precedente.
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if steps %}
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fase</th>
+                                    <th>Stato</th>
+                                    <th>Approvato da</th>
+                                    <th>Metodo</th>
+                                    <th>Data/Ora</th>
+                                    <th>Note</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for step in steps %}
+                                <tr class="{% if step.status == 'rejected' %}table-danger{% elif step.status == 'approved' %}table-success{% elif step.is_future_step %}table-secondary{% endif %}">
+                                    <td>
+                                        <strong>{{ step.step_name }}</strong>
+                                        {% if step.approver_role %}
+                                            <br>
+                                            <small class="text-muted">Ruolo: {{ step.approver_role }}</small>
+                                        {% endif %}
+                                        {% if step.is_active %}
+                                            <span class="badge bg-primary ms-2">🎯 ATTIVO</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if step.status == 'approved' %}
+                                            <span class="badge bg-success">✅ Approvato</span>
+                                        {% elif step.status == 'rejected' %}
+                                            <span class="badge bg-danger">❌ Respinto</span>
+                                        {% elif step.status == 'commented' %}
+                                            <span class="badge bg-warning text-dark">💬 Commentato</span>
+                                        {% elif step.is_future_step %}
+                                            <span class="badge bg-secondary">🔒 Futuro</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">⏳ In attesa</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if step.approver %}
+                                            {{ step.approver.username }} ({{ step.approver_role or 'N/A' }})
+                                            {% if step.method == 'ai' %}
+                                                <span class="badge bg-info text-dark ms-1">🧠 AI</span>
+                                            {% endif %}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if step.method == 'ai' %}
+                                            <span class="badge bg-info">🤖 AI</span>
+                                        {% elif step.method == 'auto' %}
+                                            <span class="badge bg-success">🤖 Auto</span>
+                                        {% else %}
+                                            <span class="badge bg-primary">👤 Manuale</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if step.approved_at %}
+                                            {{ step.approved_at.strftime('%d/%m/%Y %H:%M') }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if step.note %}
+                                            <span data-bs-toggle="tooltip" title="{{ step.note }}">
+                                                {{ step.note[:30] }}{% if step.note|length > 30 %}...{% endif %}
+                                            </span>
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if step.can_take_action %}
+                                            {% if step.status == 'pending' %}
+                                            <form method="post" action="{{ url_for('admin.take_approval_action', doc_id=document.id, step_id=step.id) }}" class="d-flex gap-2 align-items-center">
+                                                <input type="text" name="note" class="form-control form-control-sm" placeholder="Nota (facoltativa)" style="width: 150px;">
+                                                <button name="action" value="approve" class="btn btn-success btn-sm">✅ Approva</button>
+                                                <button name="action" value="reject" class="btn btn-danger btn-sm">❌ Rifiuta</button>
+                                                <button name="action" value="comment" class="btn btn-warning btn-sm">💬 Commenta</button>
+                                            </form>
+                                            {% elif step.status == 'approved' %}
+                                            <span class="text-success">✅ Completato</span>
+                                            {% elif step.status == 'rejected' %}
+                                            <span class="text-danger">❌ Respinto</span>
+                                            {% elif step.status == 'commented' %}
+                                            <span class="text-warning">💬 Commentato</span>
+                                            {% endif %}
+                                        {% elif step.is_active %}
+                                            <span class="badge bg-secondary">⏳ In attesa approvazione</span>
+                                        {% elif step.is_future_step %}
+                                            <span class="text-muted">🔒 Fase futura</span>
+                                        {% elif step.is_past_step %}
+                                            <span class="text-muted">📋 Solo lettura</span>
+                                        {% else %}
+                                            <span class="text-muted">Non autorizzato</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Nessuno step di approvazione configurato per questo documento.
+                            <br>
+                            <small>Configura un flusso di approvazione per iniziare.</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- === AZIONI === -->
+            <div class="mt-4">
+                <a href="{{ url_for('admin.document_overview') }}" class="btn btn-secondary">
+                    ⬅️ Torna alla Panoramica
+                </a>
+                <a href="{{ url_for('admin.view_document', doc_id=document.id) }}" class="btn btn-primary ms-2">
+                    👁️ Visualizza Documento
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// === Inizializza tooltip per note lunghe ===
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

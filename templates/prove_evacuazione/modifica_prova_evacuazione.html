@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <h2>✏️ Modifica Prova di Evacuazione</h2>
+            <p class="text-muted">Modifica i dati della prova di evacuazione esistente</p>
+            
+            <form method="POST" enctype="multipart/form-data">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="data" class="form-label">📅 Data Prova</label>
+                            <input type="date" class="form-control" id="data" name="data" 
+                                   value="{{ prova.data.strftime('%Y-%m-%d') }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="luogo" class="form-label">🏢 Luogo</label>
+                            <input type="text" class="form-control" id="luogo" name="luogo" 
+                                   value="{{ prova.luogo }}" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="responsabile" class="form-label">👤 Responsabile</label>
+                            <input type="text" class="form-control" id="responsabile" name="responsabile" 
+                                   value="{{ prova.responsabile }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="link_fleetfix" class="form-label">🔗 Link FleetFix (opzionale)</label>
+                            <input type="url" class="form-control" id="link_fleetfix" name="link_fleetfix" 
+                                   value="{{ prova.link_fleetfix or '' }}" placeholder="https://...">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="note" class="form-label">📝 Note</label>
+                    <textarea class="form-control" id="note" name="note" rows="3">{{ prova.note or '' }}</textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="punti_mappa" class="form-label">🎯 Punti Mappa JSON (opzionale)</label>
+                    <textarea class="form-control" id="punti_mappa" name="punti_mappa" rows="3" 
+                              placeholder='{"punti": [{"lat": 45.123, "lng": 12.456, "nome": "Punto 1"}]}'>{{ prova.punti_mappa or '' }}</textarea>
+                    <div class="form-text">Formato JSON per punti interattivi sulla mappa</div>
+                </div>
+                
+                <hr>
+                <h5>🗺️ Nuova Planimetria (opzionale)</h5>
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label for="planimetria" class="form-label">📎 Upload Planimetria</label>
+                            <input type="file" class="form-control" id="planimetria" name="planimetria" 
+                                   accept=".pdf,.jpg,.jpeg,.png">
+                            <div class="form-text">PDF, JPG, PNG - Max 10MB</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="note_versione" class="form-label">📝 Note Versione</label>
+                            <input type="text" class="form-control" id="note_versione" name="note_versione" 
+                                   placeholder="Aggiornamento planimetria...">
+                        </div>
+                    </div>
+                </div>
+                
+                {% if prova.planimetria_filename %}
+                <div class="alert alert-info">
+                    <strong>📋 Planimetria Attuale:</strong> {{ prova.planimetria_filename }}
+                    <br><small>Carica una nuova planimetria per creare una versione</small>
+                </div>
+                {% endif %}
+                
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        💾 Salva Modifiche
+                    </button>
+                    <a href="{{ url_for('prove_evacuazione.lista_prove_evacuazione') }}" class="btn btn-secondary">
+                        ❌ Annulla
+                    </a>
+                    <a href="{{ url_for('prove_evacuazione.dettaglio_prova_evacuazione', id=prova.id) }}" class="btn btn-outline-info">
+                        👁️ Visualizza Dettagli
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validazione file
+    document.getElementById('planimetria').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                alert('Il file è troppo grande. Dimensione massima: 10MB');
+                e.target.value = '';
+            }
+        }
+    });
+    
+    // Validazione JSON punti mappa
+    document.getElementById('punti_mappa').addEventListener('blur', function(e) {
+        const value = e.target.value.trim();
+        if (value) {
+            try {
+                JSON.parse(value);
+            } catch (error) {
+                alert('Formato JSON non valido per i punti mappa');
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

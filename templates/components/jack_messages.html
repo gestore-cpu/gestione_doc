@@ -1,0 +1,374 @@
+<!-- 📁 Componente: jack_messages.html -->
+<!-- Messaggi automatici per Jack Synthia -->
+
+<!-- Area per messaggi dinamici -->
+<div id="jack-message-area" class="mb-3"></div>
+
+<!-- Stili per messaggi Jack -->
+<style>
+.jack-message-container {
+  animation: jackMessageSlideIn 0.5s ease-out;
+  margin-bottom: 15px;
+}
+
+@keyframes jackMessageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.jack-message-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 15px;
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.jack-message-header {
+  display: flex;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.jack-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid white;
+  margin-right: 15px;
+  animation: jackAvatarPulse 2s infinite;
+}
+
+@keyframes jackAvatarPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.jack-message-content {
+  flex-grow: 1;
+}
+
+.jack-message-title {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 5px;
+}
+
+.jack-message-text {
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+.jack-message-actions {
+  padding: 15px 20px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.jack-action-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.jack-action-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+  color: white;
+  text-decoration: none;
+}
+
+.jack-close-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 5px;
+  transition: color 0.3s ease;
+}
+
+.jack-close-btn:hover {
+  color: white;
+}
+
+.jack-message-info {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+}
+
+.jack-message-warning {
+  background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+}
+
+.jack-message-error {
+  background: linear-gradient(135deg, #F44336 0%, #D32F2F 100%);
+}
+
+.jack-message-success {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .jack-message-header {
+    padding: 12px 15px;
+  }
+  
+  .jack-avatar {
+    width: 40px;
+    height: 40px;
+    margin-right: 12px;
+  }
+  
+  .jack-message-title {
+    font-size: 14px;
+  }
+  
+  .jack-message-text {
+    font-size: 13px;
+  }
+  
+  .jack-message-actions {
+    padding: 12px 15px;
+    flex-wrap: wrap;
+  }
+  
+  .jack-action-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+}
+</style>
+
+<!-- Script per messaggi automatici -->
+<script>
+class JackMessages {
+  constructor() {
+    this.messageArea = document.getElementById('jack-message-area');
+    this.messageQueue = [];
+    this.isProcessing = false;
+    this.init();
+  }
+
+  init() {
+    // Controlla se ci sono messaggi in coda al caricamento
+    this.checkForPendingMessages();
+    
+    // Ascolta eventi per messaggi automatici
+    this.setupEventListeners();
+  }
+
+  setupEventListeners() {
+    // Eventi per messaggi automatici basati su azioni utente
+    document.addEventListener('click', (e) => {
+      if (e.target.matches('[data-jack-event]')) {
+        const event = e.target.dataset.jackEvent;
+        this.triggerEventMessage(event);
+      }
+    });
+
+    // Messaggi basati su navigazione
+    window.addEventListener('popstate', () => {
+      this.triggerPageMessage();
+    });
+
+    // Messaggi basati su tempo
+    this.setupTimeBasedMessages();
+  }
+
+  setupTimeBasedMessages() {
+    const now = new Date();
+    const hour = now.getHours();
+    
+    // Messaggi basati sull'ora del giorno
+    if (hour >= 9 && hour <= 11) {
+      setTimeout(() => {
+        this.showMessage({
+          type: 'info',
+          title: '🌅 Buongiorno!',
+          text: 'È il momento perfetto per organizzare i documenti della giornata.',
+          action: {
+            text: 'Vedi Scadenze',
+            url: '/docs/scadenziario'
+          }
+        });
+      }, 3000);
+    } else if (hour >= 14 && hour <= 16) {
+      setTimeout(() => {
+        this.showMessage({
+          type: 'warning',
+          title: '⏰ Promemoria',
+          text: 'Controlla se ci sono documenti in scadenza oggi.',
+          action: {
+            text: 'Controlla Ora',
+            url: '/docs/scadenziario'
+          }
+        });
+      }, 2000);
+    }
+  }
+
+  triggerEventMessage(event) {
+    const messages = {
+      'upload_document': {
+        type: 'success',
+        title: '📄 Documento Caricato!',
+        text: 'Il documento è stato caricato con successo. Vuoi analizzarlo con AI?',
+        action: {
+          text: 'Analizza con AI',
+          url: '/docs/ai-analysis'
+        }
+      },
+      'sign_document': {
+        type: 'info',
+        title: '🖋️ Firma Digitale',
+        text: 'Documento firmato correttamente. La firma è stata registrata nel sistema.',
+        action: {
+          text: 'Vedi Registro',
+          url: '/docs/audit-log'
+        }
+      },
+      'download_document': {
+        type: 'info',
+        title: '📥 Download Completato',
+        text: 'Il documento è stato scaricato. Ricorda di gestirlo in modo sicuro.',
+        action: {
+          text: 'Vedi Storico',
+          url: '/admin/log_download'
+        }
+      }
+    };
+
+    if (messages[event]) {
+      this.showMessage(messages[event]);
+    }
+  }
+
+  triggerPageMessage() {
+    const currentPath = window.location.pathname;
+    const pageMessages = {
+      '/docs/scadenziario': {
+        type: 'warning',
+        title: '📅 Scadenziario',
+        text: 'Qui puoi vedere tutti i documenti in scadenza e gestire i promemoria.',
+        action: {
+          text: 'Configura Promemoria',
+          url: '/docs/calendar-instructions'
+        }
+      },
+      '/docs/audit-log': {
+        type: 'info',
+        title: '📋 Registro Audit',
+        text: 'Tutte le attività sui documenti sono registrate qui per la tracciabilità.',
+        action: {
+          text: 'Esporta Report',
+          url: '/docs/audit-log/export'
+        }
+      },
+      '/docs/kpi-dashboard': {
+        type: 'success',
+        title: '📊 KPI AI',
+        text: 'Monitora le performance dell\'analisi AI sui documenti.',
+        action: {
+          text: 'Vedi Dettagli',
+          url: '/docs/ai-dashboard'
+        }
+      }
+    };
+
+    if (pageMessages[currentPath]) {
+      setTimeout(() => {
+        this.showMessage(pageMessages[currentPath]);
+      }, 1000);
+    }
+  }
+
+  showMessage(config) {
+    const messageId = 'jack-msg-' + Date.now();
+    
+    const messageHtml = `
+      <div id="${messageId}" class="jack-message-container">
+        <div class="jack-message-card jack-message-${config.type}">
+          <div class="jack-message-header">
+            <img src="/static/img/jack_synthia_realistic.png" alt="Jack Synthia" class="jack-avatar">
+            <div class="jack-message-content">
+              <div class="jack-message-title">${config.title}</div>
+              <div class="jack-message-text">${config.text}</div>
+            </div>
+            <button class="jack-close-btn" onclick="window.jackMessages.removeMessage('${messageId}')">&times;</button>
+          </div>
+          ${config.action ? `
+            <div class="jack-message-actions">
+              <a href="${config.action.url}" class="jack-action-btn">${config.action.text}</a>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+
+    this.messageArea.insertAdjacentHTML('afterbegin', messageHtml);
+
+    // Auto-remove dopo 8 secondi
+    setTimeout(() => {
+      this.removeMessage(messageId);
+    }, 8000);
+  }
+
+  removeMessage(messageId) {
+    const message = document.getElementById(messageId);
+    if (message) {
+      message.style.animation = 'jackMessageSlideOut 0.3s ease-out';
+      setTimeout(() => {
+        if (message.parentElement) {
+          message.remove();
+        }
+      }, 300);
+    }
+  }
+
+  checkForPendingMessages() {
+    // Controlla se ci sono messaggi salvati in sessionStorage
+    const pendingMessage = sessionStorage.getItem('jack_pending_message');
+    if (pendingMessage) {
+      try {
+        const messageConfig = JSON.parse(pendingMessage);
+        this.showMessage(messageConfig);
+        sessionStorage.removeItem('jack_pending_message');
+      } catch (e) {
+        console.error('Errore nel parsing del messaggio Jack:', e);
+      }
+    }
+  }
+}
+
+// Inizializza messaggi quando il DOM è pronto
+document.addEventListener('DOMContentLoaded', () => {
+  window.jackMessages = new JackMessages();
+});
+
+// Funzione globale per mostrare messaggi da altri script
+window.showJackMessage = function(config) {
+  if (window.jackMessages) {
+    window.jackMessages.showMessage(config);
+  } else {
+    // Salva per quando JackMessages sarà inizializzato
+    sessionStorage.setItem('jack_pending_message', JSON.stringify(config));
+  }
+};
+</script> 

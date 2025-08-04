@@ -1,0 +1,374 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Dashboard AI Documentale - SYNTHIA DOCS{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header Dashboard -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">🧠 Dashboard AI Documentale</h1>
+                    <p class="text-muted mb-0">Panoramica completa dello stato dei documenti analizzati con AI</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-outline-primary">
+                        📋 Vai ai Documenti
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Box Riepilogo Principali -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-light border-success h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-success">✅ Completi</h5>
+                    <p class="display-6 text-success mb-1">{{ stats.completi }}</p>
+                    <small class="text-muted">{{ stats.percentuale_completi }}% degli analizzati</small>
+                    <div class="mt-3">
+                        <a href="{{ url_for('admin.doc_overview') }}?ai_status=completo" 
+                           class="btn btn-sm btn-outline-success">
+                            Vai ai documenti
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning border-warning h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-dark">⚠️ Incompleti</h5>
+                    <p class="display-6 text-dark mb-1">{{ stats.incompleti }}</p>
+                    <small class="text-muted">Richiedono attenzione</small>
+                    <div class="mt-3">
+                        <a href="{{ url_for('admin.doc_overview') }}?ai_status=incompleto" 
+                           class="btn btn-sm btn-outline-dark">
+                            Vai ai documenti
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-danger text-white border-danger h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">❌ Scaduti</h5>
+                    <p class="display-6 mb-1">{{ stats.scaduti }}</p>
+                    <small>Urgente - Azione immediata</small>
+                    <div class="mt-3">
+                        <a href="{{ url_for('admin.doc_overview') }}?ai_status=scaduto" 
+                           class="btn btn-sm btn-light">
+                            Vai ai documenti
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-danger text-white border-danger h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">❌ Manca Firma</h5>
+                    <p class="display-6 mb-1">{{ stats.manca_firma }}</p>
+                    <small>Firma richiesta</small>
+                    <div class="mt-3">
+                        <a href="{{ url_for('admin.doc_overview') }}?ai_status=manca_firma" 
+                           class="btn btn-sm btn-light">
+                            Vai ai documenti
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche Generali -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h5 class="card-title">📊 Totale Documenti</h5>
+                    <p class="display-6 mb-1">{{ stats.totali }}</p>
+                    <small>Nel sistema</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h5 class="card-title">🧠 Analizzati con AI</h5>
+                    <p class="display-6 mb-1">{{ stats.analizzati }}</p>
+                    <small>{{ stats.percentuale_analizzati }}% del totale</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h5 class="card-title">⚠️ Critici</h5>
+                    <p class="display-6 mb-1">{{ stats.incompleti + stats.scaduti + stats.manca_firma }}</p>
+                    <small>{{ stats.percentuale_critici }}% degli analizzati</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grafici -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">📊 Distribuzione Stati AI</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="barChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">🍩 Percentuale Analizzati</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="pieChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documenti Critici Recenti -->
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">🚨 Documenti Critici Recenti (Ultimi 7 giorni)</h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.critici_recenti %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Documento</th>
+                                        <th>Categoria</th>
+                                        <th>Stato AI</th>
+                                        <th>Analizzato il</th>
+                                        <th>Motivo</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in stats.critici_recenti %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ doc.nome }}</strong>
+                                            <br><small class="text-muted">{{ doc.uploader.username }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ doc.categoria }}</span>
+                                        </td>
+                                        <td>
+                                            {% if doc.ai_status == 'incompleto' %}
+                                                <span class="badge bg-warning text-dark">⚠️ Incompleto</span>
+                                            {% elif doc.ai_status == 'scaduto' %}
+                                                <span class="badge bg-danger">❌ Scaduto</span>
+                                            {% elif doc.ai_status == 'manca_firma' %}
+                                                <span class="badge bg-danger">❌ Manca Firma</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if doc.ai_analyzed_at %}
+                                                {{ doc.ai_analyzed_at.strftime('%d/%m/%Y %H:%M') }}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if doc.ai_explain %}
+                                                <span data-bs-toggle="tooltip" title="{{ doc.ai_explain }}">
+                                                    {{ doc.ai_explain[:50] }}...
+                                                </span>
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('admin.doc_overview') }}?id={{ doc.id }}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                👁️ Visualizza
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <p class="text-muted">🎉 Nessun documento critico negli ultimi 7 giorni!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche per Categoria -->
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">📂 Statistiche per Categoria</h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.categorie_stats %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Categoria</th>
+                                        <th>Totale</th>
+                                        <th>Completi</th>
+                                        <th>Critici</th>
+                                        <th>% Completamento</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for cat in stats.categorie_stats %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ cat.categoria or 'Non specificata' }}</strong>
+                                        </td>
+                                        <td>{{ cat.totale }}</td>
+                                        <td>
+                                            <span class="text-success">{{ cat.completi }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="text-danger">{{ cat.critici }}</span>
+                                        </td>
+                                        <td>
+                                            {% set percentuale = (cat.completi / cat.totale * 100) if cat.totale > 0 else 0 %}
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-success" 
+                                                     style="width: {{ percentuale }}%">
+                                                    {{ "%.1f"|format(percentuale) }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <p class="text-muted">Nessuna categoria disponibile</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Grafico a barre
+    const barCtx = document.getElementById('barChart').getContext('2d');
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Completi', 'Incompleti', 'Scaduti', 'Manca Firma'],
+            datasets: [{
+                label: 'Documenti AI',
+                data: [
+                    {{ stats.completi }}, 
+                    {{ stats.incompleti }}, 
+                    {{ stats.scaduti }}, 
+                    {{ stats.manca_firma }}
+                ],
+                backgroundColor: ['#198754', '#ffc107', '#dc3545', '#dc3545'],
+                borderColor: ['#198754', '#ffc107', '#dc3545', '#dc3545'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.parsed.y + ' documenti';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true, 
+                    ticks: { 
+                        stepSize: 1,
+                        callback: function(value) {
+                            return value + ' doc';
+                        }
+                    } 
+                }
+            }
+        }
+    });
+
+    // Grafico a torta
+    const pieCtx = document.getElementById('pieChart').getContext('2d');
+    new Chart(pieCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Analizzati', 'Non Analizzati'],
+            datasets: [{
+                data: [{{ stats.analizzati }}, {{ stats.totali - stats.analizzati }}],
+                backgroundColor: ['#0d6efd', '#6c757d'],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = {{ stats.totali }};
+                            const percentage = ((context.parsed / total) * 100).toFixed(1);
+                            return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Inizializza tooltip
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %} 

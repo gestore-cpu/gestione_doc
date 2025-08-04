@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <h2>📋 Audit Trail - Prova Evacuazione {{ prova.luogo }}</h2>
+            <p class="text-muted">Storico completo delle modifiche apportate a questa prova</p>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>📊 Informazioni Prova</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>📅 Data:</strong> {{ prova.data.strftime('%d/%m/%Y') }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>🏢 Luogo:</strong> {{ prova.luogo }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>👤 Responsabile:</strong> {{ prova.responsabile }}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>📝 Modifiche:</strong> {{ prova.audit_trails|length }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if prova.audit_trails %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>📅 Timestamp</th>
+                            <th>👤 Modificato da</th>
+                            <th>🔧 Campo</th>
+                            <th>📤 Valore Precedente</th>
+                            <th>📥 Valore Nuovo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for audit in prova.audit_trails|sort(attribute='timestamp', reverse=true) %}
+                        <tr>
+                            <td>{{ audit.timestamp.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                            <td>
+                                <span class="badge bg-info">{{ audit.modificato_da }}</span>
+                            </td>
+                            <td>
+                                <strong>{{ audit.campo_modificato }}</strong>
+                            </td>
+                            <td>
+                                <span class="text-muted">
+                                    {% if audit.valore_precedente and audit.valore_precedente != 'None' %}
+                                        {{ audit.valore_precedente[:50] }}{% if audit.valore_precedente|length > 50 %}...{% endif %}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="text-success">
+                                    {% if audit.valore_nuovo and audit.valore_nuovo != 'None' %}
+                                        {{ audit.valore_nuovo[:50] }}{% if audit.valore_nuovo|length > 50 %}...{% endif %}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-4">
+                <h5>📈 Statistiche Audit</h5>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>👤 Utenti Attivi</h6>
+                                <h4>{{ prova.audit_trails|map(attribute='modificato_da')|unique|list|length }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>🔧 Campi Modificati</h6>
+                                <h4>{{ prova.audit_trails|map(attribute='campo_modificato')|unique|list|length }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>📅 Ultima Modifica</h6>
+                                <h6>{{ prova.audit_trails|sort(attribute='timestamp', reverse=true)|first|attr('timestamp')|strftime('%d/%m/%Y') }}</h6>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6>📊 Totale Modifiche</h6>
+                                <h4>{{ prova.audit_trails|length }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% else %}
+            <div class="alert alert-info">
+                <h5>📋 Nessuna modifica registrata</h5>
+                <p>Questa prova non ha ancora modifiche registrate nell'audit trail.</p>
+            </div>
+            {% endif %}
+            
+            <div class="d-flex gap-2 mt-4">
+                <a href="{{ url_for('prove_evacuazione.dettaglio_prova_evacuazione', id=prova.id) }}" class="btn btn-primary">
+                    👁️ Dettagli Prova
+                </a>
+                <a href="{{ url_for('prove_evacuazione.modifica_prova_evacuazione', id=prova.id) }}" class="btn btn-warning">
+                    ✏️ Modifica Prova
+                </a>
+                <a href="{{ url_for('prove_evacuazione.lista_prove_evacuazione') }}" class="btn btn-secondary">
+                    📋 Lista Prove
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

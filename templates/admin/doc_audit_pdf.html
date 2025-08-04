@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Registro Audit Revisioni e Firme - Mercury Document Intelligence</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 18pt;
+        }
+        
+        .header p {
+            margin: 5px 0;
+            color: #7f8c8d;
+            font-size: 9pt;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-label {
+            font-size: 8pt;
+            color: #7f8c8d;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 8pt;
+        }
+        
+        th {
+            background-color: #2c3e50;
+            color: white;
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #34495e;
+        }
+        
+        td {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        .document-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .version-badge {
+            background-color: #3498db;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 7pt;
+        }
+        
+        .role-badge {
+            background-color: #95a5a6;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 7pt;
+        }
+        
+        .hash-code {
+            font-family: 'Courier New', monospace;
+            font-size: 7pt;
+            color: #7f8c8d;
+        }
+        
+        .token-code {
+            font-family: 'Courier New', monospace;
+            font-size: 7pt;
+            color: #27ae60;
+        }
+        
+        .fa-status {
+            font-size: 8pt;
+        }
+        
+        .fa-yes {
+            color: #27ae60;
+        }
+        
+        .fa-no {
+            color: #e74c3c;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 8pt;
+            color: #7f8c8d;
+            text-align: center;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .critical-badge {
+            background-color: #e74c3c;
+            color: white;
+            padding: 1px 4px;
+            border-radius: 2px;
+            font-size: 6pt;
+            margin-left: 5px;
+        }
+        
+        .active-badge {
+            background-color: #27ae60;
+            color: white;
+            padding: 1px 4px;
+            border-radius: 2px;
+            font-size: 6pt;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Registro Audit Revisioni e Firme</h1>
+        <p>Mercury Document Intelligence - Sistema di Gestione Documentale</p>
+        <p>Generato il {{ data.generated_at }} - {{ data.total_records }} record totali</p>
+    </div>
+
+    <div class="stats">
+        <div class="stat-item">
+            <div class="stat-number">{{ data.total_records }}</div>
+            <div class="stat-label">Record Totali</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">{{ data.stats.with_2fa }}</div>
+            <div class="stat-label">Con 2FA</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">{{ data.stats.without_2fa }}</div>
+            <div class="stat-label">Senza 2FA</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-number">
+                {% if data.total_records > 0 %}
+                    {{ "%.1f"|format(data.stats.with_2fa / data.total_records * 100) }}%
+                {% else %}
+                    0%
+                {% endif %}
+            </div>
+            <div class="stat-label">% 2FA</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>📄 Documento</th>
+                <th>📋 Versione</th>
+                <th>📅 Data/Ora</th>
+                <th>👤 Firmato da</th>
+                <th>🏷️ Ruolo</th>
+                <th>🔐 SHA256</th>
+                <th>✅ 2FA</th>
+                <th>🔢 Token</th>
+                <th>📝 Note</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data.rows %}
+            <tr>
+                <td class="document-name">
+                    {{ row[0] }}
+                    {% if 'critico' in row[0].lower() or 'haccp' in row[0].lower() %}
+                        <span class="critical-badge">Critico</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="version-badge">{{ row[1] }}</span>
+                    {% if 'attiva' in row[1].lower() %}
+                        <span class="active-badge">Attiva</span>
+                    {% endif %}
+                </td>
+                <td>{{ row[2] }}</td>
+                <td><strong>{{ row[3] }}</strong></td>
+                <td>
+                    <span class="role-badge">{{ row[4] }}</span>
+                </td>
+                <td>
+                    <code class="hash-code">{{ row[5][:16] }}...</code>
+                </td>
+                <td>
+                    {% if row[6] == "✅" %}
+                        <span class="fa-status fa-yes">✅ 2FA</span>
+                    {% else %}
+                        <span class="fa-status fa-no">❌ No 2FA</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if row[7] %}
+                        <code class="token-code">{{ row[7] }}</code>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if row[8] %}
+                        <small>{{ row[8] }}</small>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p><strong>Mercury Document Intelligence</strong> - Sistema di Gestione Documentale Sicura</p>
+        <p>Registro Audit Revisioni e Firme - Pagina 1 di 1</p>
+        <p>Generato automaticamente il {{ data.generated_at }} | Documenti critici evidenziati</p>
+    </div>
+</body>
+</html> 

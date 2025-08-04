@@ -1,0 +1,329 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Flusso Approvazione - {{ document.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- === HEADER === -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>📋 Flusso Approvazione Documento</h2>
+                    <p class="text-muted mb-0">
+                        <strong>{{ document.title }}</strong> 
+                        <span class="badge bg-secondary ms-2">{{ document.stato_approvazione }}</span>
+                    </p>
+                </div>
+                <a href="{{ url_for('admin.view_document', doc_id=document.id) }}" 
+                   class="btn btn-outline-primary">
+                    👁️ Visualizza Documento
+                </a>
+            </div>
+
+            <!-- === STATISTICHE FLUSSO === -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ total_steps }}</h4>
+                            <p class="mb-0">📊 Step Totali</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ completed_steps }}</h4>
+                            <p class="mb-0">✅ Completati</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <h4>{{ pending_steps }}</h4>
+                            <p class="mb-0">⏳ In Attesa</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ rejected_steps }}</h4>
+                            <p class="mb-0">❌ Respinti</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === BARRA PROGRESSO === -->
+            {% if total_steps > 0 %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">📈 Progresso Flusso</h5>
+                    <div class="progress mb-2" style="height: 25px;">
+                        <div class="progress-bar bg-success" 
+                             style="width: {{ progress_percentage }}%"
+                             role="progressbar">
+                            {{ progress_percentage|round(1) }}%
+                        </div>
+                    </div>
+                    <small class="text-muted">
+                        {{ completed_steps }} di {{ total_steps }} step completati
+                    </small>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- === AZIONI FLUSSO === -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">➕ Aggiungi Step</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('admin.add_approval_step', doc_id=document.id) }}">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="step_name" class="form-label">Nome Step</label>
+                                        <input type="text" class="form-control" id="step_name" name="step_name" 
+                                               placeholder="Es: Controllo Qualità" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="approver_role" class="form-label">Ruolo Richiesto</label>
+                                        <select class="form-select" id="approver_role" name="approver_role">
+                                            <option value="">Nessun ruolo specifico</option>
+                                            <option value="admin">Admin</option>
+                                            <option value="manager">Manager</option>
+                                            <option value="ceo">CEO</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="approver_id" class="form-label">Approvatore Specifico</label>
+                                        <select class="form-select" id="approver_id" name="approver_id">
+                                            <option value="">Nessuno (per ruolo)</option>
+                                            {% for approver in available_approvers %}
+                                            <option value="{{ approver.id }}">
+                                                {{ approver.first_name }} {{ approver.last_name }} ({{ approver.role }})
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="note" class="form-label">Note</label>
+                                        <input type="text" class="form-control" id="note" name="note" 
+                                               placeholder="Note opzionali">
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary">
+                                            ➕ Aggiungi Step
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">⚡ Azioni Rapide</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if total_steps == 0 %}
+                            <form method="POST" action="{{ url_for('admin.create_default_approval_flow', doc_id=document.id) }}">
+                                <button type="submit" class="btn btn-success w-100 mb-2">
+                                    🚀 Crea Flusso Predefinito
+                                </button>
+                                <small class="text-muted">
+                                    Crea automaticamente: Controllo Qualità → Validazione Manager → Approvazione CEO
+                                </small>
+                            </form>
+                            {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Il documento ha già un flusso di approvazione configurato.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === CHECKLIST STEP === -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Checklist Step di Approvazione</h5>
+                </div>
+                <div class="card-body">
+                    {% if approval_steps %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Step</th>
+                                    <th>Approvatore</th>
+                                    <th>Stato</th>
+                                    <th>Data Approvazione</th>
+                                    <th>Note</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for step in approval_steps %}
+                                <tr class="{% if step.is_rejected %}table-danger{% elif step.is_completed %}table-success{% endif %}">
+                                    <td>
+                                        <strong>{{ loop.index }}</strong>
+                                    </td>
+                                    <td>
+                                        <strong>{{ step.step_name }}</strong>
+                                        {% if step.approver_role %}
+                                            <br>
+                                            <small class="text-muted">Ruolo: {{ step.approver_role }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if step.approver %}
+                                            {{ step.approver_display }}
+                                            {% if step.is_ai_approval %}
+                                                <span class="badge bg-info text-dark ms-1">🧠 AI</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">Non assegnato</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge {{ step.status_badge_class }}">
+                                            {{ step.status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ step.approval_date_formatted }}</small>
+                                    </td>
+                                    <td>
+                                        {% if step.note %}
+                                            <span class="text-muted" title="{{ step.note }}">
+                                                {{ step.note[:30] }}{% if step.note|length > 30 %}...{% endif %}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if step.is_pending and step.can_be_approved_by(current_user) %}
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-success btn-sm" 
+                                                    onclick="showApprovalModal({{ step.id }}, 'approve')">
+                                                ✅ Approva
+                                            </button>
+                                            <button type="button" class="btn btn-danger btn-sm" 
+                                                    onclick="showApprovalModal({{ step.id }}, 'reject')">
+                                                ❌ Respindi
+                                            </button>
+                                        </div>
+                                        {% elif step.is_completed %}
+                                        <span class="text-muted">Completato</span>
+                                        {% else %}
+                                        <span class="text-muted">Non autorizzato</span>
+                                        {% endif %}
+                                        
+                                        {% if current_user.is_admin or current_user.is_ceo %}
+                                        <form method="POST" action="{{ url_for('admin.remove_approval_step', doc_id=document.id, step_id=step.id) }}" 
+                                              class="d-inline ms-2" 
+                                              onsubmit="return confirm('Sei sicuro di voler rimuovere questo step?')">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                🗑️
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Nessuno step di approvazione configurato per questo documento.
+                            <br>
+                            <small>Crea un flusso predefinito o aggiungi step manualmente.</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- === MODAL APPROVAZIONE === -->
+<div class="modal fade" id="approvalModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="approvalModalTitle">Approva Step</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="approvalForm" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="approval_note" class="form-label">Note (opzionale)</label>
+                        <textarea class="form-control" id="approval_note" name="note" rows="3" 
+                                  placeholder="Inserisci una nota per questo step..."></textarea>
+                    </div>
+                    <input type="hidden" id="approval_action" name="action" value="">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn" id="approvalSubmitBtn">Conferma</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// === Funzione per mostrare modal approvazione ===
+function showApprovalModal(stepId, action) {
+    const modal = document.getElementById('approvalModal');
+    const form = document.getElementById('approvalForm');
+    const title = document.getElementById('approvalModalTitle');
+    const submitBtn = document.getElementById('approvalSubmitBtn');
+    const actionInput = document.getElementById('approval_action');
+    
+    // === Imposta azione ===
+    actionInput.value = action;
+    
+    // === Personalizza modal in base all'azione ===
+    if (action === 'approve') {
+        title.textContent = '✅ Approva Step';
+        submitBtn.className = 'btn btn-success';
+        submitBtn.textContent = '✅ Approva';
+    } else {
+        title.textContent = '❌ Respindi Step';
+        submitBtn.className = 'btn btn-danger';
+        submitBtn.textContent = '❌ Respindi';
+    }
+    
+    // === Imposta action URL ===
+    form.action = `/admin/documents/{{ document.id }}/approvals/approve_step/${stepId}`;
+    
+    // === Mostra modal ===
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
+
+// === Inizializza tooltip ===
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

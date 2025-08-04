@@ -1,0 +1,14 @@
+<!-- 📁 Componente: onboarding_docs.html -->
+<div id="jack-onboarding-wrapper" style="display: none; position: fixed; bottom: 20px; right: 20px; z-index: 9999; max-width: 350px;">
+  <div id="jack-onboarding-box" class="jack-box onboarding p-3 rounded shadow bg-white">
+    <!-- Messaggio sarà iniettato da JS -->
+  </div>
+  <div class="mt-2 d-flex justify-content-end gap-2">
+    <button id="jack-onboarding-next" class="btn btn-primary btn-sm">Avanti</button>
+    <button id="jack-onboarding-skip" class="btn btn-outline-secondary btn-sm">Salta</button>
+  </div>
+</div>
+
+<!-- Inserire in base.html o nelle pagine che devono mostrare l'onboarding -->
+<!-- Ricorda di includere anche jack_onboarding.js -->
+<script src="{{ url_for('static', filename='js/jack_onboarding.js') }}"></script> 

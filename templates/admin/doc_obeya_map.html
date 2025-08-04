@@ -1,0 +1,458 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>🗺️ Obeya Visuale Documentale</h2>
+                    <p class="text-muted mb-0">Mappa interattiva dei documenti critici per auditing visivo e decisioni rapide</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('admin.documents_overview') }}" class="btn btn-outline-secondary">
+                        📊 Panoramica Documenti
+                    </a>
+                </div>
+            </div>
+
+            <!-- FILTRI AVANZATI -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 Filtri Avanzati</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="tipoDocumento" class="form-label">Tipo Documento</label>
+                            <select class="form-select" id="tipoDocumento">
+                                <option value="">Tutti i tipi</option>
+                                <option value="certificazione">Certificazione</option>
+                                <option value="DVR">DVR</option>
+                                <option value="contratto">Contratto</option>
+                                <option value="manuale">Manuale</option>
+                                <option value="procedura">Procedura</option>
+                                <option value="registro">Registro</option>
+                                <option value="altro">Altro</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="aziendaFilter" class="form-label">Azienda</label>
+                            <select class="form-select" id="aziendaFilter">
+                                <option value="">Tutte le aziende</option>
+                                <!-- Popolato dinamicamente -->
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" id="soloTaskAttivi">
+                                <label class="form-check-label" for="soloTaskAttivi">
+                                    🎯 Solo documenti con task AI attivi
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary mt-4" onclick="applicaFiltri()">
+                                🔄 Applica Filtri
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATISTICHE RAPIDE -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-white bg-primary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">📄 Documenti Totali</h6>
+                            <h4 id="totaleDocumenti">-</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-warning">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">🎯 Con Task Attivi</h6>
+                            <h4 id="conTaskAttivi">-</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-info">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">🏢 Aziende</h6>
+                            <h4 id="totaleAziende">-</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-success">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">🏭 Reparti</h6>
+                            <h4 id="totaleReparti">-</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MAPPA INTERATTIVA -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">🗺️ Mappa Documentale Interattiva</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="resetZoom()">
+                            🔍 Reset Zoom
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="fitToScreen()">
+                            📐 Adatta Schermo
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="obeyaMap" style="height: 700px; width: 100%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DETTAGLI DOCUMENTO -->
+<div class="modal fade" id="documentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="documentModalTitle">📄 Dettagli Documento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h6 id="documentTitle">-</h6>
+                        <p class="text-muted" id="documentType">-</p>
+                        <div class="mb-3">
+                            <strong>Stato AI:</strong>
+                            <span id="aiStatus" class="badge">-</span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Motivo:</strong>
+                            <p id="aiExplain" class="text-muted">-</p>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Ultimo aggiornamento:</strong>
+                            <span id="lastUpdated">-</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-grid gap-2">
+                            <a id="downloadLink" href="#" class="btn btn-primary" target="_blank">
+                                📥 Scarica Documento
+                            </a>
+                            <a id="taskLink" href="#" class="btn btn-warning" target="_blank" style="display: none;">
+                                🎯 Vai al Task
+                            </a>
+                            <button class="btn btn-outline-secondary" onclick="analyzeDocument()">
+                                🤖 Analizza con AI
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- VIS-NETWORK LIBRARY -->
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+<script>
+let network = null;
+let currentDocumentId = null;
+
+// === INIZIALIZZAZIONE ===
+document.addEventListener('DOMContentLoaded', function() {
+    caricaMappaObeya();
+    popolaFiltri();
+});
+
+// === CARICA MAPPA OBEYA ===
+function caricaMappaObeya() {
+    const params = new URLSearchParams();
+    
+    const tipoDoc = document.getElementById('tipoDocumento').value;
+    const soloTask = document.getElementById('soloTaskAttivi').checked;
+    const azienda = document.getElementById('aziendaFilter').value;
+    
+    if (tipoDoc) params.append('tipo_documento', tipoDoc);
+    if (soloTask) params.append('solo_task_attivi', 'true');
+    if (azienda) params.append('azienda_id', azienda);
+    
+    fetch(`/api/docs/obeya-map?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                creaVisualizzazione(data.data);
+                aggiornaStatistiche(data.statistiche);
+            } else {
+                console.error('Errore nel caricamento dati:', data.error);
+                alert('❌ Errore nel caricamento della mappa');
+            }
+        })
+        .catch(error => {
+            console.error('Errore di rete:', error);
+            alert('❌ Errore di connessione');
+        });
+}
+
+// === CREA VISUALIZZAZIONE ===
+function creaVisualizzazione(data) {
+    const nodes = [];
+    const edges = [];
+    let id = 1;
+    
+    data.forEach(org => {
+        // Nodo azienda
+        const aziendaId = id++;
+        nodes.push({
+            id: aziendaId,
+            label: org.azienda,
+            shape: "box",
+            size: 30,
+            color: { background: '#007bff', border: '#0056b3' },
+            font: { size: 16, color: '#ffffff' },
+            level: 0
+        });
+        
+        org.reparti.forEach(rep => {
+            // Nodo reparto
+            const repId = id++;
+            nodes.push({
+                id: repId,
+                label: rep.reparto,
+                shape: "box",
+                size: 25,
+                color: { background: '#28a745', border: '#1e7e34' },
+                font: { size: 14, color: '#ffffff' },
+                level: 1
+            });
+            edges.push({ from: aziendaId, to: repId });
+            
+            // Nodi documenti
+            rep.documenti.forEach(doc => {
+                const docId = id++;
+                
+                // Determina colore basato su stato AI
+                let color = '#6c757d'; // default grigio
+                let icon = '📄';
+                
+                if (doc.ai_status === 'completo') {
+                    color = '#28a745';
+                    icon = '✅';
+                } else if (doc.ai_status === 'incompleto') {
+                    color = '#ffc107';
+                    icon = '⚠️';
+                } else if (doc.ai_status === 'scaduto' || doc.ai_status === 'manca_firma') {
+                    color = '#dc3545';
+                    icon = '❌';
+                } else if (doc.has_active_task) {
+                    color = '#fd7e14';
+                    icon = '🎯';
+                }
+                
+                nodes.push({
+                    id: docId,
+                    label: `${icon} ${doc.titolo}`,
+                    title: `${doc.ai_status.toUpperCase()}\n${doc.ai_explain}`,
+                    shape: "dot",
+                    size: doc.has_active_task ? 25 : 20,
+                    color: { background: color, border: color },
+                    font: { size: 12, color: '#ffffff' },
+                    level: 2,
+                    // Dati personalizzati per il documento
+                    documentData: doc
+                });
+                edges.push({ from: repId, to: docId });
+            });
+        });
+    });
+    
+    // Configurazione network
+    const container = document.getElementById('obeyaMap');
+    const data_network = { nodes, edges };
+    
+    const options = {
+        nodes: {
+            shape: "dot",
+            size: 20,
+            font: {
+                size: 12,
+                color: "#333333"
+            },
+            borderWidth: 2,
+            shadow: true
+        },
+        edges: {
+            width: 2,
+            color: { inherit: "both" },
+            smooth: {
+                type: "continuous"
+            }
+        },
+        layout: {
+            hierarchical: {
+                enabled: true,
+                levelSeparation: 150,
+                nodeSpacing: 200,
+                treeSpacing: 200,
+                blockShifting: true,
+                edgeMinimization: true,
+                parentCentralization: true,
+                direction: "UD",
+                sortMethod: "directed"
+            }
+        },
+        physics: {
+            enabled: false
+        },
+        interaction: {
+            hover: true,
+            tooltipDelay: 200
+        }
+    };
+    
+    // Crea network
+    network = new vis.Network(container, data_network, options);
+    
+    // Eventi click
+    network.on("click", function(params) {
+        if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0];
+            const node = nodes.find(n => n.id === nodeId);
+            
+            if (node && node.documentData) {
+                mostraDettagliDocumento(node.documentData);
+            }
+        }
+    });
+}
+
+// === MOSTRA DETTAGLI DOCUMENTO ===
+function mostraDettagliDocumento(doc) {
+    currentDocumentId = doc.id;
+    
+    document.getElementById('documentTitle').textContent = doc.titolo;
+    document.getElementById('documentType').textContent = `Tipo: ${doc.tipo}`;
+    document.getElementById('lastUpdated').textContent = doc.last_updated;
+    document.getElementById('aiExplain').textContent = doc.ai_explain;
+    
+    // Stato AI con badge colorato
+    const statusElement = document.getElementById('aiStatus');
+    statusElement.textContent = doc.ai_status.toUpperCase();
+    statusElement.className = 'badge ';
+    
+    if (doc.ai_status === 'completo') {
+        statusElement.className += 'bg-success';
+    } else if (doc.ai_status === 'incompleto') {
+        statusElement.className += 'bg-warning';
+    } else if (doc.ai_status === 'scaduto' || doc.ai_status === 'manca_firma') {
+        statusElement.className += 'bg-danger';
+    } else {
+        statusElement.className += 'bg-secondary';
+    }
+    
+    // Link download
+    const downloadLink = document.getElementById('downloadLink');
+    downloadLink.href = doc.download_url;
+    
+    // Link task (se presente)
+    const taskLink = document.getElementById('taskLink');
+    if (doc.task_url) {
+        taskLink.href = doc.task_url;
+        taskLink.style.display = 'block';
+    } else {
+        taskLink.style.display = 'none';
+    }
+    
+    // Mostra modal
+    const modal = new bootstrap.Modal(document.getElementById('documentModal'));
+    modal.show();
+}
+
+// === ANALIZZA DOCUMENTO CON AI ===
+function analyzeDocument() {
+    if (!currentDocumentId) return;
+    
+    if (confirm("Analizzare questo documento con Document Intelligence AI?")) {
+        fetch('/docs/analyze-pdf', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ document_id: currentDocumentId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`✅ Analisi completata!\n\nStato: ${data.status}\nMotivo: ${data.explain}`);
+                // Ricarica mappa per aggiornare dati
+                caricaMappaObeya();
+            } else {
+                alert("❌ Errore nell'analisi AI: " + data.message);
+            }
+        })
+        .catch(error => {
+            console.error("Errore AI:", error);
+            alert("❌ Errore durante l'analisi AI");
+        });
+    }
+}
+
+// === APPLICA FILTRI ===
+function applicaFiltri() {
+    caricaMappaObeya();
+}
+
+// === POPOLA FILTRI ===
+function popolaFiltri() {
+    // Carica aziende disponibili
+    fetch('/api/docs/obeya-map')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const aziende = [...new Set(data.data.map(org => org.azienda))];
+                const select = document.getElementById('aziendaFilter');
+                
+                aziende.forEach(azienda => {
+                    const option = document.createElement('option');
+                    option.value = azienda;
+                    option.textContent = azienda;
+                    select.appendChild(option);
+                });
+            }
+        });
+}
+
+// === AGGIORNA STATISTICHE ===
+function aggiornaStatistiche(stats) {
+    document.getElementById('totaleDocumenti').textContent = stats.totale_documenti;
+    document.getElementById('conTaskAttivi').textContent = stats.con_task_attivi;
+    document.getElementById('totaleAziende').textContent = stats.aziende;
+    document.getElementById('totaleReparti').textContent = stats.reparti;
+}
+
+// === CONTROLLI ZOOM ===
+function resetZoom() {
+    if (network) {
+        network.fit();
+    }
+}
+
+function fitToScreen() {
+    if (network) {
+        network.fit();
+    }
+}
+</script>
+
+{% endblock %} 

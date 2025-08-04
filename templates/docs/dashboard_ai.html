@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard AI Documentale{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header della Dashboard AI -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-gradient-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0">🤖 Dashboard AI Documentale</h2>
+                            <p class="mb-0">Analisi automatica dei documenti per rilevare duplicati, obsolescenza e suggerire azioni</p>
+                        </div>
+                        <div class="text-end">
+                            <button class="btn btn-light" onclick="refreshInsights()">
+                                <i class="fas fa-sync-alt"></i> Aggiorna Analisi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche Rapide -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ insights|length }}</h4>
+                            <p class="mb-0">Insight Attivi</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ insights|selectattr('tipo', 'equalto', 'obsoleto')|list|length }}</h4>
+                            <p class="mb-0">Documenti Obsoleti</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ insights|selectattr('tipo', 'equalto', 'duplicato')|list|length }}</h4>
+                            <p class="mb-0">Duplicati Rilevati</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-copy fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ insights|selectattr('tipo', 'equalto', 'vecchio')|list|length }}</h4>
+                            <p class="mb-0">Documenti Vecchi</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-calendar-alt fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 Filtri</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="filterType" class="form-label">Tipo Insight</label>
+                            <select class="form-select" id="filterType" onchange="filterInsights()">
+                                <option value="">Tutti i tipi</option>
+                                <option value="duplicato">🔄 Duplicati</option>
+                                <option value="obsoleto">⚠️ Obsoleti</option>
+                                <option value="vecchio">📅 Vecchi</option>
+                                <option value="inutilizzato">📊 Inutilizzati</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filterSeverity" class="form-label">Severità</label>
+                            <select class="form-select" id="filterSeverity" onchange="filterInsights()">
+                                <option value="">Tutte le severità</option>
+                                <option value="critico">🔴 Critico</option>
+                                <option value="attenzione">🟡 Attenzione</option>
+                                <option value="informativo">🔵 Informativo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filterStatus" class="form-label">Stato</label>
+                            <select class="form-select" id="filterStatus" onchange="filterInsights()">
+                                <option value="">Tutti gli stati</option>
+                                <option value="attivo">🟢 Attivo</option>
+                                <option value="risolto">✅ Risolto</option>
+                                <option value="ignorato">⚪ Ignorato</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="searchDocument" class="form-label">Cerca Documento</label>
+                            <input type="text" class="form-control" id="searchDocument" placeholder="Nome documento..." onkeyup="filterInsights()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabella Insight AI -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📌 Suggerimenti AI sui Documenti</h5>
+                    <div>
+                        <span class="badge bg-primary" id="insightCount">{{ insights|length }}</span> insight trovati
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if insights %}
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="insightsTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Documento</th>
+                                    <th>Tipo Insight</th>
+                                    <th>Dettagli</th>
+                                    <th>Severità</th>
+                                    <th>Stato</th>
+                                    <th>Data Analisi</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for insight in insights %}
+                                <tr class="insight-row" 
+                                    data-tipo="{{ insight.tipo }}" 
+                                    data-severity="{{ insight.severity }}" 
+                                    data-status="{{ insight.status }}"
+                                    data-document="{{ insight.document.title.lower() }}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-3">
+                                                {% if insight.document.original_filename %}
+                                                    {% if insight.document.original_filename.lower().endswith('.pdf') %}
+                                                        <i class="fas fa-file-pdf text-danger"></i>
+                                                    {% elif insight.document.original_filename.lower().endswith(('.doc', '.docx')) %}
+                                                        <i class="fas fa-file-word text-primary"></i>
+                                                    {% elif insight.document.original_filename.lower().endswith(('.xls', '.xlsx')) %}
+                                                        <i class="fas fa-file-excel text-success"></i>
+                                                    {% else %}
+                                                        <i class="fas fa-file text-secondary"></i>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <i class="fas fa-file text-secondary"></i>
+                                                {% endif %}
+                                            </div>
+                                            <div>
+                                                <strong>{{ insight.document.title }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ insight.document.uploader_email }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ insight.severity_badge_class }}">
+                                            {{ insight.tipo_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="insight-details">
+                                            {{ insight.valore }}
+                                            {% if insight.tipo == 'duplicato' and insight.valore %}
+                                                <br>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-link"></i> 
+                                                    <a href="/document/{{ insight.valore.split('ID: ')[1] if 'ID: ' in insight.valore else '' }}" 
+                                                       class="text-decoration-none">
+                                                        Vedi documento simile
+                                                    </a>
+                                                </small>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ insight.severity_badge_class }}">
+                                            {% if insight.severity == 'critico' %}🔴 Critico
+                                            {% elif insight.severity == 'attenzione' %}🟡 Attenzione
+                                            {% else %}🔵 Informativo{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ insight.status_badge_class }}">
+                                            {% if insight.status == 'attivo' %}🟢 Attivo
+                                            {% elif insight.status == 'risolto' %}✅ Risolto
+                                            {% else %}⚪ Ignorato{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ insight.timestamp.strftime('%d/%m/%Y %H:%M') }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            {% if insight.tipo == 'duplicato' %}
+                                                <a href="/document/{{ insight.valore.split('ID: ')[1] if 'ID: ' in insight.valore else '' }}" 
+                                                   class="btn btn-sm btn-outline-primary" title="Vedi duplicato">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            {% elif insight.tipo == 'obsoleto' %}
+                                                <a href="/document/{{ insight.document_id }}" 
+                                                   class="btn btn-sm btn-warning" title="Avvia aggiornamento">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            {% endif %}
+                                            
+                                            <button class="btn btn-sm btn-success" 
+                                                    onclick="resolveInsight({{ insight.id }})" 
+                                                    title="Segna come risolto">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            
+                                            <button class="btn btn-sm btn-secondary" 
+                                                    onclick="ignoreInsight({{ insight.id }})" 
+                                                    title="Ignora">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                            
+                                            <button class="btn btn-sm btn-info" 
+                                                    onclick="createTaskFromInsight({{ insight.id }})" 
+                                                    title="Crea task">
+                                                <i class="fas fa-tasks"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-robot fa-3x text-muted mb-3"></i>
+                        <h4 class="text-muted">Nessun insight AI trovato</h4>
+                        <p class="text-muted">Tutti i documenti sono in buono stato o non ci sono insight attivi.</p>
+                        <button class="btn btn-primary" onclick="refreshInsights()">
+                            <i class="fas fa-sync-alt"></i> Esegui Nuova Analisi
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal per Dettagli Insight -->
+    <div class="modal fade" id="insightModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Dettagli Insight AI</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="insightModalBody">
+                    <!-- Contenuto dinamico -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                    <button type="button" class="btn btn-primary" onclick="createTaskFromModal()">Crea Task</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Funzioni JavaScript per la gestione della dashboard
+
+function filterInsights() {
+    const filterType = document.getElementById('filterType').value;
+    const filterSeverity = document.getElementById('filterSeverity').value;
+    const filterStatus = document.getElementById('filterStatus').value;
+    const searchDocument = document.getElementById('searchDocument').value.toLowerCase();
+    
+    const rows = document.querySelectorAll('.insight-row');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const tipo = row.dataset.tipo;
+        const severity = row.dataset.severity;
+        const status = row.dataset.status;
+        const document = row.dataset.document;
+        
+        let show = true;
+        
+        if (filterType && tipo !== filterType) show = false;
+        if (filterSeverity && severity !== filterSeverity) show = false;
+        if (filterStatus && status !== filterStatus) show = false;
+        if (searchDocument && !document.includes(searchDocument)) show = false;
+        
+        row.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+    });
+    
+    document.getElementById('insightCount').textContent = visibleCount;
+}
+
+function resolveInsight(insightId) {
+    if (confirm('Segnare questo insight come risolto?')) {
+        fetch(`/admin/ai/insight/${insightId}/resolve`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Errore durante la risoluzione dell\'insight');
+            }
+        });
+    }
+}
+
+function ignoreInsight(insightId) {
+    if (confirm('Ignorare questo insight?')) {
+        fetch(`/admin/ai/insight/${insightId}/ignore`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Errore durante l\'ignoramento dell\'insight');
+            }
+        });
+    }
+}
+
+function createTaskFromInsight(insightId) {
+    fetch(`/admin/ai/insight/${insightId}/create-task`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Task creato con successo!');
+            location.reload();
+        } else {
+            alert('Errore durante la creazione del task');
+        }
+    });
+}
+
+function refreshInsights() {
+    if (confirm('Eseguire una nuova analisi AI sui documenti?')) {
+        fetch('/admin/ai/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Analisi completata! ' + data.message);
+                location.reload();
+            } else {
+                alert('Errore durante l\'analisi: ' + data.message);
+            }
+        });
+    }
+}
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    // Aggiungi event listener per i filtri
+    filterInsights();
+});
+</script>
+
+<style>
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.insight-details {
+    max-width: 300px;
+    word-wrap: break-word;
+}
+
+.btn-group .btn {
+    margin-right: 2px;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.badge {
+    font-size: 0.75em;
+}
+</style>
+{% endblock %} 

@@ -1,0 +1,257 @@
+{% extends 'admin/base_admin.html' %}
+
+{% block title %}Storico Approvazioni Documenti{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>📋 Storico Approvazioni Documenti</h2>
+                <a href="{{ url_for('admin.export_approval_history') }}?{{ request.query_string.decode() }}" 
+                   class="btn btn-success">
+                    📥 Esporta CSV
+                </a>
+            </div>
+
+            <!-- === STATISTICHE RAPIDE === -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ total_logs }}</h4>
+                            <p class="mb-0">📊 Totale Azioni</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ approved_count }}</h4>
+                            <p class="mb-0">✅ Approvazioni</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ rejected_count }}</h4>
+                            <p class="mb-0">❌ Respinte</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ ai_count }}</h4>
+                            <p class="mb-0">🤖 AI</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === FILTRI === -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 Filtri Avanzati</h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-2">
+                            <label for="start_date" class="form-label">Data Inizio</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" 
+                                   value="{{ filters.start_date or '' }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="end_date" class="form-label">Data Fine</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" 
+                                   value="{{ filters.end_date or '' }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="approver_id" class="form-label">Approvatore</label>
+                            <select class="form-select" id="approver_id" name="approver_id">
+                                <option value="">Tutti</option>
+                                {% for approver in approvers %}
+                                <option value="{{ approver.id }}" 
+                                        {% if filters.approver_id|string == approver.id|string %}selected{% endif %}>
+                                    {{ approver.first_name }} {{ approver.last_name }} ({{ approver.role }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="action" class="form-label">Azione</label>
+                            <select class="form-select" id="action" name="action">
+                                <option value="">Tutte</option>
+                                {% for action in actions %}
+                                <option value="{{ action }}" 
+                                        {% if filters.action == action %}selected{% endif %}>
+                                    {{ action.replace('_', ' ').title() }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="method" class="form-label">Metodo</label>
+                            <select class="form-select" id="method" name="method">
+                                <option value="">Tutti</option>
+                                {% for method in methods %}
+                                <option value="{{ method }}" 
+                                        {% if filters.method == method %}selected{% endif %}>
+                                    {{ method.title() }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="document_id" class="form-label">Documento</label>
+                            <select class="form-select" id="document_id" name="document_id">
+                                <option value="">Tutti</option>
+                                {% for doc in documents %}
+                                <option value="{{ doc.id }}" 
+                                        {% if filters.document_id|string == doc.id|string %}selected{% endif %}>
+                                    {{ doc.title[:30] }}{% if doc.title|length > 30 %}...{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between">
+                                <button type="submit" class="btn btn-primary">
+                                    🔍 Applica Filtri
+                                </button>
+                                <a href="{{ url_for('admin.approval_history') }}" class="btn btn-secondary">
+                                    🔄 Reset
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- === TABELLA STORICO === -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Storico Approvazioni</h5>
+                    <small class="text-muted">
+                        Top approvatore: <strong>{{ top_approver[0] }}</strong> ({{ top_approver[1] }} azioni)
+                    </small>
+                </div>
+                <div class="card-body">
+                    {% if logs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Data/Ora</th>
+                                    <th>Documento</th>
+                                    <th>Azione</th>
+                                    <th>Approvatore</th>
+                                    <th>Ruolo</th>
+                                    <th>Metodo</th>
+                                    <th>Note</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr>
+                                    <td>
+                                        <small>{{ log.timestamp.strftime('%d/%m/%Y %H:%M') }}</small>
+                                    </td>
+                                    <td>
+                                        <strong>{{ log.document_title }}</strong>
+                                        <br>
+                                        <small class="text-muted">ID: {{ log.document_id }}</small>
+                                    </td>
+                                    <td>
+                                        {% if log.action == 'approved' %}
+                                            <span class="badge bg-success">✅ Approvato</span>
+                                        {% elif log.action == 'rejected' %}
+                                            <span class="badge bg-danger">❌ Respinto</span>
+                                        {% elif log.action == 'commented' %}
+                                            <span class="badge bg-warning text-dark">💬 Commentato</span>
+                                        {% elif log.action == 'submitted' %}
+                                            <span class="badge bg-info">📤 Inviato</span>
+                                        {% elif log.action == 'auto_approved' %}
+                                            <span class="badge bg-info">🤖 Auto-approvato</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ log.action }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ log.approver_display }}</strong>
+                                        {% if log.is_ai_approval %}
+                                            <span class="badge bg-info text-dark ms-1">🧠 AI</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ log.approver_role }}</span>
+                                    </td>
+                                    <td>
+                                        {% if log.method == 'manual' %}
+                                            <span class="badge bg-primary">👤 Manuale</span>
+                                        {% elif log.method == 'AI' %}
+                                            <span class="badge bg-info">🧠 AI</span>
+                                        {% elif log.method == 'auto' %}
+                                            <span class="badge bg-warning text-dark">🤖 Auto</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ log.method }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.note %}
+                                            <span class="text-muted" title="{{ log.note }}">
+                                                {{ log.note[:50] }}{% if log.note|length > 50 %}...{% endif %}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Nessun log di approvazione trovato con i filtri applicati.
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// === Inizializza tooltip per note lunghe ===
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+// === Auto-submit form quando cambiano i filtri principali ===
+document.getElementById('start_date').addEventListener('change', function() {
+    if (this.value) {
+        document.querySelector('form').submit();
+    }
+});
+
+document.getElementById('end_date').addEventListener('change', function() {
+    if (this.value) {
+        document.querySelector('form').submit();
+    }
+});
+
+document.getElementById('approver_id').addEventListener('change', function() {
+    if (this.value) {
+        document.querySelector('form').submit();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Documentale</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #e0ecff, #ffffff);
+    }
+    .sidebar {
+      min-height: 100vh;
+      background-color: #f8f9fa;
+      border-right: 1px solid #dee2e6;
+    }
+    .sidebar h5, .sidebar ul {
+      padding-left: 1rem;
+    }
+    .doc-card {
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 1rem;
+      background-color: #fff;
+      transition: box-shadow 0.3s;
+    }
+    .doc-card:hover {
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    }
+    .qr-box, .download-box, .chart-card {
+      background-color: #fff;
+      border-radius: 10px;
+      padding: 1rem;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+    }
+    .logo {
+      max-height: 120px;
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+  <div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 col-lg-2 sidebar py-3">
+      <img src="/static/img/logo.png" alt="Logo Mercury Surgelati" class="img-fluid logo">
+      <h5><i class="fa-solid fa-building"></i> Azienda</h5>
+      <ul class="list-unstyled">
+        <li>🔹 {{ current_user.company.name }}</li>
+        <li>🔹 {{ current_user.department }}</li>
+      </ul>
+
+      {% if current_user.is_admin %}
+      <h5 class="mt-4"><i class="fa-solid fa-gear"></i> Amministrazione</h5>
+      <ul class="list-unstyled">
+        <li><a href="#" class="text-decoration-none"><i class="fa-solid fa-users"></i> Utenti / Permessi</a></li>
+        <li><a href="#" class="text-decoration-none"><i class="fa-solid fa-folder-tree"></i> Gestione Reparti</a></li>
+        <li><a href="/upload" class="text-decoration-none"><i class="fa-solid fa-upload"></i> Carica Documenti</a></li>
+      </ul>
+      {% endif %}
+
+      {% if current_user.role == 'ceo' %}
+      <ul class="list-unstyled mt-4">
+        <li class="sidebar-item">
+          <a class="sidebar-link" href="/dashboard/obeya">
+            📊 Obeya Digitale
+          </a>
+        </li>
+      </ul>
+      {% endif %}
+
+      <h5 class="mt-4"><i class="fa-solid fa-user"></i> Profilo</h5>
+      <ul class="list-unstyled">
+        <li><a href="{{ url_for('auth.logout') }}" class="text-decoration-none"><i class="fa-solid fa-right-from-bracket"></i> Logout</a></li>
+      </ul>
+
+      <div class="qr-box mt-4">
+        <h6 class="fw-bold mb-2"><i class="fa-solid fa-qrcode"></i> Scannerizza QR</h6>
+        <input type="file" class="form-control mb-2" accept="image/*">
+        <button class="btn btn-outline-secondary w-100">Webcam</button>
+      </div>
+
+      <div class="download-box mt-4">
+        <h6 class="fw-bold"><i class="fa-solid fa-folder-open"></i> Area Download</h6>
+        <ul class="small">
+          {% for doc in documenti[:3] %}
+          <li>📥 {{ doc.title }} - {{ doc.upload_date.strftime('%d/%m') }}</li>
+          {% endfor %}
+        </ul>
+        <button class="btn btn-sm btn-primary w-100">Gestisci Ospiti</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="col-md-9 col-lg-10 py-4">
+      <!-- Flash messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Search Bar -->
+      <div class="input-group mb-4">
+        <input type="text" class="form-control" placeholder="Cerca documenti...">
+        <button class="btn btn-outline-primary"><i class="fa fa-search"></i></button>
+      </div>
+
+      <!-- Grafici -->
+      <div class="chart-card mb-4">
+        <h5><i class="fa-solid fa-chart-column"></i> Attività Recenti</h5>
+        <canvas id="activityChart" height="100"></canvas>
+      </div>
+
+      <div class="chart-card mb-4">
+        <h5><i class="fa-solid fa-chart-pie"></i> % File per Azienda / Reparto</h5>
+        <canvas id="fileDistChart" height="100"></canvas>
+      </div>
+
+      <!-- Documenti -->
+      <div class="row g-3">
+        {% for doc in documenti %}
+        <div class="col-sm-6 col-md-4 col-lg-3">
+          <div class="doc-card">
+            <div class="text-center mb-2">
+              <i class="fa-solid fa-file-lines fa-2x text-primary"></i>
+            </div>
+            <h6 class="fw-bold">{{ doc.title }}</h6>
+            <p class="text-muted small">{{ doc.description[:80] }}...</p>
+            <div class="d-flex justify-content-around">
+              <a href="{{ url_for('view_document', document_id=doc.id) }}" class="text-primary" title="Visualizza"><i class="fa fa-eye"></i></a>
+              {% if current_user.is_admin or doc.uploader_email == current_user.email %}
+              <a href="#" class="text-warning" title="Modifica"><i class="fa fa-pen"></i></a>
+              <a href="#" class="text-danger" title="Elimina"><i class="fa fa-trash"></i></a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  fetch("/api/user-activity")
+    .then(res => res.json())
+    .then(data => {
+      const ctx = document.getElementById('activityChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.labels,
+          datasets: [
+            { label: 'Upload', data: data.uploads, backgroundColor: '#1E88E5' },
+            { label: 'Download', data: data.downloads, backgroundColor: '#43A047' },
+            { label: 'Visualizzazioni', data: data.views, backgroundColor: '#FB8C00' }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'top' },
+            title: { display: true, text: 'Attività ultimi 7 giorni' }
+          }
+        }
+      });
+    });
+
+  fetch("/api/file-distribution")
+    .then(res => res.json())
+    .then(data => {
+      const ctxPie = document.getElementById('fileDistChart').getContext('2d');
+      new Chart(ctxPie, {
+        type: 'doughnut',
+        data: {
+          labels: data.labels,
+          datasets: [{
+            label: '% File',
+            data: data.percentages,
+            backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#66BB6A', '#BA68C8']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: { display: true, text: 'Distribuzione per Azienda/Reparto' }
+          }
+        }
+      });
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

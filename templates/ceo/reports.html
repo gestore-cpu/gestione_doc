@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}Report e Statistiche - CEO{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>📊 Report e Statistiche - CEO</h1>
+                <a href="{{ url_for('ceo.dashboard') }}" class="btn btn-secondary">
+                    ← Torna alla Dashboard
+                </a>
+            </div>
+
+            <!-- Statistiche generali -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">📈 Totale Documenti</h5>
+                            <h2 class="card-text">
+                                {% set total = dept_stats|sum(attribute='total') %}
+                                {{ total }}
+                            </h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">✅ Documenti Approvati</h5>
+                            <h2 class="card-text">
+                                {% set approved = dept_stats|sum(attribute='approved') %}
+                                {{ approved }}
+                            </h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <h5 class="card-title">⏳ In Attesa</h5>
+                            <h2 class="card-text">
+                                {% set pending = dept_stats|sum(attribute='pending') %}
+                                {{ pending }}
+                            </h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistiche per reparto -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Statistiche per Reparto</h5>
+                </div>
+                <div class="card-body">
+                    {% if dept_stats %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Reparto</th>
+                                    <th>Azienda</th>
+                                    <th>Totale Documenti</th>
+                                    <th>Approvati</th>
+                                    <th>In Attesa</th>
+                                    <th>% Approvazione</th>
+                                    <th>Stato</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in dept_stats %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ stat.department.name }}</strong>
+                                    </td>
+                                    <td>{{ stat.department.company.name }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ stat.total }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">{{ stat.approved }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-warning">{{ stat.pending }}</span>
+                                    </td>
+                                    <td>
+                                        {% if stat.total > 0 %}
+                                            {% set percentage = (stat.approved / stat.total * 100)|round(1) %}
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-success" 
+                                                     style="width: {{ percentage }}%">
+                                                    {{ percentage }}%
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if stat.total == 0 %}
+                                            <span class="badge bg-secondary">Vuoto</span>
+                                        {% elif stat.pending == 0 %}
+                                            <span class="badge bg-success">Completato</span>
+                                        {% elif stat.approved == 0 %}
+                                            <span class="badge bg-danger">Bloccato</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">In corso</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <h5>📭 Nessun reparto trovato</h5>
+                        <p>Non ci sono reparti configurati nel sistema.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Grafici (se disponibili) -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📊 Distribuzione per Reparto</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="deptChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📈 Tasso di Approvazione</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="approvalChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Azioni rapide -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">⚡ Azioni Rapide</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <a href="{{ url_for('ceo.documents_list', status='pending') }}" 
+                                       class="btn btn-warning btn-lg w-100 mb-2">
+                                        📋 Documenti in Attesa CEO
+                                    </a>
+                                </div>
+                                <div class="col-md-4">
+                                    <a href="{{ url_for('ceo.documents_list', status='waiting_admin') }}" 
+                                       class="btn btn-info btn-lg w-100 mb-2">
+                                        ⏳ Documenti in Attesa Admin
+                                    </a>
+                                </div>
+                                <div class="col-md-4">
+                                    <a href="{{ url_for('ceo.documents_list', status='approved') }}" 
+                                       class="btn btn-success btn-lg w-100 mb-2">
+                                        ✅ Documenti Approvati
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Grafico distribuzione per reparto
+const deptCtx = document.getElementById('deptChart').getContext('2d');
+const deptChart = new Chart(deptCtx, {
+    type: 'doughnut',
+    data: {
+        labels: [
+            {% for stat in dept_stats %}
+                '{{ stat.department.name }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for stat in dept_stats %}
+                    {{ stat.total }},
+                {% endfor %}
+            ],
+            backgroundColor: [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Grafico tasso di approvazione
+const approvalCtx = document.getElementById('approvalChart').getContext('2d');
+const approvalChart = new Chart(approvalCtx, {
+    type: 'bar',
+    data: {
+        labels: [
+            {% for stat in dept_stats %}
+                '{{ stat.department.name }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            label: '% Approvazione',
+            data: [
+                {% for stat in dept_stats %}
+                    {% if stat.total > 0 %}
+                        {{ (stat.approved / stat.total * 100)|round(1) }},
+                    {% else %}
+                        0,
+                    {% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: '#36A2EB',
+            borderColor: '#2693E6',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 100
+            }
+        }
+    }
+});
+</script>
+{% endblock %} 

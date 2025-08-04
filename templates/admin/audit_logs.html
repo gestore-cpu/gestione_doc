@@ -1,0 +1,223 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Audit Log - Admin{% endblock %}
+
+{% block admin_extra %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>📋 Audit Log Documenti</h2>
+                <div>
+                    <a href="{{ url_for('admin.export_audit_csv') }}" class="btn btn-outline-secondary">
+                        📥 Esporta CSV
+                    </a>
+                </div>
+            </div>
+
+            <!-- Statistiche rapide -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">📊 Totale Log</h5>
+                            <h3 class="card-text">{{ logs|length }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">✅ Approvazioni</h5>
+                            <h3 class="card-text">
+                                {{ logs|selectattr('azione', 'equalto', 'approvazione_admin')|list|length + 
+                                   logs|selectattr('azione', 'equalto', 'approvazione_ceo')|list|length }}
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">📥 Download</h5>
+                            <h3 class="card-text">
+                                {{ logs|selectattr('azione', 'equalto', 'download')|list|length }}
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <h5 class="card-title">✍️ Firme</h5>
+                            <h3 class="card-text">
+                                {{ logs|selectattr('azione', 'equalto', 'firma')|list|length }}
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtri -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 Filtri</h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" class="row">
+                        <div class="col-md-4">
+                            <label for="azione" class="form-label">Tipo Azione:</label>
+                            <select name="azione" id="azione" class="form-select">
+                                <option value="all" {% if filter_azione == 'all' %}selected{% endif %}>
+                                    Tutte le azioni
+                                </option>
+                                <option value="approvazione_admin" {% if filter_azione == 'approvazione_admin' %}selected{% endif %}>
+                                    ✅ Approvazione Admin
+                                </option>
+                                <option value="approvazione_ceo" {% if filter_azione == 'approvazione_ceo' %}selected{% endif %}>
+                                    👑 Approvazione CEO
+                                </option>
+                                <option value="download" {% if filter_azione == 'download' %}selected{% endif %}>
+                                    📥 Download
+                                </option>
+                                <option value="firma" {% if filter_azione == 'firma' %}selected{% endif %}>
+                                    ✍️ Firma/Presa Visione
+                                </option>
+                                <option value="accesso_negato" {% if filter_azione == 'accesso_negato' %}selected{% endif %}>
+                                    🚫 Accesso Negato
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="user" class="form-label">Utente:</label>
+                            <select name="user" id="user" class="form-select">
+                                <option value="all" {% if filter_user == 'all' %}selected{% endif %}>
+                                    Tutti gli utenti
+                                </option>
+                                {% for user in users %}
+                                <option value="{{ user.id }}" {% if filter_user == user.id|string %}selected{% endif %}>
+                                    {{ user.username }} ({{ user.role }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">
+                                🔍 Filtra
+                            </button>
+                            <a href="{{ url_for('admin.audit_logs') }}" class="btn btn-secondary">
+                                🔄 Reset
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tabella log -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        📋 Log di Audit ({{ logs|length }} record)
+                        {% if filter_azione != 'all' or filter_user != 'all' %}
+                        - Filtrati
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if logs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Utente</th>
+                                    <th>Ruolo</th>
+                                    <th>Azione</th>
+                                    <th>Documento</th>
+                                    <th>Data/Ora</th>
+                                    <th>Note</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ log.id }}</span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ log.user.username if log.user else 'N/A' }}</strong>
+                                        <br><small class="text-muted">{{ log.user.email if log.user else '' }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ log.user.role if log.user else 'N/A' }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if log.azione == 'approvazione_admin' %}bg-success
+                                            {% elif log.azione == 'approvazione_ceo' %}bg-warning
+                                            {% elif log.azione == 'download' %}bg-primary
+                                            {% elif log.azione == 'firma' %}bg-info
+                                            {% elif log.azione == 'accesso_negato' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ log.azione_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ log.document.title if log.document else 'N/A' }}</strong>
+                                        {% if log.document %}
+                                        <br><small class="text-muted">
+                                            {{ log.document.company.name }} - {{ log.document.department.name }}
+                                        </small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>{{ log.timestamp.strftime('%d/%m/%Y %H:%M:%S') }}</small>
+                                    </td>
+                                    <td>
+                                        {% if log.note %}
+                                        <small class="text-muted">{{ log.note[:50] }}{% if log.note|length > 50 %}...{% endif %}</small>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <h5>📭 Nessun log trovato</h5>
+                        <p>Non ci sono log di audit che corrispondono ai filtri selezionati.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Paginazione (se necessario) -->
+            {% if logs|length > 100 %}
+            <div class="d-flex justify-content-center mt-4">
+                <nav aria-label="Paginazione log">
+                    <ul class="pagination">
+                        <li class="page-item disabled">
+                            <span class="page-link">Pagina 1 di 1</span>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-submit form quando cambiano i filtri
+document.getElementById('azione').addEventListener('change', function() {
+    this.form.submit();
+});
+
+document.getElementById('user').addEventListener('change', function() {
+    this.form.submit();
+});
+</script>
+{% endblock %} 

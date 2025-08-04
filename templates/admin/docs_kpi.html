@@ -1,0 +1,260 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>📊 KPI AI Documentali</h2>
+                    <p class="text-muted mb-0">Performance settimanale dell'analisi documentale AI</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-outline-secondary">
+                        📄 Panoramica Documenti
+                    </a>
+                </div>
+            </div>
+
+            <!-- INSIGHT AI -->
+            {% if ai_insight %}
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <h5 class="alert-heading">🧠 Insight AI</h5>
+                {% for insight in ai_insight %}
+                <p class="mb-1">{{ insight }}</p>
+                {% endfor %}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            <!-- KPI BOXES -->
+            <div class="row g-3 mb-4">
+                {% for k, v in kpi.settimana_corrente.items() %}
+                <div class="col-md-3">
+                    <div class="card h-100">
+                        <div class="card-body text-center">
+                            <h6 class="card-title text-muted mb-2">{{ k|replace('_', ' ')|title }}</h6>
+                            <h2 class="mb-2">{{ v }}</h2>
+                            
+                            {% set variation = kpi.variazioni[k] %}
+                            <div class="d-flex justify-content-center align-items-center">
+                                {% if variation.trend == "up" %}
+                                    <span class="text-success me-2">🔺</span>
+                                    <span class="text-success">+{{ variation.delta }}</span>
+                                    <small class="text-muted ms-2">(+{{ variation.percentuale }}%)</small>
+                                {% elif variation.trend == "down" %}
+                                    <span class="text-danger me-2">🔻</span>
+                                    <span class="text-danger">{{ variation.delta }}</span>
+                                    <small class="text-muted ms-2">({{ variation.percentuale }}%)</small>
+                                {% else %}
+                                    <span class="text-muted me-2">➖</span>
+                                    <span class="text-muted">0</span>
+                                    <small class="text-muted ms-2">(0%)</small>
+                                {% endif %}
+                            </div>
+                            
+                            <small class="text-muted d-block mt-2">
+                                vs settimana precedente
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- GRAFICO TREND SETTIMANALE -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📈 Trend Ultimi 14 Giorni</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="kpiChart" height="100"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABELLA DETTAGLIATA -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📋 Dettaglio Settimanale</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Metrica</th>
+                                            <th class="text-center">Settimana Corrente</th>
+                                            <th class="text-center">Settimana Precedente</th>
+                                            <th class="text-center">Variazione</th>
+                                            <th class="text-center">Trend</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for k, v in kpi.settimana_corrente.items() %}
+                                        <tr>
+                                            <td><strong>{{ k|replace('_', ' ')|title }}</strong></td>
+                                            <td class="text-center">{{ v }}</td>
+                                            <td class="text-center">{{ kpi.settimana_precedente[k] }}</td>
+                                            <td class="text-center">
+                                                {% set variation = kpi.variazioni[k] %}
+                                                {% if variation.trend == "up" %}
+                                                    <span class="badge bg-success">+{{ variation.delta }}</span>
+                                                {% elif variation.trend == "down" %}
+                                                    <span class="badge bg-danger">{{ variation.delta }}</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center">
+                                                {% if variation.trend == "up" %}
+                                                    <span class="text-success">📈</span>
+                                                {% elif variation.trend == "down" %}
+                                                    <span class="text-danger">📉</span>
+                                                {% else %}
+                                                    <span class="text-muted">➖</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATISTICHE AGGIUNTIVE -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🎯 Performance AI</h5>
+                        </div>
+                        <div class="card-body">
+                            {% set total_current = kpi.settimana_corrente.totali %}
+                            {% set analyzed_current = kpi.settimana_corrente.analizzati %}
+                            {% set complete_current = kpi.settimana_corrente.completi %}
+                            
+                            {% if total_current > 0 %}
+                                {% set analysis_rate = (analyzed_current / total_current * 100) | round(1) %}
+                                {% set completion_rate = (complete_current / analyzed_current * 100) | round(1) if analyzed_current > 0 else 0 %}
+                            {% else %}
+                                {% set analysis_rate = 0 %}
+                                {% set completion_rate = 0 %}
+                            {% endif %}
+                            
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <h4 class="text-primary">{{ analysis_rate }}%</h4>
+                                    <small class="text-muted">Tasso di Analisi AI</small>
+                                </div>
+                                <div class="col-6">
+                                    <h4 class="text-success">{{ completion_rate }}%</h4>
+                                    <small class="text-muted">Tasso di Completamento</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">⚡ Velocità di Miglioramento</h5>
+                        </div>
+                        <div class="card-body">
+                            {% set completi_var = kpi.variazioni.completi.percentuale %}
+                            {% set incompleti_var = kpi.variazioni.incompleti.percentuale %}
+                            
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <h4 class="{% if completi_var > 0 %}text-success{% elif completi_var < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                        {{ completi_var }}%
+                                    </h4>
+                                    <small class="text-muted">Variazione Completi</small>
+                                </div>
+                                <div class="col-6">
+                                    <h4 class="{% if incompleti_var < 0 %}text-success{% elif incompleti_var > 0 %}text-danger{% else %}text-muted{% endif %}">
+                                        {{ incompleti_var }}%
+                                    </h4>
+                                    <small class="text-muted">Variazione Incompleti</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LINK DI NAVIGAZIONE -->
+            <div class="mt-4">
+                <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-secondary">
+                    ← Torna alla Panoramica
+                </a>
+                <a href="{{ url_for('admin.ai_docs_dashboard') }}" class="btn btn-outline-primary ms-2">
+                    🤖 Dashboard AI
+                </a>
+                <a href="{{ url_for('admin.obeya_map') }}" class="btn btn-outline-info ms-2">
+                    🗺️ Mappa Obeya
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Dati per il grafico
+    const chartData = {{ kpi.chart_data|tojson }};
+    
+    // Crea grafico
+    const ctx = document.getElementById('kpiChart');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: chartData.datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
+        }
+    });
+});
+</script>
+
+{% endblock %} 

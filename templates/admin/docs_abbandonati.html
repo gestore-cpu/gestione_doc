@@ -1,0 +1,332 @@
+{% extends "admin/dashboard.html" %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>🚨 Documenti Abbandonati</h2>
+                    <p class="text-muted mb-0">Documenti che hanno saltato 2 revisioni consecutive - Alert AI</p>
+                </div>
+                <div>
+                    <span class="badge bg-danger fs-6">{{ stats.totali }} Documenti Critici</span>
+                </div>
+            </div>
+
+            <!-- ALERT CRITICO -->
+            {% if stats.totali > 0 %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <h4 class="alert-heading">⚠️ ATTENZIONE CRITICA!</h4>
+                <p class="mb-0">
+                    <strong>{{ stats.totali }}</strong> documenti hanno saltato 2 revisioni consecutive. 
+                    Questo rappresenta un rischio di compliance e richiede azione immediata.
+                </p>
+                <hr>
+                <p class="mb-0">
+                    <strong>Media ritardo:</strong> {{ "%.0f"|format(stats.media_ritardo) }} giorni
+                    <br>
+                    <strong>Documenti più critici:</strong> {{ stats.piu_critici|length }} con ritardo massimo
+                </p>
+            </div>
+            {% else %}
+            <div class="alert alert-success" role="alert">
+                <h4 class="alert-heading">✅ Tutto Sotto Controllo!</h4>
+                <p class="mb-0">Nessun documento ha saltato 2 revisioni consecutive. Il sistema è conforme.</p>
+            </div>
+            {% endif %}
+
+            <!-- STATISTICHE RAPIDE -->
+            {% if stats.totali > 0 %}
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-white bg-danger">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">🚨 Totali</h6>
+                            <h4>{{ stats.totali }}</h4>
+                            <small>Documenti Abbandonati</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-warning">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">📊 Media Ritardo</h6>
+                            <h4>{{ "%.0f"|format(stats.media_ritardo) }}</h4>
+                            <small>Giorni</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-info">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">🎯 Più Critici</h6>
+                            <h4>{{ stats.piu_critici|length }}</h4>
+                            <small>Top 5 Ritardo</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-white bg-secondary">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">📋 Frequenze</h6>
+                            <h4>{{ stats.per_frequenza|length }}</h4>
+                            <small>Tipi Coinvolti</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- DISTRIBUZIONE PER FREQUENZA -->
+            {% if stats.per_frequenza %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📊 Distribuzione per Frequenza Revisione</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for frequenza, documenti in stats.per_frequenza.items() %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0">
+                                        {% if frequenza == 'annuale' %}📅 Annuale
+                                        {% elif frequenza == 'biennale' %}📅 Biennale
+                                        {% elif frequenza == 'trimestrale' %}📅 Trimestrale
+                                        {% elif frequenza == 'mensile' %}📅 Mensile
+                                        {% elif frequenza == 'semestrale' %}📅 Semestrale
+                                        {% else %}{{ frequenza|title }}
+                                        {% endif %}
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <h4 class="text-warning">{{ documenti|length }}</h4>
+                                    <small class="text-muted">documenti abbandonati</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- TABELLA DOCUMENTI ABBANDONATI -->
+            {% if documenti_abbandonati %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Documenti Abbandonati ({{ documenti_abbandonati|length }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-danger">
+                                <tr>
+                                    <th>📄 Documento</th>
+                                    <th>🏢 Azienda</th>
+                                    <th>📅 Frequenza</th>
+                                    <th>📅 Ultima Revisione</th>
+                                    <th>⏰ Giorni Ritardo</th>
+                                    <th>🎯 Task AI</th>
+                                    <th>🔧 Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in documenti_abbandonati %}
+                                <tr class="{% if doc.giorni_ritardo > 1000 %}table-danger{% elif doc.giorni_ritardo > 500 %}table-warning{% endif %}">
+                                    <td>
+                                        <strong>{{ doc.title or doc.original_filename }}</strong>
+                                        {% if doc.is_critical %}
+                                            <span class="badge bg-danger ms-1">Critico</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ doc.company.name if doc.company else 'N/A' }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            {% if doc.frequenza_revisione == 'annuale' %}📅 Annuale
+                                            {% elif doc.frequenza_revisione == 'biennale' %}📅 Biennale
+                                            {% elif doc.frequenza_revisione == 'trimestrale' %}📅 Trimestrale
+                                            {% elif doc.frequenza_revisione == 'mensile' %}📅 Mensile
+                                            {% elif doc.frequenza_revisione == 'semestrale' %}📅 Semestrale
+                                            {% else %}{{ doc.frequenza_revisione|title }}
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td>{{ doc.data_ultima_revisione.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        {% if doc.giorni_ritardo > 1000 %}
+                                            <span class="badge bg-danger fs-6">{{ doc.giorni_ritardo }} giorni</span>
+                                        {% elif doc.giorni_ritardo > 500 %}
+                                            <span class="badge bg-warning fs-6">{{ doc.giorni_ritardo }} giorni</span>
+                                        {% else %}
+                                            <span class="badge bg-info">{{ doc.giorni_ritardo }} giorni</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if doc.ai_task_id %}
+                                            <span class="badge bg-success">✅ Task #{{ doc.ai_task_id }}</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">❌ Nessun Task</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('docs.list_versions', doc_id=doc.id) }}"
+                                               class="btn btn-outline-primary" title="Visualizza Versioni">
+                                                👁️
+                                            </a>
+                                            <button onclick="completaRevisione({{ doc.id }})"
+                                                    class="btn btn-outline-success" title="Completa Revisione">
+                                                ✅
+                                            </button>
+                                            <button onclick="creaTaskAI({{ doc.id }})"
+                                                    class="btn btn-outline-warning" title="Crea Task AI">
+                                                🎯
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <h5>Nessun Documento Abbandonato</h5>
+                    <p class="text-muted">Tutti i documenti sono stati revisionati regolarmente!</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- INFORMAZIONI COMPLIANCE -->
+            {% if stats.totali > 0 %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Informazioni Compliance</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>🚨 Rischi Identificati:</h6>
+                            <ul>
+                                <li><strong>Compliance:</strong> Documenti non aggiornati potrebbero non rispettare normative</li>
+                                <li><strong>Audit:</strong> Rischio di non conformità durante audit esterni</li>
+                                <li><strong>Qualità:</strong> Procedure potrebbero essere obsolete</li>
+                                <li><strong>Legale:</strong> Possibili conseguenze legali per documenti scaduti</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>✅ Azioni Raccomandate:</h6>
+                            <ul>
+                                <li><strong>Priorità Alta:</strong> Revisionare documenti con ritardo > 500 giorni</li>
+                                <li><strong>Task AI:</strong> Creare task automatici per recupero</li>
+                                <li><strong>Responsabili:</strong> Assegnare responsabili specifici</li>
+                                <li><strong>Monitoraggio:</strong> Implementare controlli periodici</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- LINK DI NAVIGAZIONE -->
+            <div class="mt-4">
+                <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-secondary">
+                    ← Torna alla Panoramica
+                </a>
+                <a href="{{ url_for('admin.docs_scadenziario') }}" class="btn btn-outline-warning ms-2">
+                    📅 Scadenziario
+                </a>
+                <a href="{{ url_for('docs.registro_audit') }}" class="btn btn-outline-info ms-2">
+                    📋 Registro Audit
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// === FUNZIONE COMPLETA REVISIONE ===
+function completaRevisione(docId) {
+    if (confirm("Completare la revisione di questo documento abbandonato?")) {
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = "🔄 Completando...";
+        button.disabled = true;
+
+        fetch(`/docs/${docId}/revisione`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert("✅ Revisione completata con successo!");
+                location.reload();
+            } else {
+                alert("❌ Errore nel completamento: " + data.message);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error("Errore:", error);
+            alert("❌ Errore durante il completamento");
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+}
+
+// === FUNZIONE CREA TASK AI ===
+function creaTaskAI(docId) {
+    if (confirm("Creare un task AI per il recupero di questo documento?")) {
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = "🔄 Creando...";
+        button.disabled = true;
+
+        fetch('/admin/tasks/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                title: `Recupero documento abbandonato - ID ${docId}`,
+                description: `Task automatico per recupero documento che ha saltato 2 revisioni consecutive.`,
+                priority: 'alta',
+                tipo: 'revisione_fallita',
+                linked_document_id: docId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert("✅ Task AI creato con successo!");
+                location.reload();
+            } else {
+                alert("❌ Errore nella creazione task: " + data.message);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error("Errore:", error);
+            alert("❌ Errore durante la creazione del task");
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+}
+</script>
+
+{% endblock %} 

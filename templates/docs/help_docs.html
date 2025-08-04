@@ -1,0 +1,649 @@
+{% extends "admin/dashboard.html" %}
+
+{% block extra_css %}
+<style>
+/* Stile guida moderna */
+.guide-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 1rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.guide-step {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #007bff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.guide-step.warning {
+    border-left-color: #ffc107;
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+}
+
+.guide-step.success {
+    border-left-color: #28a745;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+}
+
+.guide-step.danger {
+    border-left-color: #dc3545;
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+}
+
+.feature-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+}
+
+.feature-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.toc-item {
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+.toc-item:hover {
+    background: #f8f9fa;
+    transform: translateX(5px);
+}
+
+.code-block {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+.tip-box {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    border: 1px solid #bee5eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.warning-box {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 1px solid #ffeaa7;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .guide-section {
+        padding: 1rem;
+    }
+    
+    .guide-step {
+        padding: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- HEADER GUIDA -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-primary mb-3">📚 Guida Completa DOCS</h1>
+                <p class="lead text-muted">Mercury Document Intelligence - Sistema di Gestione Documentale</p>
+                <div class="d-flex justify-content-center gap-3 mt-4">
+                    <span class="badge bg-primary fs-6">👥 Team Interno</span>
+                    <span class="badge bg-success fs-6">🏢 RSPP</span>
+                    <span class="badge bg-info fs-6">👑 CEO</span>
+                    <span class="badge bg-warning fs-6">📋 Auditor</span>
+                </div>
+            </div>
+
+            <!-- TABELLA DEI CONTENUTI -->
+            <div class="guide-section">
+                <h2 class="mb-4">📋 Indice Rapido</h2>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="toc-item" onclick="scrollToSection('getting-started')">
+                            <h5>🚀 1. Iniziare con DOCS</h5>
+                            <small class="text-muted">Primi passi e configurazione</small>
+                        </div>
+                        <div class="toc-item" onclick="scrollToSection('ai-intelligence')">
+                            <h5>🧠 2. AI Document Intelligence</h5>
+                            <small class="text-muted">Analisi automatica e compliance</small>
+                        </div>
+                        <div class="toc-item" onclick="scrollToSection('document-management')">
+                            <h5>📄 3. Gestione Documenti</h5>
+                            <small class="text-muted">Upload, versioni, organizzazione</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="toc-item" onclick="scrollToSection('digital-signatures')">
+                            <h5>🖋️ 4. Firma Digitale 2FA</h5>
+                            <small class="text-muted">Sicurezza e autenticazione</small>
+                        </div>
+                        <div class="toc-item" onclick="scrollToSection('revisions')">
+                            <h5>🔄 5. Revisioni Cicliche</h5>
+                            <small class="text-muted">Controllo qualità automatico</small>
+                        </div>
+                        <div class="toc-item" onclick="scrollToSection('export-audit')">
+                            <h5>📊 6. Export e Audit</h5>
+                            <small class="text-muted">Report e compliance</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEZIONE 1: INIZIARE CON DOCS -->
+            <div id="getting-started" class="guide-section">
+                <h2 class="mb-4">🚀 1. Iniziare con DOCS</h2>
+                
+                <div class="guide-step">
+                    <h4>📋 Panoramica Sistema</h4>
+                    <p>DOCS è il sistema di gestione documentale intelligente di Mercury Surgelati che combina:</p>
+                    <ul>
+                        <li><strong>🧠 AI Intelligence:</strong> Analisi automatica dei documenti</li>
+                        <li><strong>🖋️ Firma Digitale:</strong> Autenticazione 2FA sicura</li>
+                        <li><strong>🔄 Revisioni Automatiche:</strong> Controllo qualità ciclico</li>
+                        <li><strong>📊 Audit Trail:</strong> Tracciabilità completa</li>
+                    </ul>
+                </div>
+
+                <div class="guide-step success">
+                    <h4>✅ Accesso e Ruoli</h4>
+                    <p><strong>URL:</strong> <code>https://docs.mercurysurgelati.org</code></p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>👑 CEO</h6>
+                            <ul>
+                                <li>Accesso completo a tutti i documenti</li>
+                                <li>Dashboard executive con KPI</li>
+                                <li>Firma digitale su documenti critici</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>🏢 RSPP</h6>
+                            <ul>
+                                <li>Gestione documenti sicurezza</li>
+                                <li>Revisioni HACCP e procedure</li>
+                                <li>Firma documenti normativi</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="guide-step">
+                    <h4>🎯 Dashboard Principale</h4>
+                    <p>La dashboard mostra in tempo reale:</p>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="feature-card text-center">
+                                <span class="feature-icon">📄</span>
+                                <h6>Documenti Totali</h6>
+                                <small class="text-muted">Conteggio globale</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="feature-card text-center">
+                                <span class="feature-icon">✅</span>
+                                <h6>Approvati</h6>
+                                <small class="text-muted">Documenti validi</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="feature-card text-center">
+                                <span class="feature-icon">🖋️</span>
+                                <h6>Firmati</h6>
+                                <small class="text-muted">Con firma digitale</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="feature-card text-center">
+                                <span class="feature-icon">🔄</span>
+                                <h6>Revisioni</h6>
+                                <small class="text-muted">In corso</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEZIONE 2: AI DOCUMENT INTELLIGENCE -->
+            <div id="ai-intelligence" class="guide-section">
+                <h2 class="mb-4">🧠 2. AI Document Intelligence</h2>
+                
+                <div class="guide-step">
+                    <h4>🤖 Come Funziona l'AI</h4>
+                    <p>L'AI analizza automaticamente ogni documento caricato per:</p>
+                    <ul>
+                        <li><strong>📋 Contenuto:</strong> Estrae informazioni chiave</li>
+                        <li><strong>⏰ Scadenze:</strong> Identifica date importanti</li>
+                        <li><strong>🖋️ Firme:</strong> Verifica presenza firme</li>
+                        <li><strong>📊 Compliance:</strong> Valuta conformità normativa</li>
+                    </ul>
+                </div>
+
+                <div class="guide-step success">
+                    <h4>📊 Stati AI</h4>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <span class="badge bg-success fs-5">✅ Completo</span>
+                                <p class="mt-2"><small>Documento conforme e aggiornato</small></p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <span class="badge bg-warning fs-5">⚠️ Incompleto</span>
+                                <p class="mt-2"><small>Mancano informazioni o firme</small></p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <span class="badge bg-danger fs-5">❌ Scaduto</span>
+                                <p class="mt-2"><small>Documento oltre la scadenza</small></p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <span class="badge bg-danger fs-5">❌ Manca Firma</span>
+                                <p class="mt-2"><small>Firma digitale richiesta</small></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="guide-step">
+                    <h4>🔍 Filtri AI Avanzati</h4>
+                    <p>Usa i filtri per trovare documenti specifici:</p>
+                    <div class="code-block">
+                        <strong>Esempi di ricerca:</strong><br>
+                        • "firma RSPP" → Documenti che richiedono firma RSPP<br>
+                        • "scaduto" → Documenti scaduti<br>
+                        • "HACCP" → Documenti HACCP<br>
+                        • "procedure" → Procedure operative
+                    </div>
+                </div>
+
+                <div class="tip-box">
+                    <h6>💡 Suggerimento</h6>
+                    <p>L'AI migliora con l'uso. Più documenti analizza, più precisa diventa l'analisi.</p>
+                </div>
+            </div>
+
+            <!-- SEZIONE 3: GESTIONE DOCUMENTI -->
+            <div id="document-management" class="guide-section">
+                <h2 class="mb-4">📄 3. Gestione Documenti</h2>
+                
+                <div class="guide-step">
+                    <h4>📤 Caricamento Documenti</h4>
+                    <ol>
+                        <li>Clicca su <strong>"📤 Carica Documento"</strong></li>
+                        <li>Seleziona il file (PDF, DOC, DOCX)</li>
+                        <li>Compila i metadati:
+                            <ul>
+                                <li><strong>Titolo:</strong> Nome descrittivo</li>
+                                <li><strong>Azienda:</strong> Sede di riferimento</li>
+                                <li><strong>Reparto:</strong> Area responsabile</li>
+                                <li><strong>Tipologia:</strong> Tipo documento</li>
+                            </ul>
+                        </li>
+                        <li>Clicca <strong>"Salva"</strong></li>
+                    </ol>
+                </div>
+
+                <div class="guide-step success">
+                    <h4>📋 Versioni e Storico</h4>
+                    <p>Ogni documento mantiene uno storico completo:</p>
+                    <ul>
+                        <li><strong>📄 Versioni:</strong> Tutte le revisioni</li>
+                        <li><strong>🖋️ Firme:</strong> Chi ha firmato e quando</li>
+                        <li><strong>🔄 Revisioni:</strong> Controlli periodici</li>
+                        <li><strong>📊 AI Analysis:</strong> Risultati analisi</li>
+                    </ul>
+                </div>
+
+                <div class="guide-step">
+                    <h4>🏷️ Organizzazione</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>📁 Struttura Aziendale</h6>
+                            <ul>
+                                <li>Mercury Surgelati (sede principale)</li>
+                                <li>Reparti: Qualità, Produzione, Logistica</li>
+                                <li>Tipologie: HACCP, Procedure, Manuali</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>🔍 Ricerca Avanzata</h6>
+                            <ul>
+                                <li>Filtri per azienda/reparto</li>
+                                <li>Ricerca testuale nel contenuto</li>
+                                <li>Filtri per stato AI</li>
+                                <li>Ricerca per data</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEZIONE 4: FIRMA DIGITALE 2FA -->
+            <div id="digital-signatures" class="guide-section">
+                <h2 class="mb-4">🖋️ 4. Firma Digitale 2FA</h2>
+                
+                <div class="guide-step warning">
+                    <h4>🔐 Sicurezza Avanzata</h4>
+                    <p>La firma digitale utilizza autenticazione a due fattori (2FA):</p>
+                    <ul>
+                        <li><strong>🔑 Token Temporaneo:</strong> Codice 6 cifre valido 15 minuti</li>
+                        <li><strong>📧 Invio Sicuro:</strong> Email o WhatsApp</li>
+                        <li><strong>🔒 Hash SHA256:</strong> Verifica integrità documento</li>
+                        <li><strong>📋 Audit Trail:</strong> Tracciabilità completa</li>
+                    </ul>
+                </div>
+
+                <div class="guide-step">
+                    <h4>📝 Processo di Firma</h4>
+                    <ol>
+                        <li>Accedi al documento da firmare</li>
+                        <li>Clicca <strong>"🖋️ Richiedi Firma"</strong></li>
+                        <li>Ricevi token via email/WhatsApp</li>
+                        <li>Inserisci il codice nel campo "Token"</li>
+                        <li>Aggiungi note opzionali</li>
+                        <li>Clicca <strong>"✅ Conferma Firma"</strong></li>
+                    </ol>
+                </div>
+
+                <div class="guide-step success">
+                    <h4>👥 Ruoli Autorizzati</h4>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <span class="badge bg-primary fs-6">👑 CEO</span>
+                                <p><small>Firma su tutti i documenti</small></p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <span class="badge bg-success fs-6">🏢 RSPP</span>
+                                <p><small>Firma documenti sicurezza</small></p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <span class="badge bg-info fs-6">👨‍💼 Dirigente</span>
+                                <p><small>Firma documenti reparto</small></p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <span class="badge bg-secondary fs-6">👤 Admin</span>
+                                <p><small>Gestione sistema</small></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    <h6>⚠️ Importante</h6>
+                    <p>Il token scade dopo 15 minuti. Se non riesci a firmare, richiedi un nuovo token.</p>
+                </div>
+            </div>
+
+            <!-- SEZIONE 5: REVISIONI CICLICHE -->
+            <div id="revisions" class="guide-section">
+                <h2 class="mb-4">🔄 5. Revisioni Cicliche</h2>
+                
+                <div class="guide-step">
+                    <h4>📅 Frequenze di Revisione</h4>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <span class="badge bg-primary fs-5">📅 Annuale</span>
+                                <p><small>Documenti normativi principali</small></p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <span class="badge bg-warning fs-5">📅 Trimestrale</span>
+                                <p><small>Procedure operative</small></p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <span class="badge bg-info fs-5">📅 Mensile</span>
+                                <p><small>Controlli frequenti</small></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="guide-step success">
+                    <h4>📅 Calendario ICS</h4>
+                    <p>Aggiungi le revisioni al tuo calendario:</p>
+                    <div class="code-block">
+                        <strong>Link Calendario:</strong><br>
+                        https://docs.mercurysurgelati.org/docs/public/calendar/revisioni.ics?token=tok3n-Firm4-R3visione
+                    </div>
+                    <p><small>Compatibile con Google Calendar, Outlook, Apple Calendar</small></p>
+                </div>
+
+                <div class="guide-step">
+                    <h4>🚨 Alert Documenti Abbandonati</h4>
+                    <p>Il sistema rileva automaticamente documenti che hanno saltato 2 revisioni consecutive:</p>
+                    <ul>
+                        <li><strong>⚠️ Notifica:</strong> Alert automatico per CEO/RSPP</li>
+                        <li><strong>🎯 Task AI:</strong> Creazione automatica task recupero</li>
+                        <li><strong>📊 Dashboard:</strong> Sezione "Documenti Abbandonati"</li>
+                        <li><strong>📋 Report:</strong> Esportazione per audit</li>
+                    </ul>
+                </div>
+
+                <div class="tip-box">
+                    <h6>💡 Suggerimento</h6>
+                    <p>Controlla regolarmente la sezione "🚨 Documenti Abbandonati" per evitare scadenze.</p>
+                </div>
+            </div>
+
+            <!-- SEZIONE 6: EXPORT E AUDIT -->
+            <div id="export-audit" class="guide-section">
+                <h2 class="mb-4">📊 6. Export e Audit</h2>
+                
+                <div class="guide-step">
+                    <h4>📋 Registro Audit Completo</h4>
+                    <p>Accesso completo a tutte le attività:</p>
+                    <ul>
+                        <li><strong>📄 Documenti:</strong> Tutti i file caricati</li>
+                        <li><strong>🖋️ Firme:</strong> Chi ha firmato e quando</li>
+                        <li><strong>🔄 Revisioni:</strong> Controlli effettuati</li>
+                        <li><strong>🧠 AI Analysis:</strong> Risultati analisi</li>
+                        <li><strong>🔐 Token 2FA:</strong> Tracciabilità autenticazione</li>
+                    </ul>
+                </div>
+
+                <div class="guide-step success">
+                    <h4>📊 KPI AI Documentali</h4>
+                    <p>Dashboard con metriche settimanali:</p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>📈 Metriche Performance</h6>
+                            <ul>
+                                <li>Documenti completi vs incompleti</li>
+                                <li>Trend settimanali</li>
+                                <li>Percentuali miglioramento</li>
+                                <li>Analisi AI insights</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>📊 Grafici Interattivi</h6>
+                            <ul>
+                                <li>Chart.js responsive</li>
+                                <li>Filtri temporali</li>
+                                <li>Esportazione dati</li>
+                                <li>Condivisione report</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="guide-step">
+                    <h4>📄 Export Formati</h4>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <span class="badge bg-success fs-5">📊 CSV</span>
+                                <p><small>Dati tabellari per Excel</small></p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <span class="badge bg-danger fs-5">📄 PDF</span>
+                                <p><small>Report formattati per audit</small></p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <span class="badge bg-info fs-5">📅 ICS</span>
+                                <p><small>Calendario revisioni</small></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="guide-step warning">
+                    <h4>🔐 Accesso Auditor</h4>
+                    <p>Per auditor esterni:</p>
+                    <ul>
+                        <li><strong>📋 Registro Audit:</strong> Accesso completo a tutte le attività</li>
+                        <li><strong>📊 KPI Dashboard:</strong> Metriche performance</li>
+                        <li><strong>📄 Export PDF:</strong> Report formattati</li>
+                        <li><strong>🔍 Filtri Avanzati:</strong> Ricerca specifica</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- SEZIONE FAQ -->
+            <div class="guide-section">
+                <h2 class="mb-4">❓ Domande Frequenti</h2>
+                
+                <div class="accordion" id="faqAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                🤔 Come funziona l'AI?
+                            </button>
+                        </h2>
+                        <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                L'AI analizza automaticamente ogni documento caricato, estraendo informazioni chiave come scadenze, firme mancanti, e conformità normativa. I risultati vengono mostrati con badge colorati e spiegazioni dettagliate.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                🔐 È sicura la firma digitale?
+                            </button>
+                        </h2>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                Sì, utilizza autenticazione a due fattori (2FA) con token temporanei inviati via email/WhatsApp. Ogni firma genera un hash SHA256 per verificare l'integrità del documento.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                📅 Come funzionano le revisioni?
+                            </button>
+                        </h2>
+                        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                Il sistema programma automaticamente le revisioni in base alla frequenza impostata (annuale, trimestrale, mensile). Puoi aggiungere le revisioni al tuo calendario tramite il link ICS fornito.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTATTI SUPPORTO -->
+            <div class="guide-section text-center">
+                <h3 class="mb-4">📞 Supporto Tecnico</h3>
+                <p class="lead">Hai bisogno di aiuto?</p>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="feature-card">
+                            <span class="feature-icon">📧</span>
+                            <h6>Email Support</h6>
+                            <p><small>support@mercurysurgelati.org</small></p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="feature-card">
+                            <span class="feature-icon">📱</span>
+                            <h6>WhatsApp</h6>
+                            <p><small>+39 XXX XXX XXXX</small></p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="feature-card">
+                            <span class="feature-icon">📋</span>
+                            <h6>Documentazione</h6>
+                            <p><small>docs.mercurysurgelati.org/help</small></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Funzione per scroll alle sezioni
+function scrollToSection(sectionId) {
+    const element = document.getElementById(sectionId);
+    if (element) {
+        element.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'start'
+        });
+    }
+}
+
+// Inizializza tooltip
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            html: true
+        });
+    });
+});
+</script>
+
+{% endblock %} 

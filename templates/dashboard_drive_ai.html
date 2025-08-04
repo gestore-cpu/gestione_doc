@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}🧠 Dashboard AI - Google Drive{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">🧠 Dashboard AI - Google Drive</h1>
+                <a href="{{ url_for('ceo.dashboard_docs_ceo') }}" class="btn btn-outline-secondary">
+                    ← Torna alla Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche generali -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">📊 Totale Documenti</h5>
+                    <h2 class="mb-0">{{ analisi.totali }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">✅ Su Google Drive</h5>
+                    <h2 class="mb-0">{{ analisi.su_drive }}</h2>
+                    <small>{{ analisi.percentuale_completamento }}% completamento</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title">⚠️ Da Caricare</h5>
+                    <h2 class="mb-0">{{ analisi.da_caricare }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">❌ Con Errori</h5>
+                    <h2 class="mb-0">{{ analisi.con_errori }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Azioni rapide -->
+    {% if suggeriti %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">⚡ Azioni Rapide</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('drive.bulk_upload_documents') }}" class="d-inline">
+                        <button type="submit" class="btn btn-primary me-2">
+                            📤 Carica Tutti i Documenti Suggeriti ({{ suggeriti|length }})
+                        </button>
+                    </form>
+                    <a href="{{ url_for('drive.drive_status') }}" class="btn btn-outline-info">
+                        🔍 Verifica Connessione Drive
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Suggerimenti AI -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🧠 Suggerimenti AI – Documenti non ancora su Drive</h5>
+                </div>
+                <div class="card-body">
+                    {% if suggeriti %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>📄 Documento</th>
+                                        <th>🏢 Azienda</th>
+                                        <th>📅 Data Creazione</th>
+                                        <th>🎯 Motivo</th>
+                                        <th>⚡ Azione</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for s in suggeriti %}
+                                    <tr class="{% if s.priorita == 'alta' %}table-danger{% elif s.priorita == 'media' %}table-warning{% endif %}">
+                                        <td>
+                                            <strong>{{ s.doc.name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ s.doc.filename }}</small>
+                                        </td>
+                                        <td>
+                                            {% if s.doc.company %}
+                                                {{ s.doc.company.name }}
+                                            {% else %}
+                                                <span class="text-muted">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ s.doc.created_at.strftime('%d/%m/%Y') }}
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if '❌' in s.motivo %}bg-danger{% elif '⚠️' in s.motivo %}bg-warning{% else %}bg-info{% endif %}">
+                                                {{ s.motivo }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <form method="POST" action="{{ url_for('drive.reupload_drive', id=s.doc.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                    📤 Carica ora
+                                                </button>
+                                            </form>
+                                            <a href="{{ url_for('docs.view_document', id=s.doc.id) }}" class="btn btn-sm btn-outline-secondary ms-1">
+                                                👁️ Visualizza
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-success">
+                                <i class="fas fa-check-circle fa-3x mb-3"></i>
+                                <h4>🎉 Perfetto!</h4>
+                                <p class="lead">Tutti i documenti approvati sono già caricati su Google Drive.</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raccomandazioni AI -->
+    {% if analisi.da_caricare > 0 %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">💡 Raccomandazioni AI</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        {% if analisi.da_caricare > 5 %}
+                            <li class="mb-2">
+                                <i class="fas fa-exclamation-triangle text-warning"></i>
+                                <strong>Attenzione:</strong> Hai {{ analisi.da_caricare }} documenti da caricare. Considera l'upload in massa.
+                            </li>
+                        {% endif %}
+                        {% if analisi.con_errori > 0 %}
+                            <li class="mb-2">
+                                <i class="fas fa-exclamation-circle text-danger"></i>
+                                <strong>Problema:</strong> {{ analisi.con_errori }} documenti hanno errori di upload. Verifica le credenziali Drive.
+                            </li>
+                        {% endif %}
+                        <li class="mb-2">
+                            <i class="fas fa-info-circle text-info"></i>
+                            <strong>Suggerimento:</strong> I documenti vengono organizzati automaticamente in cartelle per Azienda/Reparto/Categoria.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Auto-refresh ogni 30 secondi per aggiornare i suggerimenti
+setTimeout(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %} 

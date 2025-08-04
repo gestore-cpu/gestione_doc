@@ -1,0 +1,1498 @@
+{% extends "admin/dashboard.html" %}
+
+{% block extra_css %}
+<style>
+/* Gradienti personalizzati per stile Apple/Notion */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.bg-gradient-success {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.bg-gradient-warning {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.bg-gradient-info {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+}
+
+.bg-gradient-dark {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+}
+
+.bg-gradient-secondary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Animazioni hover per cards */
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1) !important;
+}
+
+/* Badge con ombra morbida */
+.badge {
+    transition: all 0.3s ease;
+}
+
+.badge:hover {
+    transform: scale(1.05);
+}
+
+/* Font system moderno */
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Spacing migliorato */
+.fs-smaller {
+    font-size: 0.875rem;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem !important;
+    }
+    
+    .fs-1 {
+        font-size: 2rem !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block admin_extra %}
+<div class="container mt-4">
+    <!-- Container per messaggi Jack -->
+    <div id="jack-message-box" class="mb-3"></div>
+    
+    <!-- Container per task AI di Jack -->
+    <div id="jack-task-box" class="mb-3"></div>
+    
+    <!-- Container per suggerimenti strategici di Jack -->
+    <div id="jack-suggestions-box" class="mb-3"></div>
+    
+    <!-- Container per AI 2.0 - Jack Synthia Avanzato -->
+    <div id="jack-ai2-box" class="mb-3"></div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fs-3 fw-semibold text-dark mb-1">📊 Panoramica Documentale Cross-Azienda</h2>
+                    <p class="text-muted fs-smaller mb-0">Monitoraggio globale dello stato dei documenti, revisioni, firme e attività AI.</p>
+                </div>
+                <div>
+                                    <a href="{{ url_for('admin.documents_overview') }}" class="btn btn-outline-primary btn-lg shadow-sm" 
+                   data-bs-toggle="tooltip" data-bs-placement="top" 
+                   data-bs-html="true" title="🤖 <strong>Jack dice:</strong><br>Accedi alla gestione completa dei documenti: upload, revisioni, firme e configurazioni avanzate.">
+                    📄 Gestione Documenti
+                </a>
+                </div>
+            </div>
+
+            <!-- BOX KPI -->
+            <div class="row mt-4 g-3">
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-lg rounded-4 bg-gradient-primary text-white mb-3 h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="mb-3">
+                                <i class="fas fa-file-alt fa-2x opacity-75"></i>
+                            </div>
+                            <h5 class="card-title fw-semibold mb-2">📄 Documenti Totali</h5>
+                            <p class="card-text fs-1 fw-bold mb-2">{{ totale_documenti }}</p>
+                            <small class="opacity-75">Tutti i documenti nel sistema</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-lg rounded-4 bg-gradient-success text-white mb-3 h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="mb-3">
+                                <i class="fas fa-check-circle fa-2x opacity-75"></i>
+                            </div>
+                            <h5 class="card-title fw-semibold mb-2">✅ Approvati</h5>
+                            <p class="card-text fs-1 fw-bold mb-2">{{ approvati }}</p>
+                            <small class="opacity-75">Documenti approvati</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-lg rounded-4 bg-gradient-warning text-white mb-3 h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="mb-3">
+                                <i class="fas fa-clock fa-2x opacity-75"></i>
+                            </div>
+                            <h5 class="card-title fw-semibold mb-2">⏳ In Attesa</h5>
+                            <p class="card-text fs-1 fw-bold mb-2">{{ in_attesa }}</p>
+                            <small class="opacity-75">Documenti in attesa di approvazione</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-lg rounded-4 bg-gradient-info text-white mb-3 h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="mb-3">
+                                <i class="fas fa-signature fa-2x opacity-75"></i>
+                            </div>
+                            <h5 class="card-title fw-semibold mb-2">🖋️ Firmati</h5>
+                            <p class="card-text fs-1 fw-bold mb-2">{{ firmati }}</p>
+                            <small class="opacity-75">Documenti firmati digitalmente</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-lg rounded-4 bg-gradient-dark text-white mb-3 h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="mb-3">
+                                <i class="fas fa-sync-alt fa-2x opacity-75"></i>
+                            </div>
+                            <h5 class="card-title fw-semibold mb-2">🔄 Revisioni Frequenti</h5>
+                            <p class="card-text fs-1 fw-bold mb-2">{{ revisioni_frequenti }}</p>
+                            <small class="opacity-75">Documenti con >3 versioni</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-lg rounded-4 bg-gradient-secondary text-white mb-3 h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="mb-3">
+                                <i class="fas fa-download fa-2x opacity-75"></i>
+                            </div>
+                            <h5 class="card-title fw-semibold mb-2">📤 Download Totali</h5>
+                            <p class="card-text fs-1 fw-bold mb-2">{{ total_downloads }}</p>
+                            <small class="opacity-75">Download registrati</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistiche aggiuntive -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📊 Statistiche Rapide</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="text-center">
+                                        <h6 class="text-muted">Percentuale Approvati</h6>
+                                        <h4 class="text-success">
+                                            {% if totale_documenti > 0 %}
+                                                {{ (approvati / totale_documenti * 100) | round(1) }}%
+                                            {% else %}
+                                                0%
+                                            {% endif %}
+                                        </h4>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="text-center">
+                                        <h6 class="text-muted">Percentuale Firmati</h6>
+                                        <h4 class="text-info">
+                                            {% if totale_documenti > 0 %}
+                                                {{ (firmati / totale_documenti * 100) | round(1) }}%
+                                            {% else %}
+                                                0%
+                                            {% endif %}
+                                        </h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🎯 Obiettivi</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="text-center">
+                                        <h6 class="text-muted">Target Approvazione</h6>
+                                        <h4 class="text-success">80%</h4>
+                                        <small class="text-muted">Obiettivo mensile</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="text-center">
+                                        <h6 class="text-muted">Target Firma</h6>
+                                        <h4 class="text-info">90%</h4>
+                                        <small class="text-muted">Obiettivo mensile</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Mensile AI - Jack (Solo CEO/Admin) -->
+            {% if current_user.role in ['admin', 'ceo'] %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-lg rounded-4">
+                        <div class="card-header bg-gradient-primary text-white">
+                            <h5 class="mb-0">📥 Report Mensile AI – Jack</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">Genera report PDF automatici con analisi documentale intelligente per il periodo selezionato.</p>
+                            <form id="report-form" class="row g-3 align-items-end">
+                                <div class="col-md-3">
+                                    <label for="report-month" class="form-label fw-medium">📅 Mese</label>
+                                    <select id="report-month" class="form-select shadow-sm">
+                                        {% for m in range(1, 13) %}
+                                            <option value="{{m}}" {% if m == current_month %}selected{% endif %}>{{"%02d"|format(m)}}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="report-year" class="form-label fw-medium">📅 Anno</label>
+                                    <input type="number" id="report-year" class="form-control shadow-sm" value="{{current_year}}" min="2020" max="2030">
+                                </div>
+                                <div class="col-md-6">
+                                    <button type="button" id="download-report" class="btn btn-primary shadow-sm w-100"
+                                            data-bs-toggle="tooltip" data-bs-placement="top" 
+                                            data-bs-html="true" title="🤖 <strong>Jack dice:</strong><br>Scarica il report PDF con analisi completa: statistiche, criticità, trend e raccomandazioni strategiche.">
+                                        📥 Scarica Report AI
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- SEZIONI SUCCESSIVE -->
+            <div class="row mt-5">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📈 Grafici Attività Documentale</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Grafico Upload/Download per Azienda -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h6 class="text-muted mb-3">📦 Upload vs 📤 Download per Azienda</h6>
+                                    <canvas id="chartUploadDownload" height="100"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Grafici Stato e Reparto -->
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-3">📊 Distribuzione Documenti per Stato</h6>
+                                    <canvas id="chartStatoDocumenti" height="200"></canvas>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-3">🏢 Attività per Reparto</h6>
+                                    <canvas id="chartReparto" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-5">
+                <h4>📁 Documenti per Azienda / Reparto</h4>
+                <p class="text-muted mb-3">Tabella completa di tutti i documenti con filtri in tempo reale.</p>
+
+                <!-- Form Filtri AI Document Intelligence -->
+                {% if current_user.role in ['admin', 'ceo'] %}
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-header bg-light border-0">
+                        <h6 class="mb-0 fw-semibold">🧠 Filtri AI Document Intelligence</h6>
+                    </div>
+                    <div class="card-body">
+                        <form method="GET" class="row g-3 align-items-end">
+                            <div class="col-12 col-md-3">
+                                <label for="ai_status" class="form-label fw-medium">🧠 Stato AI</label>
+                                <select name="ai_status" id="ai_status" class="form-select shadow-sm">
+                                    <option value="">Tutti gli stati</option>
+                                    <option value="completo" {% if ai_status == 'completo' %}selected{% endif %}>✅ Completo</option>
+                                    <option value="incompleto" {% if ai_status == 'incompleto' %}selected{% endif %}>⚠️ Incompleto</option>
+                                    <option value="scaduto" {% if ai_status == 'scaduto' %}selected{% endif %}>❌ Scaduto</option>
+                                    <option value="manca_firma" {% if ai_status == 'manca_firma' %}selected{% endif %}>❌ Manca Firma</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label for="ai_explain" class="form-label fw-medium">🔍 Cerca motivo AI</label>
+                                <input type="text" name="ai_explain" id="ai_explain" class="form-control shadow-sm" 
+                                       placeholder="es. firma RSPP, scaduto, manca..."
+                                       value="{{ ai_explain or '' }}">
+                            </div>
+                            <div class="col-12 col-md-5">
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="submit" class="btn btn-primary shadow-sm" 
+                                            data-bs-toggle="tooltip" data-bs-placement="top" 
+                                            data-bs-html="true" title="🤖 <strong>Jack dice:</strong><br>Applica i filtri selezionati per trovare documenti specifici. Posso aiutarti a trovare documenti critici o incompleti.">
+                                        🔍 Filtra
+                                    </button>
+                                    <a href="{{ url_for('document_intelligence.export_critical_documents') }}?status={{ ai_status or '' }}&explain={{ ai_explain or '' }}&format=csv"
+                                       class="btn btn-outline-danger shadow-sm"
+                                       data-bs-toggle="tooltip" data-bs-placement="top" 
+                                       data-bs-html="true" title="🤖 <strong>Jack dice:</strong><br>Scarica l'elenco dei documenti critici in formato CSV per audit, riunioni o archiviazione esterna.">
+                                        ⬇️ Esporta Risultati
+                                    </a>
+                                    <a href="{{ url_for('admin.doc_overview') }}" class="btn btn-outline-secondary shadow-sm"
+                                       data-bs-toggle="tooltip" data-bs-placement="top" 
+                                       data-bs-html="true" title="<strong>Reset Filtri</strong><br>Rimuovi tutti i filtri applicati">
+                            🔄 Reset Filtri
+                        </a>
+                    </div>
+                </form>
+                {% endif %}
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" id="docSearch" placeholder="🔍 Filtra per titolo, azienda, reparto...">
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <span class="badge bg-info" id="docCount">
+                            {% if ai_status or ai_explain %}
+                                {{ documenti_tabella|length }} documenti filtrati
+                                {% if ai_status %}(Stato: {{ ai_status }}){% endif %}
+                                {% if ai_explain %}(Motivo: "{{ ai_explain }}"){% endif %}
+                            {% else %}
+                                0 documenti trovati
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Pulsanti Export Document Intelligence -->
+                {% if current_user.role in ['admin', 'ceo'] %}
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="d-flex gap-2 justify-content-end">
+                            <a href="{{ url_for('document_intelligence.export_critical_documents') }}?status=incompleto&format=csv" 
+                               class="btn btn-outline-danger btn-sm btn-export"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="top"
+                               data-bs-html="true"
+                               data-onboarding="export"
+                               title="🤖 <strong>Jack dice:</strong><br>Esporta tutti i documenti incompleti per identificare le lacune da colmare.">
+                               ⬇️ Esporta Incompleti
+                            </a>
+                            <a href="{{ url_for('document_intelligence.export_critical_documents') }}?status=scaduto&format=csv" 
+                               class="btn btn-outline-danger btn-sm"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="top"
+                               data-bs-html="true"
+                               title="🤖 <strong>Jack dice:</strong><br>Esporta i documenti scaduti per azioni immediate di aggiornamento e compliance.">
+                               ⬇️ Esporta Scaduti
+                            </a>
+                            <a href="{{ url_for('document_intelligence.export_critical_documents') }}?status=manca_firma&format=csv" 
+                               class="btn btn-outline-warning btn-sm"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="top"
+                               data-bs-html="true"
+                               title="🤖 <strong>Jack dice:</strong><br>Esporta i documenti senza firma per identificare chi deve firmare e completare la validazione.">
+                               ⬇️ Esporta Senza Firma
+                            </a>
+                            <a href="{{ url_for('document_intelligence.export_critical_documents') }}?format=csv" 
+                               class="btn btn-outline-primary btn-sm"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="top"
+                               data-bs-html="true"
+                               title="🤖 <strong>Jack dice:</strong><br>Esporta tutti i documenti critici per una visione completa delle priorità da gestire.">
+                               ⬇️ Esporta Tutti i Critici
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped shadow-sm rounded" id="docTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="px-3 py-3">📄 Titolo</th>
+                                <th class="px-3 py-3">🏢 Azienda</th>
+                                <th class="px-3 py-3">📋 Reparto</th>
+                                <th class="px-3 py-3">📊 Stato</th>
+                                <th class="px-3 py-3">🖋️ Firma</th>
+                                <th class="px-3 py-3">📅 Ultima Modifica</th>
+                                {% if current_user.role in ['admin', 'ceo'] %}
+                                <th class="px-3 py-3">🧠 Stato AI</th>
+                                <th class="px-3 py-3">📋 Motivo AI</th>
+                                <th class="px-3 py-3">🔗 Task AI</th>
+                                {% endif %}
+                                <th class="px-3 py-3">🔧 Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in documenti_tabella %}
+                            <tr>
+                                <td class="px-3 py-3">
+                                    <strong class="text-dark">{{ doc.title }}</strong>
+                                    {% if doc.is_critical %}
+                                        <span class="badge rounded-pill bg-danger shadow-sm ms-2">🔒 Critico</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if doc.company %}
+                                        {% if doc.company.name %}
+                                            {{ doc.company.name }}
+                                        {% else %}
+                                            {{ doc.company }}
+                                        {% endif %}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if doc.department %}
+                                        {% if doc.department.name %}
+                                            {{ doc.department.name }}
+                                        {% else %}
+                                            {{ doc.department }}
+                                        {% endif %}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-3">
+                                    {% if doc.stato_approvazione == 'approvato' %}
+                                        <span class="badge rounded-pill bg-success shadow-sm">✅ Approvato</span>
+                                    {% elif doc.stato_approvazione == 'in_attesa' %}
+                                        <span class="badge rounded-pill bg-warning text-dark shadow-sm">⏳ In attesa</span>
+                                    {% elif doc.stato_approvazione == 'respinto' %}
+                                        <span class="badge rounded-pill bg-danger shadow-sm">❌ Respinto</span>
+                                    {% else %}
+                                        <span class="badge rounded-pill bg-secondary shadow-sm">📝 Bozza</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if doc.is_signed %}
+                                        <span class="text-success">
+                                            ✅ {{ doc.signed_by or 'Firmato' }}
+                                            {% if doc.signed_by_ai %}
+                                                <span class="badge bg-info text-dark">🧠 AI</span>
+                                            {% endif %}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">❌ Non firmato</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if doc.updated_at %}
+                                        {{ doc.updated_at.strftime('%d/%m/%Y') }}
+                                    {% elif doc.created_at %}
+                                        {{ doc.created_at.strftime('%d/%m/%Y') }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                {% if current_user.role in ['admin', 'ceo'] %}
+                                <!-- Colonna Stato AI -->
+                                <td>
+                                    {% if doc.ai_status %}
+                                        {% if doc.ai_status == 'completo' %}
+                                            <span class="badge bg-success">✅ Completo</span>
+                                        {% elif doc.ai_status == 'incompleto' %}
+                                            <span class="badge bg-warning text-dark">⚠️ Incompleto</span>
+                                        {% elif doc.ai_status == 'scaduto' %}
+                                            <span class="badge bg-danger">❌ Scaduto</span>
+                                        {% elif doc.ai_status == 'manca_firma' %}
+                                            <span class="badge bg-danger">❌ Manca Firma</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ doc.ai_status }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <button onclick="analyzeAI({{ doc.id }})" 
+                                                class="btn btn-sm btn-outline-secondary"
+                                                title="Analizza documento con AI">
+                                            🧠 Analizza
+                                        </button>
+                                    {% endif %}
+                                </td>
+                                
+                                <!-- Colonna Motivo AI -->
+                                <td>
+                                    {% if doc.ai_explain %}
+                                        <span data-bs-toggle="tooltip" 
+                                              data-bs-placement="top" 
+                                              title="{{ doc.ai_explain }}">
+                                            {% if doc.ai_status == 'completo' %}
+                                                ✅ Conforme
+                                            {% elif doc.ai_status == 'incompleto' %}
+                                                ⚠️ {{ doc.ai_explain[:30] }}...
+                                            {% elif doc.ai_status == 'scaduto' %}
+                                                ❌ {{ doc.ai_explain[:30] }}...
+                                            {% elif doc.ai_status == 'manca_firma' %}
+                                                ❌ {{ doc.ai_explain[:30] }}...
+                                            {% else %}
+                                                {{ doc.ai_explain[:30] }}...
+                                            {% endif %}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                
+                                <!-- Colonna Task AI -->
+                                <td>
+                                    {% if doc.ai_task_id %}
+                                        <a href="/tasks/{{ doc.ai_task_id }}" 
+                                           class="btn btn-sm btn-outline-primary"
+                                           title="Visualizza task AI associato">
+                                            🔗 #{{ doc.ai_task_id }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                {% endif %}
+                                
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ url_for('admin.view_document', doc_id=doc.id) }}" 
+                                           class="btn btn-outline-primary btn-sm btn-view" 
+                                           data-bs-toggle="tooltip"
+                                           data-bs-placement="top"
+                                           data-bs-html="true"
+                                           data-onboarding="view"
+                                           title="🤖 <strong>Jack dice:</strong><br>Visualizza il contenuto completo del documento e tutte le sue versioni. Qui puoi vedere il PDF, le firme e lo storico delle modifiche.">
+                                            👁️
+                                        </a>
+                                        {% if doc.stato_approvazione == 'approvato' and not doc.is_signed %}
+                                            <button class="btn btn-outline-success btn-sm btn-sign" 
+                                                    data-bs-toggle="tooltip"
+                                                    data-bs-placement="top"
+                                                    data-bs-html="true"
+                                                    data-onboarding="sign"
+                                                    title="🤖 <strong>Jack dice:</strong><br>Firma il documento come Responsabile per validarlo ufficialmente. Questa azione è irreversibile e registra la tua identità digitale."
+                                                    onclick="firmaDocumento({{ doc.id }})">
+                                                ✍️
+                                            </button>
+                                        {% endif %}
+                                        {% if current_user.role in ['admin', 'ceo'] and not doc.ai_status %}
+                                            <button onclick="analyzeAI({{ doc.id }})" 
+                                                    class="btn btn-outline-info btn-sm btn-analyze-ai"
+                                                    data-bs-toggle="tooltip"
+                                                    data-bs-placement="top"
+                                                    data-bs-html="true"
+                                                    data-onboarding="analyze"
+                                                    title="🤖 <strong>Jack dice:</strong><br>Analizza il documento con la mia intelligenza: verifico scadenze, firme mancanti, criticità e genero suggerimenti automatici."
+                                                    >
+                                                🧠
+                                            </button>
+                                        {% endif %}
+                                        {% if current_user.role in ['admin', 'ceo'] %}
+                                            <a href="{{ url_for('docs.download_pdf_with_ai', doc_id=doc.id) }}" 
+                                               class="btn btn-outline-warning btn-sm btn-download"
+                                               data-bs-toggle="tooltip"
+                                               data-bs-placement="top"
+                                               data-bs-html="true"
+                                               data-onboarding="export"
+                                               title="🤖 <strong>Jack dice:</strong><br>Scarica il PDF con il mio badge AI incorporato: stato, spiegazione e metadati invisibili per audit."
+                                               target="_blank">
+                                                🤖📄
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="{% if current_user.role in ['admin', 'ceo'] %}10{% else %}7{% endif %}" class="text-center text-muted">
+                                    <i class="fas fa-inbox me-2"></i>
+                                    Nessun documento trovato
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🧠 Insight AI Strategici</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">Suggerimenti intelligenti generati automaticamente per ottimizzare la gestione documentale.</p>
+                            <ul class="list-group list-group-flush">
+                                {% for insight in insight_ai %}
+                                    <li class="list-group-item">
+                                        <i class="fas fa-lightbulb me-2 text-warning"></i>
+                                        {{ insight }}
+                                    </li>
+                                {% else %}
+                                    <li class="list-group-item text-muted">
+                                        <i class="fas fa-check me-2 text-success"></i>
+                                        Nessun suggerimento rilevato dal sistema.
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Link di navigazione -->
+            <div class="mt-4">
+                <a href="{{ url_for('admin.documents_overview') }}" class="btn btn-secondary"
+                   data-bs-toggle="tooltip"
+                   data-bs-placement="top"
+                   data-bs-html="true"
+                   title="🤖 <strong>Jack dice:</strong><br>Torna alla gestione completa dei documenti per upload, modifiche e configurazioni.">
+                    ← Torna ai Documenti
+                </a>
+                <a href="{{ url_for('admin.approval_stats') }}" class="btn btn-outline-primary ms-2"
+                   data-bs-toggle="tooltip"
+                   data-bs-placement="top"
+                   data-bs-html="true"
+                   title="🤖 <strong>Jack dice:</strong><br>Visualizza le statistiche dettagliate delle approvazioni per monitorare l'efficienza del processo.">
+                    📊 Statistiche Approvazioni
+                </a>
+                <a href="{{ url_for('admin.firme_documenti') }}" class="btn btn-outline-info ms-2"
+                   data-bs-toggle="tooltip"
+                   data-bs-placement="top"
+                   data-bs-html="true"
+                   title="🤖 <strong>Jack dice:</strong><br>Visualizza il registro completo delle firme digitali per audit e tracciabilità.">
+                    🖋️ Log Firme
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modale storico messaggi Jack -->
+<div class="modal fade" id="jackHistoryModal" tabindex="-1" aria-labelledby="jackHistoryLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="jackHistoryLabel">🕓 Storico Messaggi Jack</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+      </div>
+      <div class="modal-body">
+        <ul id="jackHistoryList" class="list-group small"></ul>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+        <button id="jackClearHistory" class="btn btn-outline-danger">Svuota storico</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottone per visualizzare lo storico -->
+<button type="button" class="btn btn-light position-fixed bottom-0 start-0 m-4" data-bs-toggle="modal" data-bs-target="#jackHistoryModal">
+  🕓 Messaggi recenti
+</button>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // === Grafico Upload/Download per Azienda ===
+    const uploadLabels = {{ upload_per_azienda.keys()|list|tojson }};
+    const uploadData = {{ upload_per_azienda.values()|list|tojson }};
+    const downloadData = {{ download_per_azienda.values()|list|tojson }};
+
+    new Chart(document.getElementById('chartUploadDownload'), {
+        type: 'bar',
+        data: {
+            labels: uploadLabels,
+            datasets: [
+                {
+                    label: '📦 Upload',
+                    data: uploadData,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: '📤 Download',
+                    data: downloadData,
+                    backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { 
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true
+                    }
+                } 
+            },
+            scales: { 
+                y: { 
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                } 
+            }
+        }
+    });
+
+    // === Grafico Stato Documenti ===
+    new Chart(document.getElementById('chartStatoDocumenti'), {
+        type: 'pie',
+        data: {
+            labels: {{ stato_documenti.keys()|list|tojson }},
+            datasets: [{
+                data: {{ stato_documenti.values()|list|tojson }},
+                backgroundColor: [
+                    '#28a745',  // approvato - verde
+                    '#ffc107',  // in_attesa - giallo
+                    '#dc3545',  // respinto - rosso
+                    '#6c757d'   // bozza - grigio
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { 
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // === Grafico Attività per Reparto ===
+    new Chart(document.getElementById('chartReparto'), {
+        type: 'bar',
+        data: {
+            labels: {{ attivita_reparto.keys()|list|tojson }},
+            datasets: [{
+                label: '📄 Documenti',
+                data: {{ attivita_reparto.values()|list|tojson }},
+                backgroundColor: 'rgba(153, 102, 255, 0.6)',
+                borderColor: 'rgba(153, 102, 255, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { 
+                    display: false 
+                } 
+            },
+            scales: { 
+                y: { 
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                } 
+            }
+        }
+    });
+});
+</script>
+
+<script>
+// === Filtro documenti in tempo reale ===
+document.getElementById("docSearch").addEventListener("input", function() {
+    const input = this.value.toLowerCase();
+    const rows = document.querySelectorAll("#docTable tbody tr");
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        const isVisible = text.includes(input);
+        row.style.display = isVisible ? "" : "none";
+        if (isVisible) visibleCount++;
+    });
+
+    // Aggiorna contatore
+    document.getElementById("docCount").textContent = `${visibleCount} documenti trovati`;
+});
+
+// === Funzione firma documento ===
+function firmaDocumento(docId) {
+    if (confirm("Sei sicuro di voler firmare questo documento?")) {
+        // Qui puoi implementare la chiamata AJAX per firmare il documento
+        alert("Funzione firma documento da implementare");
+    }
+}
+
+// === Funzione analisi AI documento ===
+function analyzeAI(docId) {
+    if (confirm("Analizzare questo documento con Document Intelligence AI?")) {
+        // Mostra indicatore di caricamento
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.innerHTML = "🔄 Analizzando...";
+        button.disabled = true;
+        
+        fetch('/docs/analyze-pdf', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ document_id: docId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Mostra risultato
+                let statusIcon = "✅";
+                let statusClass = "success";
+                
+                if (data.status === 'incompleto') {
+                    statusIcon = "⚠️";
+                    statusClass = "warning";
+                } else if (data.status === 'scaduto' || data.status === 'manca_firma') {
+                    statusIcon = "❌";
+                    statusClass = "danger";
+                }
+                
+                alert(`${statusIcon} Analisi completata!\n\nStato: ${data.status}\nMotivo: ${data.explain}${data.task_id ? '\n\nTask creato: #' + data.task_id : ''}`);
+                
+                // Ricarica la pagina per mostrare i nuovi dati
+                location.reload();
+            } else {
+                alert("❌ Errore nell'analisi AI: " + data.message);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error("Errore AI:", error);
+            alert("❌ Errore durante l'analisi AI. Controlla la console per dettagli.");
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+}
+
+// === Inizializza contatore al caricamento ===
+document.addEventListener('DOMContentLoaded', function() {
+    updateDocumentCount();
+    
+    // Inizializza tooltip Bootstrap con HTML abilitato e supporto per tooltip dinamici AI
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            html: true,
+            trigger: 'hover focus',
+            animation: true,
+            delay: { show: 300, hide: 100 }
+        });
+    });
+    
+    // Supporto per tooltip dinamici AI (se presenti)
+    document.querySelectorAll('[data-ai-tooltip]').forEach(function(element) {
+        const aiMessage = element.getAttribute('data-ai-tooltip');
+        if (aiMessage) {
+            element.setAttribute('data-bs-toggle', 'tooltip');
+            element.setAttribute('data-bs-html', 'true');
+            element.setAttribute('title', `🤖 <strong>Jack dice:</strong><br>${aiMessage}`);
+            element.setAttribute('aria-describedby', 'ai-tooltip');
+            element.setAttribute('role', 'button');
+            
+            // Ricrea il tooltip con il nuovo contenuto
+            const existingTooltip = bootstrap.Tooltip.getInstance(element);
+            if (existingTooltip) {
+                existingTooltip.dispose();
+            }
+            new bootstrap.Tooltip(element, {
+                html: true,
+                trigger: 'hover focus',
+                animation: true,
+                delay: { show: 300, hide: 100 }
+            });
+        }
+    });
+    
+    // Tooltip di onboarding progressivi (solo la prima volta)
+    const onboardingTooltips = [
+        { id: 'uploadBtn', message: '🤖 <strong>Jack dice:</strong><br>Carica un nuovo documento. Assicurati che sia in formato PDF e chiaro.' },
+        { id: 'aiAnalysisBtn', message: '🤖 <strong>Jack dice:</strong><br>Analizza il documento con la mia intelligenza per verificare compliance e criticità.' },
+        { id: 'signatureBtn', message: '🤖 <strong>Jack dice:</strong><br>Firma il documento per validarlo ufficialmente. Questa azione è irreversibile.' }
+    ];
+    
+    onboardingTooltips.forEach(function(tooltip) {
+        const element = document.getElementById(tooltip.id);
+        if (element && !localStorage.getItem(`seenTooltip_${tooltip.id}`)) {
+            // Mostra il tooltip automaticamente
+            setTimeout(function() {
+                const tooltipInstance = new bootstrap.Tooltip(element, {
+                    html: true,
+                    title: tooltip.message,
+                    trigger: 'manual'
+                });
+                tooltipInstance.show();
+                
+                // Nascondi dopo 5 secondi
+                setTimeout(function() {
+                    tooltipInstance.hide();
+                    localStorage.setItem(`seenTooltip_${tooltip.id}`, 'true');
+                }, 5000);
+            }, 2000);
+        }
+    });
+    
+    // Animazioni per badge
+    document.querySelectorAll('.badge').forEach(function(badge) {
+        badge.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.05)';
+        });
+        badge.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+    
+    // Animazioni per pulsanti
+    document.querySelectorAll('.btn').forEach(function(btn) {
+        btn.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px)';
+        });
+        btn.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+});
+
+// === Funzione per aggiornare contatore documenti ===
+function updateDocumentCount() {
+    const totalRows = document.querySelectorAll("#docTable tbody tr").length;
+    const countElement = document.getElementById("docCount");
+    
+    // Controlla se ci sono filtri AI attivi
+    const aiStatus = document.getElementById("ai_status");
+    const aiExplain = document.getElementById("ai_explain");
+    
+    if (aiStatus && aiExplain) {
+        const statusValue = aiStatus.value;
+        const explainValue = aiExplain.value;
+        
+        if (statusValue || explainValue) {
+            let filterText = `${totalRows} documenti filtrati`;
+            if (statusValue) filterText += ` (Stato: ${statusValue})`;
+            if (explainValue) filterText += ` (Motivo: "${explainValue}")`;
+            countElement.textContent = filterText;
+        } else {
+            countElement.textContent = `${totalRows} documenti trovati`;
+        }
+    } else {
+        countElement.textContent = `${totalRows} documenti trovati`;
+    }
+}
+
+// === Recupero preferenze Jack da FocusMe ===
+// Esempio utente loggato con ID conosciuto (da Flask, Jinja o JS)
+const userId = {{ current_user.id }};
+
+async function fetchJackPreferencesFromFocusMe() {
+  try {
+    const res = await fetch(`https://64.226.70.28/api/utente/${userId}/preferenze`, {
+      credentials: 'include'
+    });
+
+    if (!res.ok) throw new Error("Errore recupero preferenze Jack");
+    const prefs = await res.json();
+
+    // Esempio struttura: { "jack_stile": "empatico", "jack_umore": "soft", "audio": true }
+    localStorage.setItem("jack_stile", prefs.jack_stile || "neutro");
+    localStorage.setItem("jack_umore", prefs.jack_umore || "soft");
+    localStorage.setItem("jack_audio", prefs.audio ?? true);
+
+    console.log("Preferenze Jack caricate da FocusMe:", prefs);
+  } catch (err) {
+    console.warn("Impossibile connettersi a FocusMe AI. Uso impostazioni locali.", err);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", fetchJackPreferencesFromFocusMe);
+
+// === Gestione Storico Messaggi Jack ===
+// Salva ogni messaggio mostrato da Jack
+function salvaMessaggioJack(testo) {
+  let storico = JSON.parse(localStorage.getItem("jack_storico_docs") || "[]");
+  storico.push({ testo, timestamp: new Date().toLocaleString() });
+  if (storico.length > 10) storico.shift(); // mantieni ultimi 10
+  localStorage.setItem("jack_storico_docs", JSON.stringify(storico));
+}
+
+// Carica lo storico nel modale
+document.addEventListener("DOMContentLoaded", function () {
+  const lista = document.getElementById("jackHistoryList");
+  const dati = JSON.parse(localStorage.getItem("jack_storico_docs") || "[]");
+  lista.innerHTML = dati.map(msg => `<li class="list-group-item">${msg.timestamp} → ${msg.testo}</li>`).reverse().join("");
+});
+
+// Pulsante per svuotare
+document.getElementById("jackClearHistory").onclick = () => {
+  localStorage.removeItem("jack_storico_docs");
+  document.getElementById("jackHistoryList").innerHTML = "<li class='list-group-item text-muted'>Nessun messaggio registrato.</li>";
+};
+
+// === Branding Jack Centralizzato (Multi-IP Coerente) ===
+// Jack deve avere lo stesso avatar, nome, voce e stile su tutti i moduli (DOCS, Elevate, QMS…)
+
+// ✅ Recupera branding centralizzato da FocusMe AI (64.226.70.28)
+async function caricaBrandingJack() {
+  try {
+    const res = await fetch(`https://64.226.70.28/api/jack/branding/${userId}`);
+    if (!res.ok) throw new Error("Errore nel recupero branding Jack");
+
+    const data = await res.json();
+
+    // Esempio di struttura JSON ricevuta:
+    // {
+    //   nome: "Jack Synthia",
+    //   voce: "it-IT-DisneyMale",
+    //   stile: "empatico",
+    //   avatar_url: "/static/img/jack_avatar.png"
+    // }
+
+    // Applica branding nel DOM (es. avatar immagine)
+    const avatarElement = document.getElementById("jack-avatar");
+    if (avatarElement && data.avatar_url) {
+      avatarElement.src = data.avatar_url;
+    }
+
+    // Salva branding per uso locale (es. voce, stile)
+    localStorage.setItem("jack_nome", data.nome);
+    localStorage.setItem("jack_voce", data.voce);
+    localStorage.setItem("jack_stile", data.stile);
+
+    console.log("Branding Jack caricato:", data);
+  } catch (err) {
+    console.warn("Impossibile caricare branding centralizzato Jack", err);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", caricaBrandingJack);
+
+// === Jack Segretario Documentale Intelligente ===
+// Mostra messaggi proattivi a firma, scadenza, upload, approvazioni
+
+// 📦 Esempio base – notifiche generate da AI centrale via FocusMe API
+async function jackSegretarioAvvisi() {
+  try {
+    const res = await fetch(`https://64.226.70.28/api/jack/docs/avvisi/${userId}`);
+    if (!res.ok) throw new Error("Nessun avviso da mostrare");
+
+    const avvisi = await res.json();
+    if (!Array.isArray(avvisi) || avvisi.length === 0) return;
+
+    avvisi.forEach(avviso => {
+      mostraMessaggioJack(avviso.testo);
+      if (typeof jackParla === "function") {
+        jackParla(avviso.testo);
+      }
+    });
+  } catch (err) {
+    console.log("[Jack] Nessun avviso documentale da mostrare ora.", err);
+  }
+}
+
+function mostraMessaggioJack(testo) {
+  const container = document.getElementById("jack-message-box");
+  if (!container) return;
+  container.innerHTML = `<div class='alert alert-info shadow-sm'><strong>Jack:</strong> ${testo}</div>`;
+}
+
+document.addEventListener("DOMContentLoaded", jackSegretarioAvvisi);
+
+// === Task AI Automatici da Jack (DOCS) ===
+// Jack trasforma avvisi documentali in veri e propri task utente
+// Es: "Verifica documento XYZ entro 3 giorni" → diventa task tracciato
+
+// ⚙️ Requisiti:
+// - API FocusMe: restituisce lista task suggeriti
+// - Frontend: crea badge / lista azioni da eseguire con link
+
+async function jackSuggerisciTaskAI() {
+  try {
+    const res = await fetch(`https://64.226.70.28/api/jack/docs/task_ai/${userId}`);
+    if (!res.ok) throw new Error("Nessun task suggerito");
+    const tasks = await res.json();
+
+    if (!Array.isArray(tasks) || tasks.length === 0) return;
+
+    const taskBox = document.getElementById("jack-task-box");
+    if (!taskBox) return;
+
+    tasks.forEach(task => {
+      const row = document.createElement("div");
+      row.className = "alert alert-warning d-flex justify-content-between align-items-center";
+      row.innerHTML = `
+        <span>🧠 ${task.titolo} <br><small class='text-muted'>${task.scadenza}</small></span>
+        <a href="${task.url}" class="btn btn-sm btn-primary">Vai</a>
+      `;
+      taskBox.appendChild(row);
+    });
+  } catch (err) {
+    console.log("[Jack AI] Nessun task da suggerire ora.", err);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", jackSuggerisciTaskAI);
+
+// === Jack Suggerimenti Strategici Documentali (AI Consigliativi) ===
+// Suggerisce revisioni, aggiornamenti, firme mancanti, criticità strutturali
+
+// 📦 API FocusMe: lista consigli strategici da mostrare all'utente
+// Esempio di struttura: [{ tipo: "obsoleto", messaggio: "...", azione_url: "..." }]
+
+async function jackSuggerimentiStrategici() {
+  try {
+    const res = await fetch(`https://64.226.70.28/api/jack/docs/suggerimenti/${userId}`);
+    if (!res.ok) throw new Error("Nessun suggerimento disponibile");
+
+    const suggerimenti = await res.json();
+    if (!Array.isArray(suggerimenti) || suggerimenti.length === 0) return;
+
+    const suggerBox = document.getElementById("jack-suggestions-box");
+    if (!suggerBox) return;
+
+    suggerimenti.forEach(s => {
+      const item = document.createElement("div");
+      item.className = "alert alert-secondary border-start border-4 border-warning";
+      item.innerHTML = `
+        <div class="fw-bold">🧠 Suggerimento AI</div>
+        <div>${s.messaggio}</div>
+        ${s.azione_url ? `<a href='${s.azione_url}' class='btn btn-sm btn-outline-primary mt-2'>Agisci ora</a>` : ''}
+      `;
+      suggerBox.appendChild(item);
+    });
+  } catch (err) {
+    console.warn("[Jack] Nessun suggerimento strategico.", err);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", jackSuggerimentiStrategici);
+
+// === Jack Synthia AI 2.0 - Funzionalità Avanzate ===
+// Auto-verifica contenuto, risposte automatiche, suggerimenti archiviazione, alert comportamenti sospetti
+
+async function jackAI2VerifyDocument(documentId) {
+    try {
+        const response = await fetch(`/api/jack/ai2/verify-document/${documentId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Mostra risultato verifica
+            const ai2Box = document.getElementById('jack-ai2-box');
+            ai2Box.innerHTML = `
+                <div class="alert alert-${data.flag_type === 'conforme' ? 'success' : data.flag_type === 'sospetto' ? 'warning' : 'danger'} border-start border-4 border-${data.flag_type === 'conforme' ? 'success' : data.flag_type === 'sospetto' ? 'warning' : 'danger'}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-2">🧠 Jack AI 2.0 - Verifica Contenuto</h6>
+                            <p class="mb-2"><strong>${data.message}</strong></p>
+                            <p class="mb-1"><small>Punteggio Compliance: ${data.compliance_score}%</small></p>
+                            ${data.missing_sections ? `<p class="mb-1"><small>Sezioni mancanti: ${data.missing_sections}</small></p>` : ''}
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="jackAI2ShowDetails(${documentId})">
+                            📋 Dettagli
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Salva messaggio nello storico Jack
+            if (typeof salvaMessaggioJack === "function") {
+                salvaMessaggioJack(`Verifica AI 2.0 completata: ${data.message}`);
+            }
+        } else {
+            console.error('Errore verifica AI:', data.error);
+        }
+    } catch (error) {
+        console.error('Errore verifica documento AI 2.0:', error);
+    }
+}
+
+async function jackAI2SuggestArchive(documentId) {
+    try {
+        const response = await fetch(`/api/jack/ai2/suggest-archive/${documentId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Mostra suggerimento archiviazione
+            const ai2Box = document.getElementById('jack-ai2-box');
+            const confidenceClass = data.confidence_score >= 80 ? 'success' : data.confidence_score >= 60 ? 'warning' : 'info';
+            
+            ai2Box.innerHTML = `
+                <div class="alert alert-${confidenceClass} border-start border-4 border-${confidenceClass}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-2">📁 Jack AI 2.0 - Suggerimento Archiviazione</h6>
+                            <p class="mb-2"><strong>${data.message}</strong></p>
+                            <p class="mb-1"><small>Motivazione: ${data.reasoning}</small></p>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-success me-2" onclick="jackAI2AcceptSuggestion(${documentId})">
+                                ✅ Accetta
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="jackAI2ShowArchiveDetails(${documentId})">
+                                📋 Dettagli
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Salva messaggio nello storico Jack
+            if (typeof salvaMessaggioJack === "function") {
+                salvaMessaggioJack(`Suggerimento archiviazione: ${data.suggested_folder} (${data.confidence_score}% confidenza)`);
+            }
+        } else {
+            console.error('Errore suggerimento archiviazione:', data.error);
+        }
+    } catch (error) {
+        console.error('Errore suggerimento archiviazione AI 2.0:', error);
+    }
+}
+
+async function jackAI2CheckBehavior(userId, action, documentId = null) {
+    try {
+        const response = await fetch('/api/jack/ai2/check-behavior', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                action: action,
+                document_id: documentId,
+                ip_address: '127.0.0.1', // Sarebbe preso dal request
+                user_agent: navigator.userAgent
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.alert_generated) {
+            // Mostra alert comportamento sospetto
+            const ai2Box = document.getElementById('jack-ai2-box');
+            const severityClass = data.severity === 'critica' ? 'danger' : data.severity === 'alta' ? 'warning' : 'info';
+            
+            ai2Box.innerHTML = `
+                <div class="alert alert-${severityClass} border-start border-4 border-${severityClass}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-2">🚨 Jack AI 2.0 - Alert Comportamento Sospetto</h6>
+                            <p class="mb-2"><strong>${data.message}</strong></p>
+                            <p class="mb-1"><small>${data.description}</small></p>
+                            <p class="mb-1"><small>Severità: ${data.severity}</small></p>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="jackAI2ShowAlertDetails()">
+                            📋 Dettagli
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Salva messaggio nello storico Jack
+            if (typeof salvaMessaggioJack === "function") {
+                salvaMessaggioJack(`Alert AI 2.0: ${data.message}`);
+            }
+        }
+    } catch (error) {
+        console.error('Errore controllo comportamenti AI 2.0:', error);
+    }
+}
+
+async function jackAI2GenerateReply(requestType, userId, documentId = null) {
+    try {
+        const response = await fetch('/api/jack/ai2/generate-reply', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                request_type: requestType,
+                user_id: userId,
+                document_id: documentId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Mostra risposta automatica generata
+            const ai2Box = document.getElementById('jack-ai2-box');
+            
+            ai2Box.innerHTML = `
+                <div class="alert alert-info border-start border-4 border-info">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-2">✉️ Jack AI 2.0 - Risposta Automatica</h6>
+                            <p class="mb-2"><strong>${data.message}</strong></p>
+                            <div class="bg-light p-2 rounded">
+                                <small><pre>${data.reply_text}</pre></small>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-success me-2" onclick="jackAI2SendReply(${data.reply_id})">
+                                📤 Invia
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="jackAI2ShowReplyDetails(${data.reply_id})">
+                                📋 Dettagli
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Salva messaggio nello storico Jack
+            if (typeof salvaMessaggioJack === "function") {
+                salvaMessaggioJack(`Risposta automatica generata per ${requestType}`);
+            }
+        } else {
+            console.error('Errore generazione risposta:', data.error);
+        }
+    } catch (error) {
+        console.error('Errore generazione risposta AI 2.0:', error);
+    }
+}
+
+// Funzioni di supporto per AI 2.0
+function jackAI2ShowDetails(documentId) {
+    // Implementazione per mostrare dettagli verifica
+    console.log('Mostra dettagli verifica per documento:', documentId);
+}
+
+function jackAI2ShowArchiveDetails(documentId) {
+    // Implementazione per mostrare dettagli archiviazione
+    console.log('Mostra dettagli archiviazione per documento:', documentId);
+}
+
+function jackAI2ShowAlertDetails() {
+    // Implementazione per mostrare dettagli alert
+    console.log('Mostra dettagli alert');
+}
+
+function jackAI2ShowReplyDetails(replyId) {
+    // Implementazione per mostrare dettagli risposta
+    console.log('Mostra dettagli risposta:', replyId);
+}
+
+async function jackAI2AcceptSuggestion(documentId) {
+    // Implementazione per accettare suggerimento
+    console.log('Accetta suggerimento per documento:', documentId);
+}
+
+async function jackAI2SendReply(replyId) {
+    // Implementazione per inviare risposta
+    console.log('Invia risposta:', replyId);
+}
+
+// === Download Report Mensile AI - Jack ===
+document.addEventListener("DOMContentLoaded", function() {
+    const downloadBtn = document.getElementById("download-report");
+    if (downloadBtn) {
+        downloadBtn.addEventListener("click", function() {
+            const month = document.getElementById("report-month").value;
+            const year = document.getElementById("report-year").value;
+            
+            // Validazione
+            if (!month || !year) {
+                alert("⚠️ Seleziona mese e anno per generare il report.");
+                return;
+            }
+            
+            if (year < 2020 || year > 2030) {
+                alert("⚠️ Anno deve essere tra 2020 e 2030.");
+                return;
+            }
+            
+            // Mostra indicatore di caricamento
+            const originalText = this.innerHTML;
+            this.innerHTML = "🔄 Generando...";
+            this.disabled = true;
+            
+            // Costruisci URL per il report
+            const url = `https://64.226.70.28/api/jack/docs/report_ceo/${year}/${month}`;
+            
+            // Apri in nuova finestra per download
+            const newWindow = window.open(url, '_blank');
+            
+            // Ripristina pulsante dopo 3 secondi
+            setTimeout(() => {
+                this.innerHTML = originalText;
+                this.disabled = false;
+                
+                // Salva messaggio nello storico Jack
+                if (typeof salvaMessaggioJack === "function") {
+                    salvaMessaggioJack(`Report AI generato per ${month}/${year} - Scaricato con successo`);
+                }
+            }, 3000);
+            
+            // Gestione errori
+            setTimeout(() => {
+                if (newWindow && newWindow.closed) {
+                    console.log("Download report completato");
+                } else {
+                    console.warn("Download report potrebbe essere fallito");
+                }
+            }, 5000);
+        });
+    }
+});
+</script>
+
+{% endblock %}
+{% endblock %}

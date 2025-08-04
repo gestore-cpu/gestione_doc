@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>I Miei Task AI - Mercury Surgelati</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        .task-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid #dee2e6;
+        }
+        
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .task-card.completed {
+            border-left-color: #28a745;
+            opacity: 0.8;
+        }
+        
+        .task-card.overdue {
+            border-left-color: #dc3545;
+        }
+        
+        .priority-high {
+            border-left-color: #dc3545 !important;
+        }
+        
+        .priority-medium {
+            border-left-color: #ffc107 !important;
+        }
+        
+        .priority-low {
+            border-left-color: #28a745 !important;
+        }
+        
+        .badge-origin {
+            font-size: 0.75rem;
+        }
+        
+        .task-actions {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .task-card:hover .task-actions {
+            opacity: 1;
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .filter-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+        
+        .task-description {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        @media (max-width: 768px) {
+            .task-description {
+                max-width: 150px;
+            }
+            
+            .task-actions {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="container-fluid bg-primary text-white py-4">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-2">
+                        <i class="fas fa-tasks me-3"></i>
+                        I Miei Task AI
+                    </h1>
+                    <p class="mb-0 opacity-75">
+                        Gestisci i tuoi task personali provenienti da AI, Diario, Deep Work e creazione manuale
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button class="btn btn-light" onclick="exportToCSV()">
+                        <i class="fas fa-download me-2"></i>Esporta CSV
+                    </button>
+                    <button class="btn btn-outline-light ms-2" onclick="showAddTaskModal()">
+                        <i class="fas fa-plus me-2"></i>Nuovo Task
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        <!-- Statistics Cards -->
+        <div class="row mb-4" id="statsCards">
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-tasks fa-2x mb-2"></i>
+                        <h3 class="mb-1" id="totalTasks">0</h3>
+                        <p class="mb-0">Task Totali</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <h3 class="mb-1" id="completedTasks">0</h3>
+                        <p class="mb-0">Completati</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-2x mb-2"></i>
+                        <h3 class="mb-1" id="pendingTasks">0</h3>
+                        <p class="mb-0">In Attesa</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-danger text-white">
+                    <div class="card-body text-center">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                        <h3 class="mb-1" id="overdueTasks">0</h3>
+                        <p class="mb-0">Scaduti</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-3">
+                    <label for="priorityFilter" class="form-label">Priorità</label>
+                    <select class="form-select" id="priorityFilter">
+                        <option value="">Tutte</option>
+                        <option value="High">Alta</option>
+                        <option value="Medium">Media</option>
+                        <option value="Low">Bassa</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="originFilter" class="form-label">Origine</label>
+                    <select class="form-select" id="originFilter">
+                        <option value="">Tutte</option>
+                        <option value="AI">🤖 AI</option>
+                        <option value="Diario">📝 Diario</option>
+                        <option value="Deep Work">🧠 Deep Work</option>
+                        <option value="Manuale">✏️ Manuale</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="statusFilter" class="form-label">Stato</label>
+                    <select class="form-select" id="statusFilter">
+                        <option value="">Tutti</option>
+                        <option value="false">Non completati</option>
+                        <option value="true">Completati</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="searchFilter" class="form-label">Ricerca</label>
+                    <input type="text" class="form-control" id="searchFilter" placeholder="Cerca nei task...">
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <button class="btn btn-primary" onclick="applyFilters()">
+                        <i class="fas fa-filter me-2"></i>Applica Filtri
+                    </button>
+                    <button class="btn btn-outline-secondary ms-2" onclick="clearFilters()">
+                        <i class="fas fa-times me-2"></i>Pulisci
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Suggestions Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Suggerimenti AI
+                            <span class="badge bg-warning ms-2" id="suggestionCount">0</span>
+                        </h5>
+                        <div class="d-flex align-items-center">
+                            <div class="form-check form-switch me-3">
+                                <input class="form-check-input" type="checkbox" id="criticalOnlyToggle">
+                                <label class="form-check-label" for="criticalOnlyToggle">
+                                    Solo critici
+                                </label>
+                            </div>
+                            <div class="loading-spinner" id="suggestionSpinner">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Caricamento...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="suggestionsContainer">
+                            <!-- AI suggestions will be loaded here -->
+                        </div>
+                        <div id="emptySuggestions" class="text-center text-muted" style="display: none;">
+                            <i class="fas fa-lightbulb fa-2x mb-3 text-muted"></i>
+                            <p>Nessun suggerimento AI al momento</p>
+                            <small>I suggerimenti intelligenti appariranno qui quando necessario</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Distribuzione per Origine</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="originChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Distribuzione per Priorità</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="priorityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks List -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>I Miei Task
+                            <span class="badge bg-primary ms-2" id="taskCount">0</span>
+                        </h5>
+                        <div class="loading-spinner" id="loadingSpinner">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Caricamento...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="tasksContainer">
+                            <!-- Tasks will be loaded here -->
+                        </div>
+                        <div id="emptyState" class="empty-state" style="display: none;">
+                            <i class="fas fa-tasks"></i>
+                            <h4>Nessun task trovato</h4>
+                            <p>Crea il tuo primo task per iniziare!</p>
+                            <button class="btn btn-primary" onclick="showAddTaskModal()">
+                                <i class="fas fa-plus me-2"></i>Crea Task
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Task Modal -->
+    <div class="modal fade" id="addTaskModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus me-2"></i>Nuovo Task
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addTaskForm">
+                        <div class="mb-3">
+                            <label for="taskTitle" class="form-label">Titolo *</label>
+                            <input type="text" class="form-control" id="taskTitle" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="taskDescription" class="form-label">Descrizione</label>
+                            <textarea class="form-control" id="taskDescription" rows="3"></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="taskPriority" class="form-label">Priorità</label>
+                                    <select class="form-select" id="taskPriority">
+                                        <option value="Low">Bassa</option>
+                                        <option value="Medium" selected>Media</option>
+                                        <option value="High">Alta</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="taskOrigin" class="form-label">Origine</label>
+                                    <select class="form-select" id="taskOrigin">
+                                        <option value="Manuale" selected>✏️ Manuale</option>
+                                        <option value="AI">🤖 AI</option>
+                                        <option value="Diario">📝 Diario</option>
+                                        <option value="Deep Work">🧠 Deep Work</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="taskDeadline" class="form-label">Scadenza</label>
+                            <input type="datetime-local" class="form-control" id="taskDeadline">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="button" class="btn btn-primary" onclick="createTask()">
+                        <i class="fas fa-save me-2"></i>Crea Task
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container"></div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Global variables
+        let allTasks = [];
+        let filteredTasks = [];
+        let originChart = null;
+        let priorityChart = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTasks();
+            setupEventListeners();
+        });
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Search filter
+            document.getElementById('searchFilter').addEventListener('input', function() {
+                applyFilters();
+            });
+
+            // Filter dropdowns
+            ['priorityFilter', 'originFilter', 'statusFilter'].forEach(id => {
+                document.getElementById(id).addEventListener('change', function() {
+                    applyFilters();
+                });
+            });
+        }
+
+        // Load tasks from API
+        async function loadTasks() {
+            showLoading(true);
+            try {
+                const response = await fetch('/api/tasks/my');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allTasks = data.data;
+                    filteredTasks = [...allTasks];
+                    renderTasks();
+                    updateStats();
+                    updateCharts();
+                    showToast('Task caricati con successo', 'success');
+                } else {
+                    showToast('Errore nel caricamento dei task', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+                showToast('Errore di connessione', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Render tasks in the container
+        function renderTasks() {
+            const container = document.getElementById('tasksContainer');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (filteredTasks.length === 0) {
+                container.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            
+            const tasksHTML = filteredTasks.map(task => `
+                <div class="card task-card mb-3 ${task.is_completed ? 'completed' : ''} ${task.is_overdue ? 'overdue' : ''} priority-${task.priorita.toLowerCase()}" data-task-id="${task.id}">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-1 text-center">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" ${task.is_completed ? 'checked' : ''} 
+                                           onchange="toggleTaskComplete(${task.id}, this.checked)">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <h6 class="card-title mb-1 ${task.is_completed ? 'text-decoration-line-through' : ''}">${task.titolo}</h6>
+                                <p class="card-text text-muted task-description">${task.descrizione || 'Nessuna descrizione'}</p>
+                            </div>
+                            <div class="col-md-2">
+                                <span class="badge ${task.origine_badge_class} badge-origin">${task.origine_display}</span>
+                            </div>
+                            <div class="col-md-2">
+                                <span class="badge bg-${task.priority_color}">${task.priorita}</span>
+                            </div>
+                            <div class="col-md-2">
+                                ${task.data_scadenza ? 
+                                    `<small class="text-muted">
+                                        <i class="fas fa-calendar me-1"></i>
+                                        ${formatDate(task.data_scadenza)}
+                                        ${task.days_until_deadline !== null ? 
+                                            `<br><span class="text-${task.days_until_deadline < 0 ? 'danger' : task.days_until_deadline <= 3 ? 'warning' : 'success'}">
+                                                ${task.days_until_deadline < 0 ? 'Scaduto' : `${task.days_until_deadline} giorni`}
+                                            </span>` : ''
+                                        }
+                                    </small>` : 
+                                    '<small class="text-muted">Nessuna scadenza</small>'
+                                }
+                            </div>
+                            <div class="col-md-2 text-end task-actions">
+                                <button class="btn btn-sm btn-success me-1" onclick="completeTask(${task.id})" ${task.is_completed ? 'disabled' : ''}>
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteTask(${task.id})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = tasksHTML;
+            document.getElementById('taskCount').textContent = filteredTasks.length;
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const priorityFilter = document.getElementById('priorityFilter').value;
+            const originFilter = document.getElementById('originFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+            const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+
+            filteredTasks = allTasks.filter(task => {
+                // Priority filter
+                if (priorityFilter && task.priorita !== priorityFilter) return false;
+                
+                // Origin filter
+                if (originFilter && task.origine !== originFilter) return false;
+                
+                // Status filter
+                if (statusFilter !== '' && task.stato.toString() !== statusFilter) return false;
+                
+                // Search filter
+                if (searchFilter) {
+                    const searchText = `${task.titolo} ${task.descrizione || ''}`.toLowerCase();
+                    if (!searchText.includes(searchFilter)) return false;
+                }
+                
+                return true;
+            });
+
+            renderTasks();
+        }
+
+        // Clear filters
+        function clearFilters() {
+            document.getElementById('priorityFilter').value = '';
+            document.getElementById('originFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('searchFilter').value = '';
+            filteredTasks = [...allTasks];
+            renderTasks();
+        }
+
+        // Complete task
+        async function completeTask(taskId) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}/complete`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Task completato con successo', 'success');
+                    loadTasks(); // Reload all tasks
+                } else {
+                    showToast(data.error || 'Errore nel completamento del task', 'error');
+                }
+            } catch (error) {
+                console.error('Error completing task:', error);
+                showToast('Errore di connessione', 'error');
+            }
+        }
+
+        // Toggle task complete (checkbox)
+        function toggleTaskComplete(taskId, completed) {
+            if (completed) {
+                completeTask(taskId);
+            }
+        }
+
+        // Delete task
+        async function deleteTask(taskId) {
+            if (!confirm('Sei sicuro di voler eliminare questo task?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/tasks/${taskId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Task eliminato con successo', 'success');
+                    loadTasks(); // Reload all tasks
+                } else {
+                    showToast(data.error || 'Errore nell\'eliminazione del task', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting task:', error);
+                showToast('Errore di connessione', 'error');
+            }
+        }
+
+        // Create new task
+        async function createTask() {
+            const title = document.getElementById('taskTitle').value.trim();
+            const description = document.getElementById('taskDescription').value.trim();
+            const priority = document.getElementById('taskPriority').value;
+            const origin = document.getElementById('taskOrigin').value;
+            const deadline = document.getElementById('taskDeadline').value;
+
+            if (!title) {
+                showToast('Il titolo è obbligatorio', 'error');
+                return;
+            }
+
+            const taskData = {
+                titolo: title,
+                descrizione: description || null,
+                priorita: priority,
+                origine: origin,
+                data_scadenza: deadline || null
+            };
+
+            try {
+                const response = await fetch('/api/tasks/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(taskData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Task creato con successo', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('addTaskModal')).hide();
+                    document.getElementById('addTaskForm').reset();
+                    loadTasks(); // Reload all tasks
+                } else {
+                    showToast(data.error || 'Errore nella creazione del task', 'error');
+                }
+            } catch (error) {
+                console.error('Error creating task:', error);
+                showToast('Errore di connessione', 'error');
+            }
+        }
+
+        // Show add task modal
+        function showAddTaskModal() {
+            const modal = new bootstrap.Modal(document.getElementById('addTaskModal'));
+            modal.show();
+        }
+
+        // Export to CSV
+        function exportToCSV() {
+            const headers = ['ID', 'Titolo', 'Descrizione', 'Priorità', 'Origine', 'Stato', 'Scadenza', 'Creato il'];
+            const csvContent = [
+                headers.join(','),
+                ...filteredTasks.map(task => [
+                    task.id,
+                    `"${task.titolo}"`,
+                    `"${task.descrizione || ''}"`,
+                    task.priorita,
+                    task.origine,
+                    task.is_completed ? 'Completato' : 'Non completato',
+                    task.data_scadenza || '',
+                    formatDate(task.data_creazione)
+                ].join(','))
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `task_ai_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Update statistics
+        function updateStats() {
+            const total = allTasks.length;
+            const completed = allTasks.filter(t => t.is_completed).length;
+            const pending = total - completed;
+            const overdue = allTasks.filter(t => t.is_overdue).length;
+
+            document.getElementById('totalTasks').textContent = total;
+            document.getElementById('completedTasks').textContent = completed;
+            document.getElementById('pendingTasks').textContent = pending;
+            document.getElementById('overdueTasks').textContent = overdue;
+        }
+
+        // Update charts
+        function updateCharts() {
+            updateOriginChart();
+            updatePriorityChart();
+        }
+
+        // Update origin chart
+        function updateOriginChart() {
+            const ctx = document.getElementById('originChart').getContext('2d');
+            
+            if (originChart) {
+                originChart.destroy();
+            }
+
+            const originData = {};
+            allTasks.forEach(task => {
+                const origin = task.origine;
+                if (!originData[origin]) {
+                    originData[origin] = { total: 0, completed: 0 };
+                }
+                originData[origin].total++;
+                if (task.is_completed) {
+                    originData[origin].completed++;
+                }
+            });
+
+            const labels = Object.keys(originData);
+            const data = labels.map(origin => originData[origin].total);
+            const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'];
+
+            originChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update priority chart
+        function updatePriorityChart() {
+            const ctx = document.getElementById('priorityChart').getContext('2d');
+            
+            if (priorityChart) {
+                priorityChart.destroy();
+            }
+
+            const priorityData = {};
+            allTasks.forEach(task => {
+                const priority = task.priorita;
+                if (!priorityData[priority]) {
+                    priorityData[priority] = { total: 0, completed: 0 };
+                }
+                priorityData[priority].total++;
+                if (task.is_completed) {
+                    priorityData[priority].completed++;
+                }
+            });
+
+            const labels = Object.keys(priorityData);
+            const data = labels.map(priority => priorityData[priority].total);
+            const colors = ['#28a745', '#ffc107', '#dc3545'];
+
+            priorityChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Task per Priorità',
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 1,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Show/hide loading spinner
+        function showLoading(show) {
+            const spinner = document.getElementById('loadingSpinner');
+            spinner.style.display = show ? 'block' : 'none';
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            const toastId = 'toast-' + Date.now();
+            
+            const toastHTML = `
+                <div class="toast" id="${toastId}" role="alert">
+                    <div class="toast-header">
+                        <i class="fas fa-${type === 'success' ? 'check-circle text-success' : type === 'error' ? 'exclamation-circle text-danger' : 'info-circle text-info'} me-2"></i>
+                        <strong class="me-auto">Notifica</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement);
+            toast.show();
+            
+            // Remove toast element after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', function() {
+                toastElement.remove();
+            });
+        }
+
+        // AI Suggestions Functions
+        let allSuggestions = [];
+        let criticalOnly = false;
+
+        // Load AI suggestions
+        function loadAISuggestions() {
+            const spinner = document.getElementById('suggestionSpinner');
+            const container = document.getElementById('suggestionsContainer');
+            const emptyState = document.getElementById('emptySuggestions');
+            const countBadge = document.getElementById('suggestionCount');
+            
+            spinner.style.display = 'block';
+            container.style.display = 'none';
+            emptyState.style.display = 'none';
+            
+            fetch('/api/tasks/ai/suggestions')
+                .then(response => response.json())
+                .then(data => {
+                    spinner.style.display = 'none';
+                    
+                    if (data.success && data.data.length > 0) {
+                        allSuggestions = data.data;
+                        displaySuggestions();
+                        countBadge.textContent = allSuggestions.length;
+                    } else {
+                        allSuggestions = [];
+                        emptyState.style.display = 'block';
+                        countBadge.textContent = '0';
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore nel caricamento suggerimenti AI:', error);
+                    spinner.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    countBadge.textContent = '0';
+                });
+        }
+
+        // Display suggestions based on filter
+        function displaySuggestions() {
+            const container = document.getElementById('suggestionsContainer');
+            const emptyState = document.getElementById('emptySuggestions');
+            const countBadge = document.getElementById('suggestionCount');
+            
+            let filteredSuggestions = allSuggestions;
+            
+            if (criticalOnly) {
+                filteredSuggestions = allSuggestions.filter(s => s.priority === 'high');
+            }
+            
+            if (filteredSuggestions.length > 0) {
+                container.style.display = 'block';
+                emptyState.style.display = 'none';
+                countBadge.textContent = filteredSuggestions.length;
+                
+                const suggestionsHTML = filteredSuggestions.map(suggestion => `
+                    <div class="suggestion-item mb-3 p-3 border rounded ${getSuggestionClass(suggestion.priority)}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="${suggestion.icon} text-${suggestion.color} me-2"></i>
+                                    <h6 class="mb-0">${suggestion.message}</h6>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge ${getSuggestionBadgeClass(suggestion.type)} me-2">
+                                        ${suggestion.type}
+                                    </span>
+                                    <span class="badge ${getPriorityBadgeClass(suggestion.priority)}">
+                                        ${suggestion.priority}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="ms-2">
+                                <div class="btn-group-vertical">
+                                    ${suggestion.action_url ? `
+                                        <button class="btn btn-sm btn-outline-primary" onclick="handleSuggestionAction('${suggestion.action_url}')">
+                                            <i class="fas fa-arrow-right me-1"></i>
+                                            Azione
+                                        </button>
+                                    ` : ''}
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="archiveSuggestion('${suggestion.id}')">
+                                        <i class="fas fa-archive me-1"></i>
+                                        Archivia
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                container.innerHTML = suggestionsHTML;
+            } else {
+                container.style.display = 'none';
+                emptyState.style.display = 'block';
+                countBadge.textContent = '0';
+            }
+        }
+
+        // Get suggestion CSS class
+        function getSuggestionClass(priority) {
+            const classes = {
+                'high': 'border-danger bg-light',
+                'medium': 'border-warning bg-light',
+                'low': 'border-success bg-light'
+            };
+            return classes[priority] || 'border-secondary bg-light';
+        }
+
+        // Get suggestion badge class
+        function getSuggestionBadgeClass(type) {
+            const classes = {
+                'critico': 'bg-danger',
+                'operativo': 'bg-warning',
+                'motivazionale': 'bg-info'
+            };
+            return classes[type] || 'bg-secondary';
+        }
+
+        // Get priority badge class
+        function getPriorityBadgeClass(priority) {
+            const classes = {
+                'high': 'bg-danger',
+                'medium': 'bg-warning',
+                'low': 'bg-success'
+            };
+            return classes[priority] || 'bg-secondary';
+        }
+
+        // Handle suggestion action
+        function handleSuggestionAction(actionUrl) {
+            if (actionUrl.includes('/user/my_tasks_ai')) {
+                // Already on the tasks page, just scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                showToast('Navigazione ai task completata', 'success');
+            } else if (actionUrl.includes('/user/deep-work')) {
+                // Navigate to deep work page
+                window.location.href = actionUrl;
+            } else {
+                // Generic action
+                window.location.href = actionUrl;
+            }
+        }
+
+        // Archive suggestion
+        function archiveSuggestion(suggestionId) {
+            // Remove from allSuggestions array
+            allSuggestions = allSuggestions.filter(s => s.id !== suggestionId);
+            displaySuggestions();
+            showToast('Suggerimento archiviato', 'success');
+        }
+
+        // Toggle critical only filter
+        function toggleCriticalOnly() {
+            criticalOnly = document.getElementById('criticalOnlyToggle').checked;
+            displaySuggestions();
+        }
+
+        // Auto-refresh suggestions
+        function startSuggestionsAutoRefresh() {
+            setInterval(loadAISuggestions, 30000); // Refresh every 30 seconds
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('it-IT', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTasks();
+            updateStats();
+            updateCharts();
+            loadAISuggestions();
+            startSuggestionsAutoRefresh();
+            
+            // Add event listener for critical only toggle
+            document.getElementById('criticalOnlyToggle').addEventListener('change', toggleCriticalOnly);
+        });
+    </script>
+</body>
+</html> 

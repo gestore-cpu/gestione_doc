@@ -1,0 +1,551 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Versioni Documento - Admin{% endblock %}
+
+{% block admin_extra %}
+<style>
+/* Timeline Styles */
+.timeline-container {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    top: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px #dee2e6;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-left: 20px;
+    position: relative;
+}
+
+.timeline-content::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 15px;
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-right: 8px solid #f8f9fa;
+}
+
+.timeline-content::after {
+    content: '';
+    position: absolute;
+    left: -9px;
+    top: 15px;
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-right: 8px solid #dee2e6;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .timeline-container {
+        padding-left: 20px;
+    }
+    
+    .timeline-marker {
+        left: -12px;
+        width: 8px;
+        height: 8px;
+    }
+    
+    .timeline-content {
+        margin-left: 15px;
+    }
+}
+</style>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>📄 Versioni Documento: {{ document.title or document.original_filename }}</h2>
+                <div>
+                    <a href="{{ url_for('admin.view_document', document_id=document.id) }}" class="btn btn-secondary">
+                        ← Torna al Documento
+                    </a>
+                </div>
+            </div>
+
+            <!-- Informazioni documento -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📋 Informazioni Documento</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Titolo:</strong> {{ document.title or document.original_filename }}</p>
+                            <p><strong>Azienda:</strong> {{ document.company.name }}</p>
+                            <p><strong>Reparto:</strong> {{ document.department.name }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Uploader:</strong> {{ document.uploader_email }}</p>
+                            <p><strong>Data Creazione:</strong> {{ document.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                            <p><strong>Stato Approvazioni:</strong> 
+                                <span class="badge bg-{{ 'success' if document.validazione_admin else 'warning' }}">Admin</span>
+                                <span class="badge bg-{{ 'success' if document.validazione_ceo else 'warning' }}">CEO</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Carica nuova versione -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">⬆️ Carica Nuova Versione</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{{ url_for('admin.carica_nuova_versione', doc_id=document.id) }}" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="file" class="form-label">File Documento:</label>
+                                <input type="file" class="form-control" id="file" name="file" required>
+                                <small class="text-muted">Seleziona il file della nuova versione</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="note" class="form-label">Note sulla Versione:</label>
+                                <textarea class="form-control" id="note" name="note" rows="3" placeholder="Descrivi le modifiche apportate..."></textarea>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary">
+                                📤 Carica Nuova Versione
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <ul class="nav nav-tabs" id="versioniTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="lista-tab" data-bs-toggle="tab" data-bs-target="#lista" type="button" role="tab">
+                        📋 Lista Versioni
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="storico-tab" data-bs-toggle="tab" data-bs-target="#storico" type="button" role="tab">
+                        📊 Storico Firme
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content" id="versioniTabsContent">
+                <!-- Tab Lista Versioni -->
+                <div class="tab-pane fade show active" id="lista" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                📋 Versioni Documento ({{ versioni|length }} versioni)
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                    {% if versioni %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Versione</th>
+                                    <th>Data Caricamento</th>
+                                    <th>File</th>
+                                    <th>Note</th>
+                                    <th>Firme</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for versione in versioni %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if versione.is_latest else 'secondary' }}">
+                                            {{ versione.numero_versione }}
+                                            {% if versione.is_latest %}(Ultima){% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ versione.data_caricamento.strftime('%d/%m/%Y %H:%M') }}</small>
+                                    </td>
+                                    <td>
+                                        <code>{{ versione.filename }}</code>
+                                    </td>
+                                    <td>
+                                        {% if versione.note %}
+                                            <small>{{ versione.note[:50] }}{% if versione.note|length > 50 %}...{% endif %}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% set firme_confermate = versione.firme_confermate %}
+                                        {% set firme_in_attesa = versione.firme_in_attesa %}
+                                        <span class="badge bg-success">{{ firme_confermate|length }} confermate</span>
+                                        {% if firme_in_attesa %}
+                                            <span class="badge bg-warning">{{ firme_in_attesa|length }} in attesa</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('docs.download_versione', version_id=versione.id) }}" 
+                                               class="btn btn-sm btn-primary">
+                                                📥 Scarica
+                                            </a>
+                                            <a href="{{ url_for('docs.download_documento_versione_pdf', doc_id=document.id, version_id=versione.id) }}" 
+                                               class="btn btn-sm btn-success">
+                                                📄 HTML
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-info" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#firmeModal{{ versione.id }}">
+                                                👥 Firme
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <h5>📭 Nessuna versione trovata</h5>
+                        <p>Questo documento non ha ancora versioni caricate.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Statistiche versioni -->
+            {% if versioni %}
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">📊 Totale Versioni</h5>
+                            <h3 class="card-text">{{ versioni|length }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">✅ Firme Confermate</h5>
+                            <h3 class="card-text">
+                                {% set total_confermate = 0 %}
+                                {% for v in versioni %}
+                                    {% set total_confermate = total_confermate + v.firme_confermate|length %}
+                                {% endfor %}
+                                {{ total_confermate }}
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <h5 class="card-title">⏳ Firme in Attesa</h5>
+                            <h3 class="card-text">
+                                {% set total_in_attesa = 0 %}
+                                {% for v in versioni %}
+                                    {% set total_in_attesa = total_in_attesa + v.firme_in_attesa|length %}
+                                {% endfor %}
+                                {{ total_in_attesa }}
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+                </div>
+
+                <!-- Tab Storico Firme -->
+                <div class="tab-pane fade" id="storico" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📊 Storico Firme per Versione</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Timeline Versioni -->
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6>📅 Timeline Versioni</h6>
+                                    <div class="timeline-container">
+                                        {% for versione in versioni|sort(attribute='data_caricamento') %}
+                                        <div class="timeline-item">
+                                            <div class="timeline-marker {% if versione.is_latest %}bg-success{% else %}bg-secondary{% endif %}"></div>
+                                            <div class="timeline-content">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <span class="badge bg-{{ 'success' if versione.is_latest else 'secondary' }} mb-2">
+                                                            {{ versione.numero_versione }}
+                                                            {% if versione.is_latest %}(Attuale){% endif %}
+                                                        </span>
+                                                        <h6 class="mb-1">{{ versione.data_caricamento.strftime('%d/%m/%Y %H:%M') }}</h6>
+                                                        {% if versione.note %}
+                                                        <p class="text-muted mb-2">{{ versione.note }}</p>
+                                                        {% endif %}
+                                                        <small class="text-muted">File: {{ versione.filename }}</small>
+                                                    </div>
+                                                    <div class="text-end">
+                                                        {% set firme_confermate = versione.firme_confermate|length %}
+                                                        {% set firme_in_attesa = versione.firme_in_attesa|length %}
+                                                        {% set totale_firme = firme_confermate + firme_in_attesa %}
+                                                        
+                                                        {% if totale_firme > 0 %}
+                                                            {% if firme_in_attesa == 0 %}
+                                                                <span class="badge bg-success">✅ {{ firme_confermate }} confermate</span>
+                                                            {% else %}
+                                                                <span class="badge bg-warning">⚠️ {{ firme_confermate }} confermate, {{ firme_in_attesa }} in attesa</span>
+                                                            {% endif %}
+                                                        {% else %}
+                                                            <span class="badge bg-secondary">📭 Nessuna firma</span>
+                                                        {% endif %}
+                                                        
+                                                        <div class="mt-2">
+                                                            <a href="{{ url_for('docs.download_documento_versione_pdf', doc_id=document.id, version_id=versione.id) }}" 
+                                                               class="btn btn-sm btn-success">
+                                                                📄 Genera HTML
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <h6>📊 Statistiche Firme</h6>
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <canvas id="firmeChart" width="400" height="300"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+<!-- Modali per visualizzare le firme di ogni versione -->
+{% for versione in versioni %}
+<div class="modal fade" id="firmeModal{{ versione.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">👥 Firme Versione {{ versione.numero_versione }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>📅 Data Caricamento:</strong> {{ versione.data_caricamento.strftime('%d/%m/%Y %H:%M') }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>📁 File:</strong> {{ versione.filename }}
+                    </div>
+                </div>
+                
+                {% if versione.read_logs %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Utente</th>
+                                <th>Data Firma</th>
+                                <th>Stato</th>
+                                <th>Data Conferma</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for firma in versione.read_logs %}
+                            <tr>
+                                <td>
+                                    <strong>{{ firma.user.username }}</strong>
+                                    <br><small class="text-muted">{{ firma.user.email }}</small>
+                                </td>
+                                <td>
+                                    <small>{{ firma.timestamp.strftime('%d/%m/%Y %H:%M') }}</small>
+                                </td>
+                                <td>
+                                    {% if firma.confermata %}
+                                        <span class="badge bg-success">✅ Confermata</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">⏳ In Attesa</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if firma.data_conferma %}
+                                        <small>{{ firma.data_conferma.strftime('%d/%m/%Y %H:%M') }}</small>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <h6>📭 Nessuna firma registrata</h6>
+                    <p>Nessun utente ha ancora firmato questa versione del documento.</p>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Auto-submit form quando cambiano i filtri
+document.getElementById('stato').addEventListener('change', function() {
+    this.form.submit();
+});
+
+// Dati per il grafico delle firme
+const versioniData = {
+    labels: [
+        {% for versione in versioni|sort(attribute='data_caricamento') %}
+        '{{ versione.numero_versione }}'{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ],
+    datasets: [
+        {
+            label: '✅ Firme Confermate',
+            data: [
+                {% for versione in versioni|sort(attribute='data_caricamento') %}
+                {{ versione.firme_confermate|length }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(40, 167, 69, 0.8)',
+            borderColor: 'rgba(40, 167, 69, 1)',
+            borderWidth: 1
+        },
+        {
+            label: '⏳ Firme in Attesa',
+            data: [
+                {% for versione in versioni|sort(attribute='data_caricamento') %}
+                {{ versione.firme_in_attesa|length }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(255, 193, 7, 0.8)',
+            borderColor: 'rgba(255, 193, 7, 1)',
+            borderWidth: 1
+        },
+        {
+            label: '📭 Nessuna Firma',
+            data: [
+                {% for versione in versioni|sort(attribute='data_caricamento') %}
+                {% set totale_utenti = 10 %}
+                {% set firme_totali = versione.firme_confermate|length + versione.firme_in_attesa|length %}
+                {{ [0, totale_utenti - firme_totali]|max }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: 'rgba(108, 117, 125, 0.8)',
+            borderColor: 'rgba(108, 117, 125, 1)',
+            borderWidth: 1
+        }
+    ]
+};
+
+// Configurazione del grafico
+const chartConfig = {
+    type: 'bar',
+    data: versioniData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            title: {
+                display: true,
+                text: 'Distribuzione Firme per Versione'
+            },
+            legend: {
+                position: 'top',
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Numero di Firme'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Versioni Documento'
+                }
+            }
+        }
+    }
+};
+
+// Inizializza il grafico quando il tab viene attivato
+document.getElementById('storico-tab').addEventListener('shown.bs.tab', function (e) {
+    const canvas = document.getElementById('firmeChart');
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        new Chart(ctx, chartConfig);
+    }
+});
+
+// Inizializza il grafico se il tab è già attivo
+document.addEventListener('DOMContentLoaded', function() {
+    const storicoTab = document.getElementById('storico');
+    if (storicoTab.classList.contains('show')) {
+        const canvas = document.getElementById('firmeChart');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            new Chart(ctx, chartConfig);
+        }
+    }
+});
+</script>
+{% endblock %} 

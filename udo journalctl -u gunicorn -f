@@ -1,0 +1,24 @@
+[0;1;32m●[0m gunicorn.service - gunicorn daemon
+     Loaded: loaded (]8;;file://documenti/etc/systemd/system/gunicorn.service/etc/systemd/system/gunicorn.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Mon 2025-06-30 05:29:54 UTC; 3s ago
+ Invocation: 19e02c40b9a74161adea54026d80a7c5
+   Main PID: 755440 (gunicorn)
+      Tasks: 4 (limit: 1109)
+     Memory: 205M (peak: 205.2M)
+        CPU: 3.210s
+     CGroup: /system.slice/gunicorn.service
+             ├─[0;38;5;245m755440 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn --workers 3 --bind unix:/var/www/gestione_doc/gunicorn.sock app:app[0m
+             ├─[0;38;5;245m755441 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn --workers 3 --bind unix:/var/www/gestione_doc/gunicorn.sock app:app[0m
+             ├─[0;38;5;245m755442 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn --workers 3 --bind unix:/var/www/gestione_doc/gunicorn.sock app:app[0m
+             └─[0;38;5;245m755443 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn --workers 3 --bind unix:/var/www/gestione_doc/gunicorn.sock app:app[0m
+
+Jun 30 05:29:54 documenti systemd[1]: Started gunicorn.service - gunicorn daemon.
+Jun 30 05:29:54 documenti gunicorn[755440]: [2025-06-30 05:29:54 +0000] [755440] [INFO] Starting gunicorn 23.0.0
+Jun 30 05:29:54 documenti gunicorn[755440]: [2025-06-30 05:29:54 +0000] [755440] [INFO] Listening at: unix:/var/www/gestione_doc/gunicorn.sock (755440)
+Jun 30 05:29:54 documenti gunicorn[755440]: [2025-06-30 05:29:54 +0000] [755440] [INFO] Using worker: sync
+Jun 30 05:29:54 documenti gunicorn[755441]: [2025-06-30 05:29:54 +0000] [755441] [INFO] Booting worker with pid: 755441
+Jun 30 05:29:54 documenti gunicorn[755442]: [2025-06-30 05:29:54 +0000] [755442] [INFO] Booting worker with pid: 755442
+Jun 30 05:29:54 documenti gunicorn[755443]: [2025-06-30 05:29:54 +0000] [755443] [INFO] Booting worker with pid: 755443
+Jun 30 05:29:58 documenti gunicorn[755442]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+Jun 30 05:29:58 documenti gunicorn[755443]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0
+Jun 30 05:29:58 documenti gunicorn[755441]: INFO:googleapiclient.discovery_cache:file_cache is only supported with oauth2client<4.0.0

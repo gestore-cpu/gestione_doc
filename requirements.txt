@@ -1,0 +1,40 @@
+fastapi>=0.95
+uvicorn[standard]>=0.22
+httpx>=0.27
+openai>=1.14
+pdfplumber>=0.10
+pydantic>=1.10
+python-multipart>=0.0.5
+python-dotenv>=1.0
+PyPDF2>=3.0
+sqlalchemy>=2.0
+alembic>=1.11
+pytesseract
+pdf2image
+# Dipendenze per esportazione PDF e QR code
+weasyprint>=60.0
+qrcode[pil]>=7.4
+Pillow>=10.0
+jinja2>=3.1
+# Dipendenze per export PDF avanzato
+reportlab>=4.0
+pandas>=2.0
+# Dipendenze per testing
+pytest>=7.0
+pytest-flask>=1.2
+# Dipendenze Flask
+flask>=2.3
+flask-migrate>=4.0
+flask-sqlalchemy>=3.0
+# Dipendenze per analisi AI documenti
+python-docx>=0.8.11
+difflib
+# Dipendenze per OCR avanzato
+opencv-python>=4.8.0
+numpy>=1.24.0
+# Dipendenze Google Drive API
+google-api-python-client>=2.108.0
+google-auth>=2.23.4
+google-auth-oauthlib>=1.1.0
+APScheduler>=3.10.4
+icalendar>=5.0.7

@@ -1,0 +1,21 @@
+[0;1;32m●[0m gestione_doc.service - Gunicorn instance to serve gestione_doc
+     Loaded: loaded (]8;;file://documenti/etc/systemd/system/gestione_doc.service/etc/systemd/system/gestione_doc.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Thu 2025-05-15 09:10:52 UTC; 5s ago
+ Invocation: c97b6a135c0a4baea938c7d98019377c
+   Main PID: 16957 (gunicorn)
+      Tasks: 4 (limit: 1110)
+     Memory: 118M (peak: 118.1M)
+        CPU: 2.192s
+     CGroup: /system.slice/gestione_doc.service
+             ├─[0;38;5;245m16957 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 app:app[0m
+             ├─[0;38;5;245m16958 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 app:app[0m
+             ├─[0;38;5;245m16959 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 app:app[0m
+             └─[0;38;5;245m16960 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 app:app[0m
+
+May 15 09:10:52 documenti systemd[1]: Started gestione_doc.service - Gunicorn instance to serve gestione_doc.
+May 15 09:10:52 documenti gunicorn[16957]: [2025-05-15 09:10:52 +0000] [16957] [INFO] Starting gunicorn 23.0.0
+May 15 09:10:52 documenti gunicorn[16957]: [2025-05-15 09:10:52 +0000] [16957] [INFO] Listening at: http://127.0.0.1:8000 (16957)
+May 15 09:10:52 documenti gunicorn[16957]: [2025-05-15 09:10:52 +0000] [16957] [INFO] Using worker: sync
+May 15 09:10:52 documenti gunicorn[16958]: [2025-05-15 09:10:52 +0000] [16958] [INFO] Booting worker with pid: 16958
+May 15 09:10:52 documenti gunicorn[16959]: [2025-05-15 09:10:52 +0000] [16959] [INFO] Booting worker with pid: 16959
+May 15 09:10:52 documenti gunicorn[16960]: [2025-05-15 09:10:52 +0000] [16960] [INFO] Booting worker with pid: 16960

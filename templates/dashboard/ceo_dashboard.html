@@ -1,0 +1,128 @@
+<h2>CEO Dashboard – Stato AI & Obeya</h2>
+{% if request.user and request.user.role == 'superadmin' %}
+<div class="row mb-4">
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <span class="badge bg-primary" data-bs-toggle="tooltip" title="Totale notifiche AI inviate nell'ultima settimana">Totali</span>
+        <h4>{{ stats.tot }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <span class="badge bg-danger" data-bs-toggle="tooltip" title="Percentuale notifiche AI con errore">Errori AI</span>
+        <h4>{{ stats.err_pct }}%</h4>
+        <small>{{ stats.err }} errori</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <span class="badge bg-warning" data-bs-toggle="tooltip" title="Percentuale notifiche di sync fallito">Sync Fail</span>
+        <h4>{{ stats.sync_pct }}%</h4>
+        <small>{{ stats.sync_fail }} sync fail</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <span class="badge bg-info" data-bs-toggle="tooltip" title="Numero violazioni Lean AI">Violazioni Lean</span>
+        <h4>{{ stats.lean_viol }}</h4>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="mb-4">
+  <form id="batchForm" class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label for="from_date" class="form-label mb-0">Da:</label>
+      <input type="date" class="form-control" id="from_date" name="from_date">
+    </div>
+    <div class="col-auto">
+      <label for="to_date" class="form-label mb-0">A:</label>
+      <input type="date" class="form-control" id="to_date" name="to_date">
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary" id="batchBtn">
+        🔍 Analizza retroattivamente
+      </button>
+      <span id="batchSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></span>
+    </div>
+  </form>
+  <div id="batchToast" class="toast align-items-center text-bg-success border-0 mt-2 d-none" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="batchToastMsg"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+  <div id="csvLink" class="mt-2"></div>
+</div>
+<script>
+const batchForm = document.getElementById('batchForm');
+const batchBtn = document.getElementById('batchBtn');
+const batchSpinner = document.getElementById('batchSpinner');
+const batchToast = document.getElementById('batchToast');
+const batchToastMsg = document.getElementById('batchToastMsg');
+const csvLink = document.getElementById('csvLink');
+batchForm.onsubmit = async (e) => {
+  e.preventDefault();
+  batchBtn.disabled = true;
+  batchSpinner.classList.remove('d-none');
+  csvLink.innerHTML = '';
+  const formData = new FormData(batchForm);
+  const resp = await fetch('/ceo/analisi-retroattiva', {
+    method: 'POST',
+    body: formData
+  });
+  const data = await resp.json();
+  batchBtn.disabled = false;
+  batchSpinner.classList.add('d-none');
+  batchToastMsg.textContent = data.msg;
+  batchToast.classList.remove('d-none');
+  if (data.csv) {
+    csvLink.innerHTML = `<a href="/${data.csv}" class="btn btn-sm btn-success mt-2">⬇️ Scarica report CSV</a>`;
+  }
+  setTimeout(() => batchToast.classList.add('d-none'), 5000);
+};
+</script>
+{% endif %}
+<div class="mb-3">
+  <span class="badge bg-danger">Non sincronizzati: {{ non_sync }}</span>
+  <span class="badge bg-warning">Problemi Lean: {{ lean_issues }}</span>
+</div>
+<table class="table table-striped mt-3">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Nome file</th>
+      <th>Data</th>
+      <th>Sync</th>
+      <th>Dettagli</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for doc in documenti %}
+    <tr>
+      <td>{{ doc.id }}</td>
+      <td>{{ doc.filename }}</td>
+      <td>{{ doc.created_at.strftime('%d/%m/%Y %H:%M') if doc.created_at else '' }}</td>
+      <td>
+        {% if doc.synced %}
+          <span class="badge bg-success">🟢 Sync</span>
+        {% else %}
+          <span class="badge bg-danger">🔴 Non Sync</span>
+        {% endif %}
+      </td>
+      <td>
+        <a href="/ceo/documenti/{{ doc.id }}" class="btn btn-sm btn-info">📄 Dettagli</a>
+        <a href="/ceo/documenti/{{ doc.id }}/export/pdf" class="btn btn-sm btn-primary" target="_blank">📄 PDF</a>
+        <a href="/ceo/documenti/{{ doc.id }}/export/csv" class="btn btn-sm btn-success" target="_blank">📊 CSV</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table> 

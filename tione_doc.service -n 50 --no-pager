@@ -1,0 +1,24 @@
+[0;1;32m●[0m gestione_doc.service - Gunicorn instance to serve gestione_doc
+     Loaded: loaded (]8;;file://documenti/etc/systemd/system/gestione_doc.service/etc/systemd/system/gestione_doc.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Thu 2025-06-05 08:01:30 UTC; 3s ago
+ Invocation: 9b8debdf6bd6435383790e05ca2fb91f
+   Main PID: 36512 (gunicorn)
+      Tasks: 4 (limit: 1109)
+     Memory: 120.8M (peak: 152.7M)
+        CPU: 3.642s
+     CGroup: /system.slice/gestione_doc.service
+             ├─[0;38;5;245m36512 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn -w 3 -b 127.0.0.1:8000 app:app[0m
+             ├─[0;38;5;245m36513 "[gunicorn]"[0m
+             ├─[0;38;5;245m36514 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn -w 3 -b 127.0.0.1:8000 app:app[0m
+             └─[0;38;5;245m36515 /var/www/gestione_doc/venv/bin/python3 /var/www/gestione_doc/venv/bin/gunicorn -w 3 -b 127.0.0.1:8000 app:app[0m
+
+Jun 05 08:01:33 documenti gunicorn[36515]:   File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+Jun 05 08:01:33 documenti gunicorn[36515]:   File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+Jun 05 08:01:33 documenti gunicorn[36515]:   File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+Jun 05 08:01:33 documenti gunicorn[36515]:   File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+Jun 05 08:01:33 documenti gunicorn[36515]:   File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+Jun 05 08:01:33 documenti gunicorn[36515]:   File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+Jun 05 08:01:33 documenti gunicorn[36515]:   File "/var/www/gestione_doc/app.py", line 693, in <module>
+Jun 05 08:01:33 documenti gunicorn[36515]:     from flask_wtf.csrf import CSRFProtect, csrf_exempt
+Jun 05 08:01:33 documenti gunicorn[36515]: ImportError: cannot import name 'csrf_exempt' from 'flask_wtf.csrf' (/var/www/gestione_doc/venv/lib/python3.12/site-packages/flask_wtf/csrf.py)
+Jun 05 08:01:33 documenti gunicorn[36515]: [2025-06-05 08:01:33 +0000] [36515] [INFO] Worker exiting (pid: 36515)

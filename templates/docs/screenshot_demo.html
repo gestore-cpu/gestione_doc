@@ -1,0 +1,596 @@
+{% extends "admin/dashboard.html" %}
+
+{% block extra_css %}
+<style>
+/* Stile per screenshot demo */
+.demo-section {
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.screenshot-area {
+    border: 2px dashed #007bff;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+    background: #f8f9fa;
+    text-align: center;
+}
+
+.screenshot-area::before {
+    content: "📸 SCREENSHOT AREA";
+    display: block;
+    font-weight: bold;
+    color: #007bff;
+    margin-bottom: 0.5rem;
+}
+
+.demo-highlight {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 2px solid #ffc107;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.demo-note {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    border: 1px solid #bee5eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+    font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .demo-section {
+        padding: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- HEADER DEMO -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-primary mb-3">📸 Screenshot Demo DOCS</h1>
+                <p class="lead text-muted">Struttura per screenshot di onboarding e reportistica</p>
+                <div class="d-flex justify-content-center gap-3 mt-4">
+                    <span class="badge bg-primary fs-6">👥 Onboarding</span>
+                    <span class="badge bg-success fs-6">📊 Reportistica</span>
+                    <span class="badge bg-info fs-6">🎯 Demo</span>
+                </div>
+            </div>
+
+            <!-- SCREENSHOT 1: DASHBOARD PRINCIPALE -->
+            <div class="demo-section">
+                <h2 class="mb-4">📊 Screenshot 1: Dashboard Principale</h2>
+                <div class="demo-note">
+                    <strong>🎯 Obiettivo:</strong> Mostrare la dashboard principale con KPI e statistiche
+                </div>
+                
+                <div class="screenshot-area">
+                    <!-- CONTENUTO DA SCREENSHOTARE -->
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card text-white bg-primary mb-3">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">📄 Documenti Totali</h5>
+                                    <p class="card-text fs-4">1,247</p>
+                                    <small>Tutti i documenti nel sistema</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-success mb-3">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">✅ Approvati</h5>
+                                    <p class="card-text fs-4">1,156</p>
+                                    <small>Documenti approvati</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-warning mb-3">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">⏳ In Attesa</h5>
+                                    <p class="card-text fs-4">91</p>
+                                    <small>Documenti in attesa</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-info mb-3">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">🖋️ Firmati</h5>
+                                    <p class="card-text fs-4">892</p>
+                                    <small>Documenti firmati</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-highlight">
+                    <h6>💡 Punti Chiave da Evidenziare:</h6>
+                    <ul>
+                        <li>KPI cards con gradienti moderni</li>
+                        <li>Statistiche in tempo reale</li>
+                        <li>Layout responsive</li>
+                        <li>Colori coerenti con brand</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- SCREENSHOT 2: AI DOCUMENT INTELLIGENCE -->
+            <div class="demo-section">
+                <h2 class="mb-4">🧠 Screenshot 2: AI Document Intelligence</h2>
+                <div class="demo-note">
+                    <strong>🎯 Obiettivo:</strong> Mostrare l'analisi AI e i filtri avanzati
+                </div>
+                
+                <div class="screenshot-area">
+                    <!-- CONTENUTO DA SCREENSHOTARE -->
+                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                        <div class="card-header bg-light border-0">
+                            <h6 class="mb-0 fw-semibold">🧠 Filtri AI Document Intelligence</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label fw-medium">🧠 Stato AI</label>
+                                    <select class="form-select shadow-sm">
+                                        <option>Tutti gli stati</option>
+                                        <option>✅ Completo</option>
+                                        <option>⚠️ Incompleto</option>
+                                        <option>❌ Scaduto</option>
+                                        <option>❌ Manca Firma</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label fw-medium">🔍 Cerca motivo AI</label>
+                                    <input type="text" class="form-control shadow-sm" 
+                                           placeholder="es. firma RSPP, scaduto, manca...">
+                                </div>
+                                <div class="col-12 col-md-5">
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <button class="btn btn-primary shadow-sm">🔍 Filtra</button>
+                                        <button class="btn btn-outline-danger shadow-sm">⬇️ Esporta Risultati</button>
+                                        <button class="btn btn-outline-secondary shadow-sm">🔄 Reset Filtri</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-highlight">
+                    <h6>💡 Punti Chiave da Evidenziare:</h6>
+                    <ul>
+                        <li>Filtri AI avanzati</li>
+                        <li>Ricerca testuale intelligente</li>
+                        <li>Esportazione risultati</li>
+                        <li>UI moderna con ombre</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- SCREENSHOT 3: TABELLA DOCUMENTI -->
+            <div class="demo-section">
+                <h2 class="mb-4">📋 Screenshot 3: Tabella Documenti</h2>
+                <div class="demo-note">
+                    <strong>🎯 Obiettivo:</strong> Mostrare la tabella documenti con stati AI e azioni
+                </div>
+                
+                <div class="screenshot-area">
+                    <!-- CONTENUTO DA SCREENSHOTARE -->
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped shadow-sm rounded">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th class="px-3 py-3">📄 Titolo</th>
+                                    <th class="px-3 py-3">🏢 Azienda</th>
+                                    <th class="px-3 py-3">📊 Stato</th>
+                                    <th class="px-3 py-3">🧠 Stato AI</th>
+                                    <th class="px-3 py-3">🔧 Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="px-3 py-3">
+                                        <strong class="text-dark">Manuale HACCP 2024</strong>
+                                        <span class="badge rounded-pill bg-danger shadow-sm ms-2">🔒 Critico</span>
+                                    </td>
+                                    <td class="px-3 py-3">Mercury Surgelati</td>
+                                    <td class="px-3 py-3">
+                                        <span class="badge rounded-pill bg-success shadow-sm">✅ Approvato</span>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <span class="badge rounded-pill bg-success shadow-sm">✅ Completo</span>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" title="Visualizza">👁️</button>
+                                            <button class="btn btn-outline-success" title="Firma">🖋️</button>
+                                            <button class="btn btn-outline-info" title="Analizza AI">🧠</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-3 py-3">
+                                        <strong class="text-dark">Procedure Sicurezza</strong>
+                                    </td>
+                                    <td class="px-3 py-3">Mercury Surgelati</td>
+                                    <td class="px-3 py-3">
+                                        <span class="badge rounded-pill bg-warning text-dark shadow-sm">⏳ In attesa</span>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <span class="badge rounded-pill bg-warning text-dark shadow-sm">⚠️ Incompleto</span>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" title="Visualizza">👁️</button>
+                                            <button class="btn btn-outline-success" title="Firma">🖋️</button>
+                                            <button class="btn btn-outline-info" title="Analizza AI">🧠</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="demo-highlight">
+                    <h6>💡 Punti Chiave da Evidenziare:</h6>
+                    <ul>
+                        <li>Badge colorati per stati</li>
+                        <li>Azioni rapide con icone</li>
+                        <li>Layout responsive</li>
+                        <li>Ombre e bordi arrotondati</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- SCREENSHOT 4: KPI DASHBOARD -->
+            <div class="demo-section">
+                <h2 class="mb-4">📊 Screenshot 4: KPI AI Dashboard</h2>
+                <div class="demo-note">
+                    <strong>🎯 Obiettivo:</strong> Mostrare le metriche AI e i grafici interattivi
+                </div>
+                
+                <div class="screenshot-area">
+                    <!-- CONTENUTO DA SCREENSHOTARE -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card text-white bg-success">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">✅ Completi</h6>
+                                    <h4>892</h4>
+                                    <small>+12% vs settimana precedente</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-warning">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">⚠️ Incompleti</h6>
+                                    <h4>156</h4>
+                                    <small>-8% vs settimana precedente</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-danger">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">❌ Scaduti</h6>
+                                    <h4>23</h4>
+                                    <small>-15% vs settimana precedente</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-info">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">📊 % Compliance</h6>
+                                    <h4>85.2%</h4>
+                                    <small>+2.1% vs settimana precedente</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📈 Trend Settimanale</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="demoChart" height="100"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-highlight">
+                    <h6>💡 Punti Chiave da Evidenziare:</h6>
+                    <ul>
+                        <li>KPI con trend percentuali</li>
+                        <li>Grafici Chart.js interattivi</li>
+                        <li>Colori coerenti per stati</li>
+                        <li>Metriche performance</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- SCREENSHOT 5: FIRMA DIGITALE -->
+            <div class="demo-section">
+                <h2 class="mb-4">🖋️ Screenshot 5: Firma Digitale 2FA</h2>
+                <div class="demo-note">
+                    <strong>🎯 Obiettivo:</strong> Mostrare il processo di firma digitale sicura
+                </div>
+                
+                <div class="screenshot-area">
+                    <!-- CONTENUTO DA SCREENSHOTARE -->
+                    <div class="card border-0 shadow-lg rounded-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">🖋️ Firma Digitale - Manuale HACCP 2024</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>🔐 Sicurezza 2FA</h6>
+                                    <ul>
+                                        <li>✅ Token temporaneo (15 min)</li>
+                                        <li>✅ Invio via email/WhatsApp</li>
+                                        <li>✅ Hash SHA256 per integrità</li>
+                                        <li>✅ Audit trail completo</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>📝 Processo di Firma</h6>
+                                    <div class="mb-3">
+                                        <label class="form-label">🔑 Token 2FA</label>
+                                        <input type="text" class="form-control" placeholder="Inserisci codice 6 cifre">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">📝 Note (opzionale)</label>
+                                        <textarea class="form-control" rows="3" placeholder="Aggiungi note alla firma..."></textarea>
+                                    </div>
+                                    <button class="btn btn-success btn-lg w-100">
+                                        ✅ Conferma Firma Digitale
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-highlight">
+                    <h6>💡 Punti Chiave da Evidenziare:</h6>
+                    <ul>
+                        <li>Processo 2FA sicuro</li>
+                        <li>Token temporaneo</li>
+                        <li>Hash SHA256</li>
+                        <li>UI moderna e intuitiva</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- SCREENSHOT 6: REVISIONI CICLICHE -->
+            <div class="demo-section">
+                <h2 class="mb-4">🔄 Screenshot 6: Revisioni Cicliche</h2>
+                <div class="demo-note">
+                    <strong>🎯 Obiettivo:</strong> Mostrare il sistema di revisioni automatiche
+                </div>
+                
+                <div class="screenshot-area">
+                    <!-- CONTENUTO DA SCREENSHOTARE -->
+                    <div class="card border-0 shadow-lg rounded-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">📅 Calendario Revisioni</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <span class="badge bg-primary fs-5">📅 Annuale</span>
+                                        <p class="mt-2"><small>Documenti normativi principali</small></p>
+                                        <h4>12</h4>
+                                        <small>documenti programmati</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <span class="badge bg-warning fs-5">📅 Trimestrale</span>
+                                        <p class="mt-2"><small>Procedure operative</small></p>
+                                        <h4>8</h4>
+                                        <small>documenti programmati</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <span class="badge bg-info fs-5">📅 Mensile</span>
+                                        <p class="mt-2"><small>Controlli frequenti</small></p>
+                                        <h4>24</h4>
+                                        <small>documenti programmati</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-4">
+                                <h6>🔗 Link Calendario ICS</h6>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" 
+                                           value="https://docs.mercurysurgelati.org/docs/public/calendar/revisioni.ics?token=tok3n-Firm4-R3visione" 
+                                           readonly>
+                                    <button class="btn btn-outline-secondary">📋 Copia</button>
+                                </div>
+                                <small class="text-muted">Compatibile con Google Calendar, Outlook, Apple Calendar</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-highlight">
+                    <h6>💡 Punti Chiave da Evidenziare:</h6>
+                    <ul>
+                        <li>Frequenze di revisione</li>
+                        <li>Calendario ICS integrato</li>
+                        <li>Conteggi automatici</li>
+                        <li>Compatibilità multi-piattaforma</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- SCREENSHOT 7: EXPORT E AUDIT -->
+            <div class="demo-section">
+                <h2 class="mb-4">📊 Screenshot 7: Export e Audit</h2>
+                <div class="demo-note">
+                    <strong>🎯 Obiettivo:</strong> Mostrare le funzionalità di export e audit
+                </div>
+                
+                <div class="screenshot-area">
+                    <!-- CONTENUTO DA SCREENSHOTARE -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-lg rounded-4">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">📋 Registro Audit Completo</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ul>
+                                        <li><strong>📄 Documenti:</strong> Tutti i file caricati</li>
+                                        <li><strong>🖋️ Firme:</strong> Chi ha firmato e quando</li>
+                                        <li><strong>🔄 Revisioni:</strong> Controlli effettuati</li>
+                                        <li><strong>🧠 AI Analysis:</strong> Risultati analisi</li>
+                                        <li><strong>🔐 Token 2FA:</strong> Tracciabilità autenticazione</li>
+                                    </ul>
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button class="btn btn-outline-success">📊 Esporta CSV</button>
+                                        <button class="btn btn-outline-danger">📄 Esporta PDF</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-lg rounded-4">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0">📊 KPI AI Documentali</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-6">
+                                            <h4 class="text-success">85.2%</h4>
+                                            <small>Compliance Rate</small>
+                                        </div>
+                                        <div class="col-6">
+                                            <h4 class="text-info">1,247</h4>
+                                            <small>Documenti Totali</small>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <h6>📈 Trend Settimanale</h6>
+                                        <canvas id="auditChart" height="100"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-highlight">
+                    <h6>💡 Punti Chiave da Evidenziare:</h6>
+                    <ul>
+                        <li>Registro audit completo</li>
+                        <li>Export multipli (CSV/PDF)</li>
+                        <li>KPI performance</li>
+                        <li>Grafici interattivi</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- ISTRUZIONI SCREENSHOT -->
+            <div class="demo-section">
+                <h2 class="mb-4">📸 Istruzioni Screenshot</h2>
+                
+                <div class="demo-note">
+                    <h6>🎯 Processo di Screenshot:</h6>
+                    <ol>
+                        <li><strong>Browser:</strong> Usa Chrome con risoluzione 1920x1080</li>
+                        <li><strong>Modalità:</strong> Schermo intero o finestra massimizzata</li>
+                        <li><strong>Formato:</strong> PNG per qualità, JPG per dimensioni</li>
+                        <li><strong>Naming:</strong> docs-screenshot-01-dashboard.png</li>
+                    </ol>
+                </div>
+                
+                <div class="demo-note">
+                    <h6>📋 Checklist Screenshot:</h6>
+                    <ul>
+                        <li>✅ Dashboard principale con KPI</li>
+                        <li>✅ Filtri AI Document Intelligence</li>
+                        <li>✅ Tabella documenti con stati</li>
+                        <li>✅ KPI AI Dashboard con grafici</li>
+                        <li>✅ Processo firma digitale 2FA</li>
+                        <li>✅ Calendario revisioni cicliche</li>
+                        <li>✅ Export e audit functions</li>
+                    </ul>
+                </div>
+                
+                <div class="demo-note">
+                    <h6>💡 Suggerimenti:</h6>
+                    <ul>
+                        <li>Evita informazioni sensibili negli screenshot</li>
+                        <li>Usa dati di esempio realistici</li>
+                        <li>Mostra sempre l'interfaccia completa</li>
+                        <li>Includi elementi di navigazione</li>
+                        <li>Verifica qualità e leggibilità</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Demo chart per screenshot
+document.addEventListener('DOMContentLoaded', function() {
+    // Chart.js per demo
+    if (typeof Chart !== 'undefined') {
+        const ctx = document.getElementById('demoChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'],
+                    datasets: [{
+                        label: 'Completi',
+                        data: [65, 72, 68, 75, 82, 79, 85],
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)'
+                    }, {
+                        label: 'Incompleti',
+                        data: [35, 28, 32, 25, 18, 21, 15],
+                        borderColor: '#ffc107',
+                        backgroundColor: 'rgba(255, 193, 7, 0.1)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    }
+                }
+            });
+        }
+    }
+});
+</script>
+
+{% endblock %} 

@@ -1,0 +1,282 @@
+<!-- 📁 Componente: jack_ai_chat.html -->
+<!-- Box AI "Chiedi a Jack" - Componente riutilizzabile -->
+
+<!-- Modale conversazionale -->
+<div class="modal fade" id="jackAiModal" tabindex="-1" aria-labelledby="jackAiModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-gradient-primary text-white">
+        <h5 class="modal-title" id="jackAiModalLabel">
+          <img src="/static/img/jack_synthia_realistic.png" width="32" height="32" class="me-2 rounded-circle" alt="Jack">
+          💬 Chiedi a Jack
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="jackChatBox" class="mb-3 p-3 bg-light rounded" style="max-height: 300px; overflow-y: auto; min-height: 200px;">
+          <div class="text-muted text-center">
+            <img src="/static/img/jack_synthia_realistic.png" width="48" height="48" class="mb-2 rounded-circle" alt="Jack">
+            <p class="mb-0">Ciao! Sono Jack Synthia, il tuo assistente AI. Come posso aiutarti?</p>
+          </div>
+        </div>
+        <div class="input-group">
+          <textarea id="jackUserInput" class="form-control" placeholder="Scrivi qui la tua domanda..." rows="3"></textarea>
+          <button id="jackSendBtn" class="btn btn-primary" type="button">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+        <button class="btn btn-outline-primary" onclick="clearJackChat()">Pulisci Chat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottone per aprire la chat -->
+<button type="button" class="btn btn-outline-primary position-fixed bottom-0 end-0 m-4 shadow-lg" 
+        data-bs-toggle="modal" data-bs-target="#jackAiModal"
+        style="z-index: 1000; border-radius: 50px; padding: 12px 20px;">
+  <img src="/static/img/jack_synthia_realistic.png" width="24" height="24" class="me-2 rounded-circle" alt="Jack">
+  💬 Chiedi a Jack
+</button>
+
+<!-- Stili per la chat -->
+<style>
+.jack-chat-message {
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  border-radius: 15px;
+  max-width: 80%;
+  word-wrap: break-word;
+}
+
+.jack-chat-user {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  margin-left: auto;
+  text-align: right;
+}
+
+.jack-chat-jack {
+  background: #f8f9fa;
+  color: #333;
+  border: 1px solid #e9ecef;
+}
+
+.jack-chat-typing {
+  font-style: italic;
+  color: #6c757d;
+  text-align: center;
+  padding: 10px;
+}
+
+#jackAiModal .modal-content {
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+#jackAiModal .modal-header {
+  border-radius: 20px 20px 0 0;
+  border-bottom: none;
+}
+
+#jackUserInput {
+  border-radius: 15px;
+  border: 2px solid #e9ecef;
+  transition: border-color 0.3s ease;
+}
+
+#jackUserInput:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+#jackSendBtn {
+  border-radius: 15px;
+  margin-left: 10px;
+}
+
+/* Animazione per il bottone */
+.btn-outline-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .jack-chat-message {
+    max-width: 90%;
+  }
+  
+  #jackAiModal .modal-dialog {
+    margin: 10px;
+  }
+}
+</style>
+
+<!-- Script per la funzionalità chat -->
+<script>
+// Configurazione per diversi moduli
+const jackModuleConfig = {
+  'docs': {
+    endpoint: '/jack/api/jack/docs/chat',
+    welcomeMessage: 'Ciao! Sono Jack Synthia, il tuo assistente AI per la gestione documenti. Posso aiutarti con caricamento, firme, analisi AI, scadenze e molto altro! 🤖'
+  },
+  'elevate': {
+    endpoint: '/jack/api/jack/elevate/chat',
+    welcomeMessage: 'Ciao! Sono Jack Synthia, il tuo assistente AI per il modulo Elevate. Posso aiutarti con gestione HR, ferie, performance e molto altro! 👥'
+  },
+  'qms': {
+    endpoint: '/jack/api/jack/qms/chat',
+    welcomeMessage: 'Ciao! Sono Jack Synthia, il tuo assistente AI per il QMS. Posso aiutarti con procedure, audit, formazione e molto altro! 📋'
+  },
+  'service': {
+    endpoint: '/jack/api/jack/service/chat',
+    welcomeMessage: 'Ciao! Sono Jack Synthia, il tuo assistente AI per il Service Desk. Posso aiutarti con incidenti, manutenzioni e molto altro! 🔧'
+  }
+};
+
+// Determina il modulo corrente
+function getCurrentModule() {
+  const path = window.location.pathname;
+  if (path.includes('/docs')) return 'docs';
+  if (path.includes('/elevate')) return 'elevate';
+  if (path.includes('/qms')) return 'qms';
+  if (path.includes('/service')) return 'service';
+  return 'docs'; // Default
+}
+
+// Inizializza la chat
+function initJackChat() {
+  const module = getCurrentModule();
+  const config = jackModuleConfig[module] || jackModuleConfig['docs'];
+  
+  // Aggiorna messaggio di benvenuto
+  const chatBox = document.getElementById('jackChatBox');
+  if (chatBox) {
+    const welcomeDiv = chatBox.querySelector('.text-muted');
+    if (welcomeDiv) {
+      welcomeDiv.innerHTML = `
+        <img src="/static/img/jack_synthia_realistic.png" width="48" height="48" class="mb-2 rounded-circle" alt="Jack">
+        <p class="mb-0">${config.welcomeMessage}</p>
+      `;
+    }
+  }
+  
+  // Configura l'endpoint
+  window.jackChatEndpoint = config.endpoint;
+}
+
+// Funzione per inviare messaggio
+async function sendJackMessage() {
+  const input = document.getElementById("jackUserInput");
+  const message = input.value.trim();
+  
+  if (!message) return;
+  
+  const chatBox = document.getElementById("jackChatBox");
+  
+  // Aggiungi messaggio utente
+  addChatMessage(message, 'user');
+  input.value = "";
+  
+  // Mostra indicatore di digitazione
+  showTypingIndicator();
+  
+  try {
+    const response = await fetch(window.jackChatEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domanda: message })
+    });
+    
+    const data = await response.json();
+    
+    // Rimuovi indicatore di digitazione
+    hideTypingIndicator();
+    
+    if (data.success) {
+      addChatMessage(data.risposta, 'jack');
+    } else {
+      addChatMessage("Mi dispiace, c'è stato un errore. Riprova più tardi.", 'jack');
+    }
+    
+  } catch (error) {
+    console.error('Errore nella chat Jack:', error);
+    hideTypingIndicator();
+    addChatMessage("Mi dispiace, c'è stato un errore di connessione. Riprova più tardi.", 'jack');
+  }
+}
+
+// Aggiungi messaggio alla chat
+function addChatMessage(message, sender) {
+  const chatBox = document.getElementById("jackChatBox");
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `jack-chat-message jack-chat-${sender}`;
+  messageDiv.innerHTML = `<strong>${sender === 'user' ? 'Tu' : 'Jack'}:</strong> ${message}`;
+  
+  chatBox.appendChild(messageDiv);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Mostra indicatore di digitazione
+function showTypingIndicator() {
+  const chatBox = document.getElementById("jackChatBox");
+  const typingDiv = document.createElement('div');
+  typingDiv.className = 'jack-chat-typing';
+  typingDiv.id = 'jackTypingIndicator';
+  typingDiv.innerHTML = 'Jack sta digitando...';
+  
+  chatBox.appendChild(typingDiv);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Nascondi indicatore di digitazione
+function hideTypingIndicator() {
+  const typingDiv = document.getElementById('jackTypingIndicator');
+  if (typingDiv) {
+    typingDiv.remove();
+  }
+}
+
+// Pulisci chat
+function clearJackChat() {
+  const chatBox = document.getElementById("jackChatBox");
+  const module = getCurrentModule();
+  const config = jackModuleConfig[module] || jackModuleConfig['docs'];
+  
+  chatBox.innerHTML = `
+    <div class="text-muted text-center">
+      <img src="/static/img/jack_synthia_realistic.png" width="48" height="48" class="mb-2 rounded-circle" alt="Jack">
+      <p class="mb-0">${config.welcomeMessage}</p>
+    </div>
+  `;
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+  initJackChat();
+  
+  // Invia messaggio con Enter
+  document.getElementById("jackUserInput").addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendJackMessage();
+    }
+  });
+  
+  // Invia messaggio con bottone
+  document.getElementById("jackSendBtn").addEventListener('click', sendJackMessage);
+});
+
+// Esporta funzioni per uso esterno
+window.JackChat = {
+  sendMessage: sendJackMessage,
+  clearChat: clearJackChat,
+  addMessage: addChatMessage
+};
+</script> 

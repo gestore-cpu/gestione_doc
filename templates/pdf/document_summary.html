@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Riepilogo Documento - {{ documento.title }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @bottom-center {
+                content: "Pagina " counter(page) " di " counter(pages);
+                font-size: 10pt;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 12pt;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #007bff;
+            font-size: 24pt;
+            margin: 0 0 10px 0;
+            font-weight: bold;
+        }
+        
+        .header .subtitle {
+            color: #666;
+            font-size: 14pt;
+            margin: 0;
+        }
+        
+        .document-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .info-item {
+            margin-bottom: 10px;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #495057;
+            font-size: 11pt;
+        }
+        
+        .info-value {
+            color: #333;
+            font-size: 12pt;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section h2 {
+            color: #007bff;
+            font-size: 16pt;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .version-item {
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .version-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .version-title {
+            font-weight: bold;
+            font-size: 14pt;
+            color: #007bff;
+        }
+        
+        .version-date {
+            color: #666;
+            font-size: 11pt;
+        }
+        
+        .signatures-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .signatures-table th,
+        .signatures-table td {
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 10pt;
+        }
+        
+        .signatures-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .status-confermata {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .status-in-attesa {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        
+        .status-mancante {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .summary-section {
+            background-color: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 11pt;
+        }
+        
+        .summary-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .summary-value {
+            color: #333;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+            font-size: 10pt;
+            color: #666;
+        }
+        
+        .no-data {
+            color: #6c757d;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>📄 Riepilogo Documento</h1>
+        <div class="subtitle">{{ documento.title }}</div>
+    </div>
+    
+    <!-- Informazioni Documento -->
+    <div class="document-info">
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">ID Documento:</div>
+                <div class="info-value">{{ documento.id }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Azienda:</div>
+                <div class="info-value">{{ documento.company.name if documento.company else 'N/A' }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Autore:</div>
+                <div class="info-value">{{ documento.uploader.username if documento.uploader else documento.uploader_email }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Reparto:</div>
+                <div class="info-value">{{ documento.department.name if documento.department else 'N/A' }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Data Creazione:</div>
+                <div class="info-value">{{ documento.created_at.strftime('%d/%m/%Y %H:%M') if documento.created_at else 'N/A' }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">File Originale:</div>
+                <div class="info-value">{{ documento.original_filename or documento.filename }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Visibilità:</div>
+                <div class="info-value">{{ documento.visibility }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Richiede Firma:</div>
+                <div class="info-value">{{ 'Sì' if documento.richiedi_firma else 'No' }}</div>
+            </div>
+        </div>
+        
+        {% if documento.description %}
+        <div style="margin-top: 15px;">
+            <div class="info-label">Descrizione:</div>
+            <div class="info-value">{{ documento.description }}</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Versioni del Documento -->
+    <div class="section">
+        <h2>📋 Versioni del Documento</h2>
+        
+        {% if documento.versioni %}
+            {% for versione in documento.versioni|sort(attribute='data_caricamento', reverse=true) %}
+            <div class="version-item">
+                <div class="version-header">
+                    <div class="version-title">{{ versione.numero_versione }}</div>
+                    <div class="version-date">{{ versione.data_caricamento.strftime('%d/%m/%Y %H:%M') }}</div>
+                </div>
+                
+                <div class="info-item">
+                    <div class="info-label">File:</div>
+                    <div class="info-value">{{ versione.filename }}</div>
+                </div>
+                
+                {% if versione.note %}
+                <div class="info-item">
+                    <div class="info-label">Note:</div>
+                    <div class="info-value">{{ versione.note }}</div>
+                </div>
+                {% endif %}
+                
+                <!-- Firme Associate -->
+                <h3 style="margin: 20px 0 10px 0; font-size: 12pt; color: #495057;">Firme Associate alla Versione {{ versione.numero_versione }}</h3>
+                
+                {% if versione.read_logs %}
+                <table class="signatures-table">
+                    <thead>
+                        <tr>
+                            <th>Utente</th>
+                            <th>Email</th>
+                            <th>Data Firma</th>
+                            <th>Stato</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for firma in versione.read_logs %}
+                        <tr>
+                            <td>{{ firma.user.username if firma.user else 'N/A' }}</td>
+                            <td>{{ firma.user.email if firma.user else 'N/A' }}</td>
+                            <td>{{ firma.timestamp.strftime('%d/%m/%Y %H:%M') if firma.timestamp else 'N/A' }}</td>
+                            <td class="status-{{ firma.stato_firma }}">
+                                {% if firma.confermata %}
+                                    ✅ Confermata
+                                {% elif firma.data_conferma %}
+                                    ✅ Firmata
+                                {% else %}
+                                    ⏳ In Attesa
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-data">Nessuna firma associata a questa versione.</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="no-data">Nessuna versione disponibile per questo documento.</div>
+        {% endif %}
+    </div>
+    
+    <!-- Riepilogo Finale -->
+    <div class="summary-section">
+        <h2 style="margin-top: 0;">📊 Riepilogo Finale</h2>
+        
+        {% set total_versioni = documento.versioni|length if documento.versioni else 0 %}
+        {% set total_firme = 0 %}
+        {% set firme_confermate = 0 %}
+        {% set firme_in_attesa = 0 %}
+        
+        {% if documento.versioni %}
+            {% for versione in documento.versioni %}
+                {% set total_firme = total_firme + versione.read_logs|length %}
+                {% for firma in versione.read_logs %}
+                    {% if firma.confermata or firma.data_conferma %}
+                        {% set firme_confermate = firme_confermate + 1 %}
+                    {% else %}
+                        {% set firme_in_attesa = firme_in_attesa + 1 %}
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+        {% endif %}
+        
+        <div class="summary-item">
+            <span class="summary-label">Numero totale versioni:</span>
+            <span class="summary-value">{{ total_versioni }}</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label">Numero totale firme:</span>
+            <span class="summary-value">{{ total_firme }}</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label">Firme confermate:</span>
+            <span class="summary-value">{{ firme_confermate }}</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label">Firme in attesa:</span>
+            <span class="summary-value">{{ firme_in_attesa }}</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label">Percentuale completamento:</span>
+            <span class="summary-value">
+                {% if total_firme > 0 %}
+                    {{ ((firme_confermate / total_firme) * 100)|round(1) }}%
+                {% else %}
+                    0%
+                {% endif %}
+            </span>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+        <p><strong>PDF generato il:</strong> {{ now.strftime('%d/%m/%Y alle %H:%M:%S') }}</p>
+        <p><strong>Sistema di Gestione Documenti Mercury Surgelati</strong></p>
+        <p>Questo documento è stato generato automaticamente dal sistema.</p>
+    </div>
+</body>
+</html> 

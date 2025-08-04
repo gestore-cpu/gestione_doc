@@ -1,0 +1,214 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Upload Firma Manuale - SYNTHIA DOCS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-signature"></i> 📝 Carica Firma Manuale Scansionata</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Informazioni:</strong> Questo form permette di registrare firme manuali su documenti cartacei scansionati. 
+                        Tutti i file vengono salvati in modo sicuro e sono accessibili solo agli utenti autorizzati.
+                    </div>
+
+                    <form method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="mb-3"><i class="fas fa-file-alt"></i> Dettagli Documento</h5>
+                                
+                                <div class="mb-3">
+                                    <label for="documento_id" class="form-label">
+                                        <i class="fas fa-file"></i> Documento associato <span class="text-danger">*</span>
+                                    </label>
+                                    <select class="form-select" name="documento_id" id="documento_id" required>
+                                        <option value="">Seleziona un documento...</option>
+                                        {% for doc in documenti %}
+                                        <option value="{{ doc.id }}">{{ doc.nome }} (ID: {{ doc.id }})</option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="invalid-feedback">
+                                        Seleziona un documento.
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="firmato_da" class="form-label">
+                                        <i class="fas fa-user"></i> Firmato da <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="text" class="form-control" name="firmato_da" id="firmato_da" 
+                                           placeholder="Nome e cognome del firmatario" required>
+                                    <div class="invalid-feedback">
+                                        Inserisci il nome del firmatario.
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="ruolo" class="form-label">
+                                        <i class="fas fa-briefcase"></i> Ruolo/Funzione
+                                    </label>
+                                    <input type="text" class="form-control" name="ruolo" id="ruolo" 
+                                           placeholder="es. Responsabile Qualità, Amministratore, ecc.">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <h5 class="mb-3"><i class="fas fa-calendar-alt"></i> Dettagli Firma</h5>
+                                
+                                <div class="mb-3">
+                                    <label for="data_firma" class="form-label">
+                                        <i class="fas fa-calendar"></i> Data firma <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="date" class="form-control" name="data_firma" id="data_firma" required>
+                                    <div class="invalid-feedback">
+                                        Seleziona la data della firma.
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="file_scan" class="form-label">
+                                        <i class="fas fa-upload"></i> Upload scansione firmata <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="file" class="form-control" name="file_scan" id="file_scan" 
+                                           accept=".pdf,.jpg,.jpeg,.png" required>
+                                    <div class="form-text">
+                                        Formati supportati: PDF, JPG, JPEG, PNG. Dimensione massima: 10MB
+                                    </div>
+                                    <div class="invalid-feedback">
+                                        Seleziona un file da caricare.
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="note" class="form-label">
+                                        <i class="fas fa-sticky-note"></i> Note (opzionale)
+                                    </label>
+                                    <textarea class="form-control" name="note" id="note" rows="3" 
+                                              placeholder="Note aggiuntive sulla firma..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- ✅ ACCETTAZIONE PRIVACY -->
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-shield-alt"></i> Informativa Privacy</h6>
+                            <p class="mb-2">
+                                La registrazione di firme manuali comporta il trattamento di dati personali. 
+                                Prima di procedere, leggi attentamente l'informativa privacy.
+                            </p>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="privacy_accettata" 
+                                       id="privacyCheck" required>
+                                <label class="form-check-label" for="privacyCheck">
+                                    <strong>Dichiaro di aver letto l'</strong>
+                                    <a href="{{ url_for('static', filename='privacy_firme_manuali.pdf') }}" 
+                                       target="_blank" class="text-decoration-none">
+                                        <i class="fas fa-external-link-alt"></i> informativa privacy
+                                    </a>
+                                    <strong>e di accettarne il contenuto.</strong>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <div class="invalid-feedback">
+                                    Devi accettare l'informativa privacy per procedere.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Annulla
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 📥 Registra Firma
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Preview File -->
+<div class="modal fade" id="filePreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Anteprima File</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="filePreviewContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validazione form
+    const form = document.querySelector('.needs-validation');
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    });
+
+    // Preview file
+    const fileInput = document.getElementById('file_scan');
+    fileInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            // Controlla dimensione file (10MB)
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                alert('❌ Il file è troppo grande. Dimensione massima: 10MB');
+                this.value = '';
+                return;
+            }
+
+            // Controlla tipo file
+            const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('❌ Formato file non supportato. Usa PDF, JPG, JPEG o PNG.');
+                this.value = '';
+                return;
+            }
+
+            // Mostra preview per immagini
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const modal = new bootstrap.Modal(document.getElementById('filePreviewModal'));
+                    document.getElementById('filePreviewContent').innerHTML = 
+                        `<img src="${e.target.result}" class="img-fluid" alt="Preview">`;
+                    modal.show();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    });
+
+    // Imposta data odierna come default
+    const dataFirmaInput = document.getElementById('data_firma');
+    if (!dataFirmaInput.value) {
+        const today = new Date().toISOString().split('T')[0];
+        dataFirmaInput.value = today;
+    }
+});
+</script>
+{% endblock %} 

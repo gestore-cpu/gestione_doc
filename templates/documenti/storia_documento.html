@@ -1,0 +1,30 @@
+<h2>📜 Storia del documento</h2>
+<div class="timeline">
+  {% for versione in versioni %}
+    <div class="timeline-entry border rounded p-3 mb-3 bg-light">
+      <h5>Revisione {{ versione.revisione }}</h5>
+      <p><strong>Creato il:</strong> {{ versione.data_creazione.strftime('%d/%m/%Y') }}</p>
+      <p><strong>Caricato da:</strong> {{ versione.uploader }}</p>
+      <p><strong>Nome file:</strong> {{ versione.nome }}</p>
+      
+      <a href="{{ url_for('download_documento', doc_id=versione.id) }}" class="btn btn-sm btn-primary">⬇️ Scarica</a>
+      <a href="/qr/{{ versione.id }}" class="btn btn-sm btn-secondary">📎 QR Code</a>
+
+      {% if not loop.first %}
+        <a href="{{ url_for('confronta_revisioni', vecchia_id=versioni[loop.index0 - 1].id, nuova_id=versione.id) }}" class="btn btn-sm btn-info">🔍 Confronta con precedente</a>
+      {% endif %}
+
+      {% if user_is_admin %}
+        <form method="POST" action="{{ url_for('ripristina_revisione', id=versione.id) }}" class="d-inline">
+          <button type="submit" class="btn btn-sm btn-danger">⏪ Ripristina questa versione</button>
+        </form>
+      {% endif %}
+
+      {% if versione.storico %}
+        <span class="badge bg-warning">📦 Storico</span>
+      {% else %}
+        <span class="badge bg-success">✅ Attiva</span>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div> 

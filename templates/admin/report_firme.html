@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Report Firme Documenti</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-12">
+      <h2 class="mb-4">
+        <i class="fas fa-chart-bar text-primary"></i> 
+        Report Firme Documenti
+      </h2>
+
+      <!-- Filtri -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h6 class="mb-0">🔍 Filtri Report</h6>
+        </div>
+        <div class="card-body">
+          <form method="GET" class="row g-3">
+            <div class="col-md-3">
+              <label for="tag_filter" class="form-label">Tag Documento:</label>
+              <select name="tag_filter" id="tag_filter" class="form-select">
+                <option value="">Tutti i tag</option>
+                <option value="Risorse Umane">Risorse Umane</option>
+                <option value="Policy">Policy</option>
+                <option value="DPI">DPI</option>
+                <option value="Regolamento">Regolamento</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="status_filter" class="form-label">Stato Firma:</label>
+              <select name="status_filter" id="status_filter" class="form-select">
+                <option value="">Tutti gli stati</option>
+                <option value="firmati">Firmati</option>
+                <option value="non_firmati">Non Firmati</option>
+                <option value="parziali">Parzialmente Firmati</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="user_filter" class="form-label">Utente:</label>
+              <select name="user_filter" id="user_filter" class="form-select">
+                <option value="">Tutti gli utenti</option>
+                {% for user in users %}
+                  <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">&nbsp;</label>
+              <div>
+                <button type="submit" class="btn btn-primary">🔍 Filtra</button>
+                <a href="{{ url_for('admin.report_firme') }}" class="btn btn-secondary">🔄 Reset</a>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Statistiche generali -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">📄 Documenti</h5>
+              <h3>{{ documenti_totali }}</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-success text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">✅ Completamente Firmati</h5>
+              <h3>{{ documenti_completamente_firmati }}</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+              <h5 class="card-title">⚠️ Parzialmente Firmati</h5>
+              <h3>{{ documenti_parzialmente_firmati }}</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+              <h5 class="card-title">❌ Non Firmati</h5>
+              <h3>{{ documenti_non_firmati }}</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabella report -->
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i class="fas fa-table"></i> 
+            Report Dettagliato
+          </h5>
+          <div>
+            <button class="btn btn-sm btn-outline-primary" onclick="exportCSV()">
+              <i class="fas fa-download"></i> Esporta CSV
+            </button>
+            <button class="btn btn-sm btn-outline-success" onclick="printReport()">
+              <i class="fas fa-print"></i> Stampa
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover" id="report-table">
+              <thead class="table-light">
+                <tr>
+                  <th>📄 Documento</th>
+                  <th>🏷️ Tag</th>
+                  <th>👥 Utenti Totali</th>
+                  <th>✅ Firmati</th>
+                  <th>❌ Non Firmati</th>
+                  <th>📊 % Completamento</th>
+                  <th>📅 Ultima Firma</th>
+                  <th>📊 Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for doc in documenti %}
+                  <tr>
+                    <td>
+                      <strong>{{ doc.title }}</strong>
+                      <br><small class="text-muted">{{ doc.uploader_email }}</small>
+                    </td>
+                    <td>
+                      {% if doc.tag %}
+                        <span class="badge bg-primary">{{ doc.tag }}</span>
+                      {% else %}
+                        <span class="text-muted">-</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <span class="badge bg-info">{{ doc.utenti_totali }}</span>
+                    </td>
+                    <td>
+                      <span class="badge bg-success">{{ doc.firme_count }}</span>
+                    </td>
+                    <td>
+                      <span class="badge bg-danger">{{ doc.utenti_totali - doc.firme_count }}</span>
+                    </td>
+                    <td>
+                      <div class="progress" style="height: 20px;">
+                        <div class="progress-bar bg-success" 
+                             style="width: {{ (doc.firme_count / doc.utenti_totali * 100)|round }}%">
+                          {{ (doc.firme_count / doc.utenti_totali * 100)|round }}%
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      {% if doc.ultima_firma %}
+                        <small>{{ doc.ultima_firma.strftime('%d/%m/%Y') }}</small>
+                      {% else %}
+                        <span class="text-muted">-</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <a href="{{ url_for('docs.visualizza_firme_documento', doc_id=doc.id) }}" 
+                         class="btn btn-sm btn-outline-info" title="Visualizza firme">
+                        <i class="fas fa-eye"></i>
+                      </a>
+                      <button class="btn btn-sm btn-outline-warning" 
+                              onclick="sendReminder({{ doc.id }})" 
+                              title="Invia promemoria">
+                        <i class="fas fa-bell"></i>
+                      </button>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Report utenti non in regola -->
+      {% if utenti_non_in_regola %}
+        <div class="card mt-4">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="fas fa-exclamation-triangle text-warning"></i> 
+              Utenti Non in Regola
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>👤 Utente</th>
+                    <th>📧 Email</th>
+                    <th>📄 Documenti Non Firmati</th>
+                    <th>📅 Ultimo Accesso</th>
+                    <th>📊 Azioni</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for user in utenti_non_in_regola %}
+                    <tr>
+                      <td>
+                        <strong>{{ user.username }}</strong>
+                      </td>
+                      <td>{{ user.email }}</td>
+                      <td>
+                        <span class="badge bg-danger">{{ user.documenti_non_firmati|length }}</span>
+                      </td>
+                      <td>
+                        {% if user.last_login %}
+                          <small>{{ user.last_login.strftime('%d/%m/%Y') }}</small>
+                        {% else %}
+                          <span class="text-muted">Mai</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        <button class="btn btn-sm btn-outline-warning" 
+                                onclick="sendUserReminder({{ user.id }})" 
+                                title="Invia promemoria">
+                          <i class="fas fa-bell"></i> Promemoria
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" 
+                                onclick="viewUserDetails({{ user.id }})" 
+                                title="Dettagli utente">
+                          <i class="fas fa-user"></i> Dettagli
+                        </button>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// Mantieni i valori dei filtri selezionati
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    const tagFilter = urlParams.get('tag_filter');
+    if (tagFilter) {
+        document.getElementById('tag_filter').value = tagFilter;
+    }
+    
+    const statusFilter = urlParams.get('status_filter');
+    if (statusFilter) {
+        document.getElementById('status_filter').value = statusFilter;
+    }
+    
+    const userFilter = urlParams.get('user_filter');
+    if (userFilter) {
+        document.getElementById('user_filter').value = userFilter;
+    }
+});
+
+function exportCSV() {
+    const table = document.getElementById('report-table');
+    const rows = table.querySelectorAll('tbody tr');
+    let csv = 'Documento,Tag,Utenti Totali,Firmati,Non Firmati,% Completamento,Ultima Firma\n';
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const documento = cells[0].textContent.trim();
+        const tag = cells[1].textContent.trim();
+        const utentiTotali = cells[2].textContent.trim();
+        const firmati = cells[3].textContent.trim();
+        const nonFirmati = cells[4].textContent.trim();
+        const completamento = cells[5].textContent.trim();
+        const ultimaFirma = cells[6].textContent.trim();
+        
+        csv += `"${documento}","${tag}","${utentiTotali}","${firmati}","${nonFirmati}","${completamento}","${ultimaFirma}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'report_firme_documenti.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+function printReport() {
+    window.print();
+}
+
+function sendReminder(docId) {
+    if (confirm('Inviare promemoria agli utenti che non hanno firmato questo documento?')) {
+        // Implementazione invio promemoria
+        console.log('Invia promemoria per documento:', docId);
+    }
+}
+
+function sendUserReminder(userId) {
+    if (confirm('Inviare promemoria a questo utente per i documenti non firmati?')) {
+        // Implementazione invio promemoria utente
+        console.log('Invia promemoria utente:', userId);
+    }
+}
+
+function viewUserDetails(userId) {
+    // Implementazione visualizzazione dettagli utente
+    console.log('Visualizza dettagli utente:', userId);
+}
+</script>
+
+</body>
+</html> 

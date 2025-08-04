@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard Amministratore</title>
+</head>
+<body>
+    <h2>Dashboard Amministratore</h2>
+    <p>Benvenuto, {{ current_user.username }}</p>
+
+    <h3>Utenti registrati:</h3>
+    <ul>
+        {% for u in utenti %}
+            <li>{{ u.username }} - {{ u.email }}</li>
+        {% endfor %}
+    </ul>
+
+    <h3>Documenti caricati:</h3>
+    <ul>
+        {% for d in documenti %}
+            <li>{{ d.title }} - {{ d.uploaded_by }} ({{ d.upload_date }})</li>
+        {% endfor %}
+    </ul>
+
+    <h3>Ultimi log amministrativi:</h3>
+    <ul>
+        {% for l in log_admin %}
+            <li>{{ l.action }} - {{ l.timestamp }}</li>
+        {% endfor %}
+    </ul>
+
+    <a href="{{ url_for('auth.logout') }}">Logout</a>
+</body>
+</html>

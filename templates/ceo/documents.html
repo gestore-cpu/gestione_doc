@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Documenti - CEO{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>📄 Gestione Documenti - CEO</h1>
+                <a href="{{ url_for('ceo.dashboard') }}" class="btn btn-secondary">
+                    ← Torna alla Dashboard
+                </a>
+            </div>
+
+            <!-- Filtri -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 Filtri</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="status-filter" class="form-label">Stato Approvazione:</label>
+                            <select id="status-filter" class="form-select" onchange="filterDocuments(this.value)">
+                                <option value="all" {% if filter_status == 'all' %}selected{% endif %}>
+                                    Tutti i documenti
+                                </option>
+                                <option value="waiting_admin" {% if filter_status == 'waiting_admin' %}selected{% endif %}>
+                                    ⏳ In attesa di Admin
+                                </option>
+                                <option value="pending" {% if filter_status == 'pending' %}selected{% endif %}>
+                                    ⏳ In attesa di CEO
+                                </option>
+                                <option value="approved" {% if filter_status == 'approved' %}selected{% endif %}>
+                                    ✅ Completamente approvati
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Azioni rapide:</label>
+                            <div>
+                                <a href="{{ url_for('ceo.documents_list', status='pending') }}" 
+                                   class="btn btn-warning btn-sm">
+                                    📋 Solo in attesa CEO
+                                </a>
+                                <a href="{{ url_for('ceo.documents_list', status='approved') }}" 
+                                   class="btn btn-success btn-sm">
+                                    ✅ Solo approvati
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista documenti -->
+            {% if documents %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        📋 Documenti ({{ documents|length }})
+                        {% if filter_status != 'all' %}
+                        - Filtro: {{ filter_status }}
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Titolo</th>
+                                    <th>Uploader</th>
+                                    <th>Azienda</th>
+                                    <th>Reparto</th>
+                                    <th>Data Upload</th>
+                                    <th>Stato Approvazione</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in documents %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ doc.title or doc.original_filename }}</strong>
+                                        {% if doc.description %}
+                                        <br><small class="text-muted">{{ doc.description[:50] }}...</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ doc.uploader_email }}</td>
+                                    <td>{{ doc.company.name }}</td>
+                                    <td>{{ doc.department.name }}</td>
+                                    <td>{{ doc.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <div class="mb-1">
+                                                <small>Admin:</small>
+                                                {% if doc.validazione_admin %}
+                                                    <span class="badge bg-success">🟢</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">🟡</span>
+                                                {% endif %}
+                                            </div>
+                                            <div>
+                                                <small>CEO:</small>
+                                                {% if doc.validazione_ceo %}
+                                                    <span class="badge bg-success">🟢</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">🟡</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('ceo.document_detail', doc_id=doc.id) }}" 
+                                               class="btn btn-sm btn-info">
+                                                👁️ Visualizza
+                                            </a>
+                                            
+                                            {% if not doc.validazione_ceo and doc.validazione_admin %}
+                                            <form method="post" action="{{ url_for('ceo.approva_documento_ceo', doc_id=doc.id) }}" 
+                                                  style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-success">
+                                                    👑 Approva
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <h5>📭 Nessun documento trovato</h5>
+                <p>
+                    {% if filter_status == 'pending' %}
+                        Non ci sono documenti in attesa di approvazione CEO.
+                    {% elif filter_status == 'approved' %}
+                        Non ci sono documenti completamente approvati.
+                    {% elif filter_status == 'waiting_admin' %}
+                        Non ci sono documenti in attesa di approvazione Admin.
+                    {% else %}
+                        Non ci sono documenti nel sistema.
+                    {% endif %}
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function filterDocuments(status) {
+    window.location.href = "{{ url_for('ceo.documents_list') }}?status=" + status;
+}
+</script>
+{% endblock %} 

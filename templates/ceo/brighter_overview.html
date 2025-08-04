@@ -1,0 +1,502 @@
+{% extends "admin/dashboard.html" %}
+
+{% block extra_css %}
+{% from 'components/synthia_message.html' import synthia_message %}
+<style>
+/* Stile CEO dashboard moderna */
+.ceo-dashboard {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 1rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    color: white;
+}
+
+.alert-ceo {
+    border-radius: 1rem;
+    border: none;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 1.5rem;
+}
+
+.alert-ceo.success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.alert-ceo.danger {
+    background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+    color: white;
+}
+
+.alert-ceo.warning {
+    background: linear-gradient(135deg, #ffc107 0%, #ff8c00 100%);
+    color: white;
+}
+
+.filter-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.table-ceo {
+    background: white;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.table-ceo thead {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+}
+
+.badge-talento {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border: none;
+}
+
+.badge-criticita {
+    background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+    color: white;
+    border: none;
+}
+
+.badge-idea {
+    background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
+    color: white;
+    border: none;
+}
+
+.stats-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+}
+
+.stats-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.stats-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .ceo-dashboard {
+        padding: 1rem;
+    }
+    
+    .filter-card {
+        padding: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block admin_extra %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- JACK SYNTHIA MESSAGE -->
+            {% if synthia_message_config %}
+                {{ synthia_message(
+                    synthia_message_config.messaggio,
+                    synthia_message_config.azione_url,
+                    synthia_message_config.azione_testo,
+                    synthia_message_config.id,
+                    synthia_message_config.tipo,
+                    synthia_message_config.icona
+                ) }}
+            {% endif %}
+
+            <!-- HEADER CEO DASHBOARD -->
+            <div class="ceo-dashboard">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h1 class="display-5 fw-bold mb-2">🌟 Brighter Overview</h1>
+                        <p class="lead mb-0">Dashboard CEO - Talenti, Segnalazioni e Alert Strategici</p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="d-flex justify-content-end gap-2">
+                            <span class="badge bg-light text-dark fs-6">👑 CEO</span>
+                            <span class="badge bg-light text-dark fs-6">🧠 AI Insights</span>
+                            <span class="badge bg-light text-dark fs-6">📊 Real-time</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATISTICHE RAPIDE -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number text-success">{{ stats.talenti_emergenti }}</div>
+                        <div class="stats-label">🌟 Talenti Emergenti</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number text-danger">{{ stats.segnalazioni_critiche }}</div>
+                        <div class="stats-label">⚠️ Segnalazioni Critiche</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number text-info">{{ stats.idee_innovative }}</div>
+                        <div class="stats-label">💡 Idee Innovative</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number text-warning">{{ stats.in_attesa }}</div>
+                        <div class="stats-label">⏳ In Attesa Valutazione</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ALERT AI STRATEGICI -->
+            {% if alert_talenti %}
+            <div class="alert alert-ceo success">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="fas fa-brain fa-2x"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1">🧠 AI Insight - Talenti Emergenti</h5>
+                        <p class="mb-0">{{ alert_talenti }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if alert_criticita %}
+            <div class="alert alert-ceo danger">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1">⚠️ Attenzione - Segnalazioni Critiche</h5>
+                        <p class="mb-0">{{ alert_criticita }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if alert_idee %}
+            <div class="alert alert-ceo warning">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <i class="fas fa-lightbulb fa-2x"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1">💡 Opportunità - Idee Innovative</h5>
+                        <p class="mb-0">{{ alert_idee }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- FILTRI AVANZATI -->
+            <div class="filter-card">
+                <h5 class="mb-3">🔍 Filtri Avanzati</h5>
+                <form method="GET" class="row g-3">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label fw-medium">🔍 Cerca</label>
+                        <input type="text" name="search" class="form-control shadow-sm" 
+                               placeholder="Dipendente, testo, autore..."
+                               value="{{ request.args.get('search', '') }}">
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label fw-medium">📋 Tipo</label>
+                        <select name="tipo" class="form-select shadow-sm">
+                            <option value="">Tutti i tipi</option>
+                            <option value="talento" {% if request.args.get('tipo') == 'talento' %}selected{% endif %}>🌟 Talento</option>
+                            <option value="criticità" {% if request.args.get('tipo') == 'criticità' %}selected{% endif %}>⚠️ Criticità</option>
+                            <option value="idea" {% if request.args.get('tipo') == 'idea' %}selected{% endif %}>💡 Idea</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label fw-medium">📊 Stato</label>
+                        <select name="stato" class="form-select shadow-sm">
+                            <option value="">Tutti gli stati</option>
+                            <option value="in_attesa" {% if request.args.get('stato') == 'in_attesa' %}selected{% endif %}>⏳ In Attesa</option>
+                            <option value="valutato" {% if request.args.get('stato') == 'valutato' %}selected{% endif %}>✅ Valutato</option>
+                            <option value="archiviato" {% if request.args.get('stato') == 'archiviato' %}selected{% endif %}>📁 Archiviato</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label fw-medium">📅 Data</label>
+                        <select name="periodo" class="form-select shadow-sm">
+                            <option value="">Tutti i periodi</option>
+                            <option value="oggi" {% if request.args.get('periodo') == 'oggi' %}selected{% endif %}>Oggi</option>
+                            <option value="settimana" {% if request.args.get('periodo') == 'settimana' %}selected{% endif %}>Questa settimana</option>
+                            <option value="mese" {% if request.args.get('periodo') == 'mese' %}selected{% endif %}>Questo mese</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <div class="d-flex gap-2 align-items-end h-100">
+                            <button type="submit" class="btn btn-primary shadow-sm flex-fill">
+                                🔍 Filtra
+                            </button>
+                            <a href="{{ url_for('ceo.brighter_overview') }}" class="btn btn-outline-secondary shadow-sm">
+                                🔄 Reset
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TABELLA FEEDBACK CEO -->
+            <div class="table-ceo">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="px-3 py-3">#</th>
+                                <th class="px-3 py-3">👤 Dipendente</th>
+                                <th class="px-3 py-3">📋 Tipo</th>
+                                <th class="px-3 py-3">📝 Contenuto</th>
+                                <th class="px-3 py-3">✍️ Autore</th>
+                                <th class="px-3 py-3">📅 Data</th>
+                                <th class="px-3 py-3">📊 Stato</th>
+                                <th class="px-3 py-3">🔧 Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for nota in feedback_ceo %}
+                            <tr>
+                                <td class="px-3 py-3">
+                                    <strong class="text-muted">#{{ nota.id }}</strong>
+                                </td>
+                                <td class="px-3 py-3">
+                                    <div>
+                                        <strong class="text-dark">{{ nota.dipendente_nome or nota.dipendente_id }}</strong>
+                                        {% if nota.dipartimento %}
+                                        <br><small class="text-muted">{{ nota.dipartimento }}</small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3">
+                                    {% if nota.tipo == 'talento' %}
+                                        <span class="badge badge-talento">🌟 Talento</span>
+                                    {% elif nota.tipo == 'criticità' %}
+                                        <span class="badge badge-criticita">⚠️ Criticità</span>
+                                    {% elif nota.tipo == 'idea' %}
+                                        <span class="badge badge-idea">💡 Idea</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ nota.tipo }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-3">
+                                    <div class="text-truncate" style="max-width: 300px;" 
+                                         data-bs-toggle="tooltip" data-bs-placement="top" 
+                                         data-bs-html="true" 
+                                         title="<strong>{{ nota.tipo | title }}</strong><br>{{ nota.testo }}">
+                                        {{ nota.testo | truncate(80) }}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3">
+                                    <div>
+                                        <strong>{{ nota.autore_nome or nota.autore_id }}</strong>
+                                        {% if nota.autore_ruolo %}
+                                        <br><small class="text-muted">{{ nota.autore_ruolo }}</small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3">
+                                    <div>
+                                        <strong>{{ nota.data_creazione.strftime('%d/%m/%Y') }}</strong>
+                                        <br><small class="text-muted">{{ nota.data_creazione.strftime('%H:%M') }}</small>
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3">
+                                    {% if nota.stato == "in_attesa" %}
+                                        <span class="badge bg-warning text-dark">⏳ In Attesa</span>
+                                    {% elif nota.stato == "valutato" %}
+                                        <span class="badge bg-success">✅ Valutato</span>
+                                    {% elif nota.stato == "archiviato" %}
+                                        <span class="badge bg-secondary">📁 Archiviato</span>
+                                    {% else %}
+                                        <span class="badge bg-info">{{ nota.stato | title }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-3">
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" 
+                                                data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                data-bs-html="true" 
+                                                title="<strong>Visualizza Dettagli</strong><br>Vedi informazioni complete">
+                                            👁️
+                                        </button>
+                                        {% if nota.stato == "in_attesa" %}
+                                        <button class="btn btn-outline-success" 
+                                                data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                data-bs-html="true" 
+                                                title="<strong>Valuta</strong><br>Segna come valutato">
+                                            ✅
+                                        </button>
+                                        {% endif %}
+                                        <button class="btn btn-outline-info" 
+                                                data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                data-bs-html="true" 
+                                                title="<strong>Commenta</strong><br>Aggiungi note CEO">
+                                            💬
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4">
+                                    <div class="text-muted">
+                                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                                        <h5>Nessun feedback trovato</h5>
+                                        <p>Prova a modificare i filtri di ricerca</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PAGINAZIONE -->
+            {% if feedback_ceo.pages > 1 %}
+            <div class="d-flex justify-content-center mt-4">
+                <nav>
+                    <ul class="pagination">
+                        {% if feedback_ceo.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('ceo.brighter_overview', page=feedback_ceo.prev_num, **request.args) }}">
+                                ← Precedente
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for page_num in feedback_ceo.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != feedback_ceo.page %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('ceo.brighter_overview', page=page_num, **request.args) }}">
+                                        {{ page_num }}
+                                    </a>
+                                </li>
+                                {% else %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                                {% endif %}
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if feedback_ceo.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('ceo.brighter_overview', page=feedback_ceo.next_num, **request.args) }}">
+                                Successiva →
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+
+            <!-- EXPORT E REPORT -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">📊 Export Dati</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex gap-2">
+                                <a href="{{ url_for('ceo.export_feedback', format='csv', **request.args) }}" 
+                                   class="btn btn-outline-success btn-sm">
+                                    📊 Export CSV
+                                </a>
+                                <a href="{{ url_for('ceo.export_feedback', format='pdf', **request.args) }}" 
+                                   class="btn btn-outline-danger btn-sm">
+                                    📄 Export PDF
+                                </a>
+                                <a href="{{ url_for('ceo.export_feedback', format='excel', **request.args) }}" 
+                                   class="btn btn-outline-primary btn-sm">
+                                    📈 Export Excel
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">📈 Report AI</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-info btn-sm" 
+                                        data-bs-toggle="tooltip" data-bs-placement="top" 
+                                        data-bs-html="true" 
+                                        title="<strong>Analisi Talenti</strong><br>Report dettagliato talenti emergenti">
+                                    🧠 Analisi Talenti
+                                </button>
+                                <button class="btn btn-outline-warning btn-sm" 
+                                        data-bs-toggle="tooltip" data-bs-placement="top" 
+                                        data-bs-html="true" 
+                                        title="<strong>Trend Criticità</strong><br>Analisi trend segnalazioni">
+                                    📈 Trend Criticità
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Inizializza tooltip
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            html: true
+        });
+    });
+    
+    // Animazioni per stats cards
+    document.querySelectorAll('.stats-card').forEach(function(card) {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+        });
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+});
+</script>
+
+{% endblock %} 

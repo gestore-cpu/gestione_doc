@@ -1,0 +1,722 @@
+{% extends "base.html" %}
+
+{% block title %}Dettaglio Documento - {{ document.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-0">📄 {{ document.title }}</h1>
+                    <p class="text-muted mb-0">ID: {{ document.id }} | Creato: {{ document.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                </div>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-primary" onclick="exportPDF()">
+                        📄 Esporta PDF
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="exportCSV()">
+                        📊 Esporta CSV
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="exportPDFWithVersions()">
+                        📚 PDF Completo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadati Documento -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">📋 Metadati Documento</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>Titolo:</strong></td>
+                            <td>{{ document.title }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Descrizione:</strong></td>
+                            <td>{{ document.description or 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>File originale:</strong></td>
+                            <td>{{ document.original_filename }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Uploader:</strong></td>
+                            <td>{{ uploader.first_name }} {{ uploader.last_name }} ({{ uploader.email }})</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Azienda:</strong></td>
+                            <td>{{ company.name }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Reparto:</strong></td>
+                            <td>{{ department.name }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Visibilità:</strong></td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if document.visibility == 'pubblico' else 'warning' }}">
+                                    {{ document.visibility }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Downloadable:</strong></td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if document.downloadable else 'danger' }}">
+                                    {{ 'Sì' if document.downloadable else 'No' }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% if document.expiry_date %}
+                        <tr>
+                            <td><strong>Data scadenza:</strong></td>
+                            <td>{{ document.expiry_date.strftime('%d/%m/%Y') }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Versione AI Attiva -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">🤖 Versione AI Attiva</h5>
+                </div>
+                <div class="card-body">
+                    {% if versione_ai_attiva %}
+                    <div class="ai-analysis-box">
+                        <h6 class="text-primary">{{ versione_ai_attiva.titolo }}</h6>
+                        <p class="mb-2">{{ versione_ai_attiva.descrizione }}</p>
+                        {% if versione_ai_attiva.aforisma %}
+                        <blockquote class="blockquote">
+                            <p class="mb-0"><em>"{{ versione_ai_attiva.aforisma }}"</em></p>
+                        </blockquote>
+                        {% endif %}
+                        {% if versione_ai_attiva.autore %}
+                        <p class="text-muted mb-1"><small>Autore: {{ versione_ai_attiva.autore }}</small></p>
+                        {% endif %}
+                        <p class="text-muted mb-0">
+                            <small>
+                                Data: {{ versione_ai_attiva.data_creazione.strftime('%d/%m/%Y %H:%M') }} | 
+                                AI: {{ 'Sì' if versione_ai_attiva.generata_da_ai else 'No' }}
+                            </small>
+                        </p>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted">
+                        <p>Nessuna versione AI attiva</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline Eventi Visiva -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">📊 Timeline Eventi Audit</h5>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick="filterTimeline('all')">Tutti</button>
+                        <button class="btn btn-outline-success" onclick="filterTimeline('ai')">AI</button>
+                        <button class="btn btn-outline-warning" onclick="filterTimeline('download')">Download</button>
+                        <button class="btn btn-outline-info" onclick="filterTimeline('activity')">Attività</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="timeline-container">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Caricamento timeline...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Versioni AI -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">📚 Versioni AI</h5>
+                    <button class="btn btn-sm btn-primary" onclick="showCreateVersionModal()">
+                        ➕ Nuova Versione
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="versioni-container">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Caricamento...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per nuova versione AI -->
+<div class="modal fade" id="createVersionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Crea Nuova Versione AI</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createVersionForm">
+                    <div class="mb-3">
+                        <label for="titolo" class="form-label">Titolo *</label>
+                        <input type="text" class="form-control" id="titolo" name="titolo" required minlength="3">
+                    </div>
+                    <div class="mb-3">
+                        <label for="descrizione" class="form-label">Descrizione *</label>
+                        <textarea class="form-control" id="descrizione" name="descrizione" rows="4" required minlength="5"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="aforisma" class="form-label">Aforisma</label>
+                        <input type="text" class="form-control" id="aforisma" name="aforisma">
+                    </div>
+                    <div class="mb-3">
+                        <label for="autore" class="form-label">Autore</label>
+                        <input type="text" class="form-control" id="autore" name="autore">
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="attiva" name="attiva">
+                        <label class="form-check-label" for="attiva">
+                            Attiva immediatamente
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="createVersion()">Crea Versione</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.ai-analysis-box {
+    background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+    border: 2px solid #2196f3;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.timeline-container {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline-line {
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #2196f3, #4caf50, #ff9800, #f44336);
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-left: 4px solid #2196f3;
+    transition: all 0.3s ease;
+}
+
+.timeline-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -22px;
+    top: 20px;
+    width: 12px;
+    height: 12px;
+    background: #2196f3;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 3px #2196f3;
+}
+
+.timeline-item.ai-event {
+    border-left-color: #4caf50;
+}
+
+.timeline-item.ai-event::before {
+    background: #4caf50;
+    box-shadow: 0 0 0 3px #4caf50;
+}
+
+.timeline-item.download-event {
+    border-left-color: #ff9800;
+}
+
+.timeline-item.download-event::before {
+    background: #ff9800;
+    box-shadow: 0 0 0 3px #ff9800;
+}
+
+.timeline-item.activity-event {
+    border-left-color: #9c27b0;
+}
+
+.timeline-item.activity-event::before {
+    background: #9c27b0;
+    box-shadow: 0 0 0 3px #9c27b0;
+}
+
+.timeline-item.critical-event {
+    border-left-color: #f44336;
+    background: #ffebee;
+}
+
+.timeline-item.critical-event::before {
+    background: #f44336;
+    box-shadow: 0 0 0 3px #f44336;
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.timeline-date {
+    color: #666;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.timeline-type {
+    font-size: 0.8em;
+    padding: 2px 8px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 500;
+}
+
+.timeline-type.ai {
+    background: #4caf50;
+}
+
+.timeline-type.download {
+    background: #ff9800;
+}
+
+.timeline-type.activity {
+    background: #9c27b0;
+}
+
+.timeline-type.critical {
+    background: #f44336;
+}
+
+.timeline-content {
+    margin-bottom: 8px;
+}
+
+.timeline-details {
+    color: #666;
+    font-size: 0.85em;
+    background: #f8f9fa;
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 8px;
+}
+
+.version-item {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.version-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.version-item.active {
+    background: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.export-loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.export-loading .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+.timeline-filter {
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+
+.timeline-filter.hidden {
+    display: none;
+}
+</style>
+
+<script>
+let currentFilter = 'all';
+
+// Carica timeline eventi
+async function loadTimeline() {
+    try {
+        const response = await fetch(`/ceo/documenti/{{ document.id }}/timeline`);
+        const eventi = await response.json();
+        
+        const container = document.getElementById('timeline-container');
+        if (eventi.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center">Nessun evento trovato</p>';
+            return;
+        }
+        
+        let html = '<div class="timeline-container"><div class="timeline-line"></div>';
+        eventi.forEach((evento, index) => {
+            const date = new Date(evento.timestamp).toLocaleString('it-IT');
+            const eventClass = getEventClass(evento.tipo);
+            const typeClass = getTypeClass(evento.tipo);
+            
+            html += `
+                <div class="timeline-item ${eventClass}" data-type="${getEventType(evento.tipo)}">
+                    <div class="timeline-header">
+                        <div class="timeline-date">${date}</div>
+                        <span class="timeline-type ${typeClass}">${getEventIcon(evento.tipo)} ${evento.tipo}</span>
+                    </div>
+                    <div class="timeline-content">
+                        <strong>${evento.descrizione}</strong>
+                    </div>
+                    ${evento.dettagli ? `<div class="timeline-details">${evento.dettagli}</div>` : ''}
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        
+        // Applica filtro corrente
+        filterTimeline(currentFilter);
+    } catch (error) {
+        console.error('Errore nel caricamento timeline:', error);
+        document.getElementById('timeline-container').innerHTML = 
+            '<p class="text-danger text-center">Errore nel caricamento della timeline</p>';
+    }
+}
+
+function getEventClass(tipo) {
+    if (tipo.includes('ai') || tipo.includes('analisi')) return 'ai-event';
+    if (tipo.includes('download')) return 'download-event';
+    if (tipo.includes('attività') || tipo.includes('activity')) return 'activity-event';
+    if (tipo.includes('errore') || tipo.includes('violazione')) return 'critical-event';
+    return '';
+}
+
+function getTypeClass(tipo) {
+    if (tipo.includes('ai') || tipo.includes('analisi')) return 'ai';
+    if (tipo.includes('download')) return 'download';
+    if (tipo.includes('attività') || tipo.includes('activity')) return 'activity';
+    if (tipo.includes('errore') || tipo.includes('violazione')) return 'critical';
+    return 'activity';
+}
+
+function getEventType(tipo) {
+    if (tipo.includes('ai') || tipo.includes('analisi')) return 'ai';
+    if (tipo.includes('download')) return 'download';
+    if (tipo.includes('attività') || tipo.includes('activity')) return 'activity';
+    return 'other';
+}
+
+function getEventIcon(tipo) {
+    if (tipo.includes('ai') || tipo.includes('analisi')) return '🤖';
+    if (tipo.includes('download')) return '⬇️';
+    if (tipo.includes('attività') || tipo.includes('activity')) return '👤';
+    if (tipo.includes('errore') || tipo.includes('violazione')) return '⚠️';
+    if (tipo.includes('creazione')) return '📄';
+    if (tipo.includes('sync')) return '🔄';
+    return '📝';
+}
+
+function filterTimeline(filter) {
+    currentFilter = filter;
+    const items = document.querySelectorAll('.timeline-item');
+    
+    items.forEach(item => {
+        const itemType = item.dataset.type;
+        
+        if (filter === 'all' || itemType === filter) {
+            item.classList.remove('timeline-filter', 'hidden');
+        } else {
+            item.classList.add('timeline-filter');
+        }
+    });
+    
+    // Aggiorna stile dei pulsanti
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+
+// Carica versioni AI
+async function loadVersioni() {
+    try {
+        const response = await fetch(`/ceo/documenti/{{ document.id }}/analisi_ai_versioni`);
+        const versioni = await response.json();
+        
+        const container = document.getElementById('versioni-container');
+        if (versioni.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center">Nessuna versione AI trovata</p>';
+            return;
+        }
+        
+        let html = '';
+        versioni.forEach(versione => {
+            const date = new Date(versione.data_creazione).toLocaleString('it-IT');
+            const activeClass = versione.attiva ? 'active' : '';
+            html += `
+                <div class="version-item ${activeClass}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1">${versione.titolo}</h6>
+                            <p class="mb-2">${versione.descrizione}</p>
+                            ${versione.aforisma ? `<blockquote class="blockquote"><p class="mb-0"><em>"${versione.aforisma}"</em></p></blockquote>` : ''}
+                            <div class="text-muted small">
+                                ${versione.autore ? `Autore: ${versione.autore} | ` : ''}
+                                Data: ${date} | 
+                                AI: ${versione.generata_da_ai ? 'Sì' : 'No'} |
+                                Stato: ${versione.attiva ? 'Attiva' : 'Inattiva'}
+                            </div>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            ${!versione.attiva ? `<button class="btn btn-outline-success" onclick="activateVersion(${versione.id})">Attiva</button>` : ''}
+                            <button class="btn btn-outline-danger" onclick="deleteVersion(${versione.id})">Elimina</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Errore nel caricamento versioni:', error);
+        document.getElementById('versioni-container').innerHTML = 
+            '<p class="text-danger text-center">Errore nel caricamento delle versioni</p>';
+    }
+}
+
+// Funzioni di esportazione
+function showExportLoading() {
+    const loading = document.createElement('div');
+    loading.className = 'export-loading';
+    loading.innerHTML = '<div class="spinner-border text-light" role="status"><span class="visually-hidden">Generazione in corso...</span></div>';
+    document.body.appendChild(loading);
+    return loading;
+}
+
+function hideExportLoading(loading) {
+    if (loading) {
+        loading.remove();
+    }
+}
+
+async function exportPDF() {
+    const loading = showExportLoading();
+    try {
+        const response = await fetch(`/ceo/documenti/{{ document.id }}/export/pdf`);
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `documento_{{ document.id }}_analisi.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } else {
+            alert('Errore nella generazione del PDF');
+        }
+    } catch (error) {
+        console.error('Errore esportazione PDF:', error);
+        alert('Errore nella generazione del PDF');
+    } finally {
+        hideExportLoading(loading);
+    }
+}
+
+async function exportCSV() {
+    const loading = showExportLoading();
+    try {
+        const response = await fetch(`/ceo/documenti/{{ document.id }}/export/csv`);
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `documento_{{ document.id }}_audit.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } else {
+            alert('Errore nella generazione del CSV');
+        }
+    } catch (error) {
+        console.error('Errore esportazione CSV:', error);
+        alert('Errore nella generazione del CSV');
+    } finally {
+        hideExportLoading(loading);
+    }
+}
+
+async function exportPDFWithVersions() {
+    const loading = showExportLoading();
+    try {
+        const response = await fetch(`/ceo/documenti/{{ document.id }}/export/pdf?include_versions=true`);
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `documento_{{ document.id }}_completo.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } else {
+            alert('Errore nella generazione del PDF completo');
+        }
+    } catch (error) {
+        console.error('Errore esportazione PDF completo:', error);
+        alert('Errore nella generazione del PDF completo');
+    } finally {
+        hideExportLoading(loading);
+    }
+}
+
+// Funzioni per gestione versioni AI
+function showCreateVersionModal() {
+    const modal = new bootstrap.Modal(document.getElementById('createVersionModal'));
+    modal.show();
+}
+
+async function createVersion() {
+    const form = document.getElementById('createVersionForm');
+    const formData = new FormData(form);
+    const data = {
+        titolo: formData.get('titolo'),
+        descrizione: formData.get('descrizione'),
+        aforisma: formData.get('aforisma') || null,
+        autore: formData.get('autore') || null,
+        attiva: formData.get('attiva') === 'on'
+    };
+    
+    try {
+        const response = await fetch(`/ceo/documenti/{{ document.id }}/analisi_ai_versioni`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('createVersionModal')).hide();
+            form.reset();
+            loadVersioni();
+        } else {
+            alert('Errore nella creazione della versione');
+        }
+    } catch (error) {
+        console.error('Errore creazione versione:', error);
+        alert('Errore nella creazione della versione');
+    }
+}
+
+async function activateVersion(id) {
+    try {
+        const response = await fetch(`/ceo/analisi_ai_versioni/${id}/attiva`, {
+            method: 'PATCH'
+        });
+        
+        if (response.ok) {
+            loadVersioni();
+        } else {
+            alert('Errore nell\'attivazione della versione');
+        }
+    } catch (error) {
+        console.error('Errore attivazione versione:', error);
+        alert('Errore nell\'attivazione della versione');
+    }
+}
+
+async function deleteVersion(id) {
+    if (!confirm('Sei sicuro di voler eliminare questa versione?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/ceo/analisi_ai_versioni/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            loadVersioni();
+        } else {
+            alert('Errore nell\'eliminazione della versione');
+        }
+    } catch (error) {
+        console.error('Errore eliminazione versione:', error);
+        alert('Errore nell\'eliminazione della versione');
+    }
+}
+
+// Carica i dati all'avvio
+document.addEventListener('DOMContentLoaded', function() {
+    loadTimeline();
+    loadVersioni();
+});
+</script>
+{% endblock %} 
