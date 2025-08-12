@@ -1,0 +1,521 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-robot me-2"></i>
+                        🤖 Gestione Regole AI
+                    </h2>
+                    <p class="text-muted mb-0">Attivazione, disattivazione e gestione regole automatiche</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" onclick="generatePolicies()">
+                        <i class="fas fa-magic me-1"></i>
+                        Genera Regole AI
+                    </button>
+                    <button class="btn btn-info" onclick="simulatePolicies()">
+                        <i class="fas fa-play me-1"></i>
+                        Simula Regole
+                    </button>
+                    <a href="{{ url_for('admin.view_generated_policies') }}" class="btn btn-warning">
+                        <i class="fas fa-magic me-1"></i>
+                        Regole Generate
+                    </a>
+                    <a href="{{ url_for('admin.policy_audit_log') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-history me-1"></i>
+                        Audit Log
+                    </a>
+                    <a href="{{ url_for('admin.export_policies') }}" class="btn btn-outline-success">
+                        <i class="fas fa-download me-1"></i>
+                        Esporta CSV
+                    </a>
+                </div>
+            </div>
+
+            <!-- Statistiche -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ total_active }}</h4>
+                            <small>Regole Attive</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ total_pending }}</h4>
+                            <small>Regole in Attesa</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1" id="auto-approved">0</h4>
+                            <small>Auto-Approva</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1" id="auto-denied">0</h4>
+                            <small>Auto-Nega</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Regole Attive -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Regole Attive
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if active_policies %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Condizione</th>
+                                        <th>Azione</th>
+                                        <th>Priorità</th>
+                                        <th>Confidenza</th>
+                                        <th>Creato da</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for policy in active_policies %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ policy.name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ policy.description[:50] }}...</small>
+                                        </td>
+                                        <td>
+                                            <code class="small">{{ policy.get_condition_summary() }}</code>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ 'success' if policy.action == 'approve' else 'danger' }}">
+                                                <i class="fas fa-{{ 'check' if policy.action == 'approve' else 'times' }} me-1"></i>
+                                                {{ policy.get_action_display() }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ policy.get_priority_display() }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-{{ 'success' if policy.confidence > 80 else 'warning' if policy.confidence > 60 else 'danger' }}" 
+                                                     style="width: {{ policy.confidence }}%">
+                                                    {{ policy.confidence }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <small>{{ policy.creator.username if policy.creator else 'N/A' }}</small>
+                                            <br>
+                                            <small class="text-muted">{{ policy.created_at.strftime('%d/%m/%Y') if policy.created_at else 'N/A' }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{{ url_for('admin.simulate_policy', policy_id=policy.id) }}" class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-flask"></i>
+                                                </a>
+                                                <button class="btn btn-sm btn-warning" onclick="togglePolicy({{ policy.id }})">
+                                                    <i class="fas fa-pause"></i>
+                                                </button>
+                                                <a href="{{ url_for('admin.edit_policy', policy_id=policy.id) }}" class="btn btn-sm btn-info">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <button class="btn btn-sm btn-danger" onclick="deletePolicy({{ policy.id }})">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-info-circle text-muted fa-3x mb-3"></i>
+                            <p class="text-muted">Nessuna regola attiva</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Regole in Attesa -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clock me-2"></i>
+                        Regole in Attesa di Approvazione
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if pending_policies %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Condizione</th>
+                                        <th>Azione</th>
+                                        <th>Priorità</th>
+                                        <th>Confidenza</th>
+                                        <th>Creato da</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for policy in pending_policies %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ policy.name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ policy.description[:50] }}...</small>
+                                        </td>
+                                        <td>
+                                            <code class="small">{{ policy.get_condition_summary() }}</code>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ 'success' if policy.action == 'approve' else 'danger' }}">
+                                                <i class="fas fa-{{ 'check' if policy.action == 'approve' else 'times' }} me-1"></i>
+                                                {{ policy.get_action_display() }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ policy.get_priority_display() }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-{{ 'success' if policy.confidence > 80 else 'warning' if policy.confidence > 60 else 'danger' }}" 
+                                                     style="width: {{ policy.confidence }}%">
+                                                    {{ policy.confidence }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <small>{{ policy.creator.username if policy.creator else 'N/A' }}</small>
+                                            <br>
+                                            <small class="text-muted">{{ policy.created_at.strftime('%d/%m/%Y') if policy.created_at else 'N/A' }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-success" onclick="activatePolicy({{ policy.id }})">
+                                                    <i class="fas fa-play"></i>
+                                                </button>
+                                                <a href="{{ url_for('admin.edit_policy', policy_id=policy.id) }}" class="btn btn-sm btn-info">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <button class="btn btn-sm btn-danger" onclick="deletePolicy({{ policy.id }})">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-info-circle text-muted fa-3x mb-3"></i>
+                            <p class="text-muted">Nessuna regola in attesa</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Modal Generazione Regole -->
+            <div class="modal fade" id="generateModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-magic me-2"></i>
+                                Regole AI Generate
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="generated-policies-container">
+                                <!-- Le regole generate verranno inserite qui -->
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Simulazione -->
+            <div class="modal fade" id="simulateModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-play me-2"></i>
+                                Risultati Simulazione
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="simulation-results">
+                                <!-- I risultati della simulazione verranno inseriti qui -->
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function generatePolicies() {
+    // Mostra loading
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Generando...';
+    btn.disabled = true;
+    
+    fetch('/admin/access_requests/ai_policies/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showGeneratedPolicies(data.policies);
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Errore durante la generazione delle regole');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function showGeneratedPolicies(policies) {
+    const container = document.getElementById('generated-policies-container');
+    
+    if (policies.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-info-circle text-muted fa-3x mb-3"></i>
+                <p class="text-muted">Nessuna regola generata</p>
+            </div>
+        `;
+    } else {
+        let html = '<div class="row">';
+        
+        policies.forEach((policy, index) => {
+            const actionClass = policy.action === 'approve' ? 'success' : 'danger';
+            const actionIcon = policy.action === 'approve' ? 'check' : 'times';
+            
+            html += `
+                <div class="col-md-6 mb-3">
+                    <div class="card border-${actionClass}">
+                        <div class="card-header bg-${actionClass} text-white">
+                            <h6 class="mb-0">
+                                <i class="fas fa-${actionIcon} me-2"></i>
+                                ${policy.name}
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text">${policy.description}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-info">Priorità: ${policy.priority}</span>
+                                <span class="badge bg-${actionClass}">${policy.action.toUpperCase()}</span>
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-sm btn-success" onclick="activateGeneratedPolicy(${index})">
+                                    <i class="fas fa-play me-1"></i>
+                                    Attiva
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
+    }
+    
+    // Mostra modal
+    new bootstrap.Modal(document.getElementById('generateModal')).show();
+}
+
+function activateGeneratedPolicy(index) {
+    // Implementa attivazione regola generata
+    alert('Funzionalità di attivazione in sviluppo');
+}
+
+function simulatePolicies() {
+    // Mostra loading
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Simulando...';
+    btn.disabled = true;
+    
+    fetch('/admin/access_requests/ai_policies/simulate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSimulationResults(data.simulation);
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Errore durante la simulazione');
+    })
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function showSimulationResults(simulation) {
+    const container = document.getElementById('simulation-results');
+    
+    // Aggiorna statistiche
+    document.getElementById('auto-approved').textContent = simulation.auto_approved;
+    document.getElementById('auto-denied').textContent = simulation.auto_denied;
+    
+    let html = `
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-primary">${simulation.total_requests}</h4>
+                    <small class="text-muted">Totale Richieste</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-success">${simulation.auto_approved}</h4>
+                    <small class="text-muted">Auto-Approva</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-danger">${simulation.auto_denied}</h4>
+                    <small class="text-muted">Auto-Nega</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center">
+                    <h4 class="text-warning">${simulation.manual_review}</h4>
+                    <small class="text-muted">Revisione Manuale</small>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (simulation.policies_applied.length > 0) {
+        html += `
+            <h6>Regole Applicate:</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Regola</th>
+                            <th>Azione</th>
+                            <th>Applicazioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        simulation.policies_applied.forEach(policy => {
+            const actionClass = policy.action === 'approve' ? 'success' : 'danger';
+            const actionIcon = policy.action === 'approve' ? 'check' : 'times';
+            
+            html += `
+                <tr>
+                    <td>${policy.name}</td>
+                    <td>
+                        <span class="badge bg-${actionClass}">
+                            <i class="fas fa-${actionIcon} me-1"></i>
+                            ${policy.action.toUpperCase()}
+                        </span>
+                    </td>
+                    <td>${policy.count}</td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
+    container.innerHTML = html;
+    
+    // Mostra modal
+    new bootstrap.Modal(document.getElementById('simulateModal')).show();
+}
+
+function activatePolicy(policyId) {
+    if (confirm('Attivare questa regola?')) {
+        window.location.href = `/admin/access_requests/ai_policies/${policyId}/activate`;
+    }
+}
+
+function togglePolicy(policyId) {
+    if (confirm('Modificare lo stato di questa regola?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/access_requests/ai_policies/${policyId}/toggle`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function deletePolicy(policyId) {
+    if (confirm('Eliminare questa regola? Questa azione non può essere annullata.')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/access_requests/ai_policies/${policyId}/delete`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %} 

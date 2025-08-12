@@ -1,0 +1,594 @@
+{% extends "base_docs.html" %}
+
+{% block title %}Alert AI Tempo Reale - DOCS Mercury{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header con statistiche -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-0">🚨 Alert AI Tempo Reale</h2>
+                    <p class="text-muted mb-0">Monitoraggio continuo delle attività sospette</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button id="refresh-btn" class="btn btn-outline-primary">
+                        <i class="fas fa-sync-alt"></i> Aggiorna
+                    </button>
+                    <button id="analyze-btn" class="btn btn-warning">
+                        <i class="fas fa-brain"></i> Analizza Ora
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche overview -->
+    <div class="row mb-4" id="overview-stats">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0" id="total-alerts">-</h4>
+                            <small>Alert 24h</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0" id="nuovi-alert">-</h4>
+                            <small>Nuovi</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-bell fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0" id="critici-alert">-</h4>
+                            <small>Critici</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-radiation fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0" id="risolti-alert">-</h4>
+                            <small>Risolti</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check-circle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri avanzati -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 Filtri Avanzati</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2">
+                            <label for="filter-livello" class="form-label">Livello</label>
+                            <select id="filter-livello" class="form-select">
+                                <option value="all">Tutti</option>
+                                <option value="basso">Basso</option>
+                                <option value="medio">Medio</option>
+                                <option value="alto">Alto</option>
+                                <option value="critico">Critico</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="filter-stato" class="form-label">Stato</label>
+                            <select id="filter-stato" class="form-select">
+                                <option value="all">Tutti</option>
+                                <option value="nuovo">Nuovo</option>
+                                <option value="in_revisione">In Revisione</option>
+                                <option value="chiuso">Chiuso</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="filter-periodo" class="form-label">Periodo</label>
+                            <select id="filter-periodo" class="form-select">
+                                <option value="1h">Ultima ora</option>
+                                <option value="24h" selected>Ultime 24h</option>
+                                <option value="7d">Ultimi 7 giorni</option>
+                                <option value="30d">Ultimi 30 giorni</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filter-tipo" class="form-label">Tipo Alert</label>
+                            <select id="filter-tipo" class="form-select">
+                                <option value="all">Tutti</option>
+                                <option value="download_massivo">Download Massivo</option>
+                                <option value="accessi_falliti">Accessi Falliti</option>
+                                <option value="ip_sospetto">IP Sospetto</option>
+                                <option value="accesso_fuori_orario">Accesso Fuori Orario</option>
+                                <option value="accesso_simultaneo">Accesso Simultaneo</option>
+                                <option value="accesso_non_autorizzato">Accesso Non Autorizzato</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button id="apply-filters" class="btn btn-primary me-2">
+                                <i class="fas fa-filter"></i> Applica Filtri
+                            </button>
+                            <button id="clear-filters" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Pulisci
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabella alert -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📋 Alert AI</h5>
+                    <div class="btn-group" role="group">
+                        <button id="bulk-close" class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-check"></i> Chiudi Selezionati
+                        </button>
+                        <button id="bulk-review" class="btn btn-outline-warning btn-sm">
+                            <i class="fas fa-eye"></i> In Revisione
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="alerts-table">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <input type="checkbox" id="select-all" class="form-check-input">
+                                    </th>
+                                    <th>ID</th>
+                                    <th>Tipo</th>
+                                    <th>Livello</th>
+                                    <th>Stato</th>
+                                    <th>Utente</th>
+                                    <th>Descrizione</th>
+                                    <th>IP</th>
+                                    <th>Data</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alerts-tbody">
+                                <!-- Popolato via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginazione -->
+                    <nav aria-label="Paginazione alert">
+                        <ul class="pagination justify-content-center" id="pagination">
+                            <!-- Popolato via JavaScript -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal dettagli alert -->
+<div class="modal fade" id="alertDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🔍 Dettagli Alert</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="alert-details-content">
+                <!-- Popolato via JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                <button type="button" class="btn btn-warning" id="mark-review">In Revisione</button>
+                <button type="button" class="btn btn-success" id="mark-resolved">Risolto</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast notifications -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+    <div id="alert-toast" class="toast" role="alert">
+        <div class="toast-header">
+            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+            <strong class="me-auto">Nuovo Alert</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toast-message">
+            <!-- Popolato via JavaScript -->
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentFilters = {
+    livello: 'all',
+    stato: 'all',
+    periodo: '24h',
+    tipo: 'all'
+};
+
+let selectedAlerts = new Set();
+let autoRefreshInterval;
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    loadOverview();
+    loadAlerts();
+    setupEventListeners();
+    startAutoRefresh();
+});
+
+function setupEventListeners() {
+    // Filtri
+    document.getElementById('apply-filters').addEventListener('click', applyFilters);
+    document.getElementById('clear-filters').addEventListener('click', clearFilters);
+    
+    // Azioni
+    document.getElementById('refresh-btn').addEventListener('click', refreshData);
+    document.getElementById('analyze-btn').addEventListener('click', runAnalysis);
+    
+    // Bulk actions
+    document.getElementById('bulk-close').addEventListener('click', bulkCloseAlerts);
+    document.getElementById('bulk-review').addEventListener('click', bulkReviewAlerts);
+    
+    // Select all
+    document.getElementById('select-all').addEventListener('change', toggleSelectAll);
+    
+    // Modal actions
+    document.getElementById('mark-review').addEventListener('click', markAlertAsReview);
+    document.getElementById('mark-resolved').addEventListener('click', markAlertAsResolved);
+}
+
+function loadOverview() {
+    fetch('/admin/ai/dashboard/overview')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateOverviewStats(data.overview);
+            }
+        })
+        .catch(error => console.error('Errore caricamento overview:', error));
+}
+
+function updateOverviewStats(overview) {
+    document.getElementById('total-alerts').textContent = overview.total_alerts_24h;
+    document.getElementById('nuovi-alert').textContent = overview.nuovi_alert_24h;
+    
+    // Conta critici
+    const critici = overview.alert_per_livello.find(item => item.livello === 'critico');
+    document.getElementById('critici-alert').textContent = critici ? critici.count : 0;
+    
+    // Conta risolti
+    const risolti = overview.alert_per_livello.find(item => item.livello === 'chiuso');
+    document.getElementById('risolti-alert').textContent = risolti ? risolti.count : 0;
+}
+
+function loadAlerts() {
+    const params = new URLSearchParams(currentFilters);
+    
+    fetch(`/admin/ai/alerts/realtime?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderAlertsTable(data.alerts);
+            }
+        })
+        .catch(error => console.error('Errore caricamento alert:', error));
+}
+
+function renderAlertsTable(alerts) {
+    const tbody = document.getElementById('alerts-tbody');
+    tbody.innerHTML = '';
+    
+    alerts.forEach(alert => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <input type="checkbox" class="form-check-input alert-checkbox" 
+                       value="${alert.id}" ${selectedAlerts.has(alert.id) ? 'checked' : ''}>
+            </td>
+            <td>${alert.id}</td>
+            <td>
+                <span class="badge bg-secondary">${alert.tipo_alert_display}</span>
+            </td>
+            <td>
+                <span class="badge ${alert.livello_badge_class}">${alert.livello_display}</span>
+            </td>
+            <td>
+                <span class="badge ${alert.stato_badge_class}">${alert.stato}</span>
+            </td>
+            <td>${alert.utente_display}</td>
+            <td>
+                <div class="text-truncate" style="max-width: 200px;" title="${alert.descrizione}">
+                    ${alert.descrizione}
+                </div>
+            </td>
+            <td>
+                <small class="text-muted">${alert.ip_address || '-'}</small>
+            </td>
+            <td>
+                <small class="text-muted">${formatDateTime(alert.timestamp)}</small>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button class="btn btn-outline-primary btn-sm" onclick="showAlertDetails(${alert.id})">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-warning btn-sm" onclick="markAlertAsReview(${alert.id})">
+                        <i class="fas fa-clock"></i>
+                    </button>
+                    <button class="btn btn-outline-success btn-sm" onclick="markAlertAsResolved(${alert.id})">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    // Setup checkbox listeners
+    document.querySelectorAll('.alert-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                selectedAlerts.add(parseInt(this.value));
+            } else {
+                selectedAlerts.delete(parseInt(this.value));
+            }
+            updateSelectAllState();
+        });
+    });
+}
+
+function applyFilters() {
+    currentFilters = {
+        livello: document.getElementById('filter-livello').value,
+        stato: document.getElementById('filter-stato').value,
+        periodo: document.getElementById('filter-periodo').value,
+        tipo: document.getElementById('filter-tipo').value
+    };
+    
+    loadAlerts();
+}
+
+function clearFilters() {
+    document.getElementById('filter-livello').value = 'all';
+    document.getElementById('filter-stato').value = 'all';
+    document.getElementById('filter-periodo').value = '24h';
+    document.getElementById('filter-tipo').value = 'all';
+    
+    currentFilters = {
+        livello: 'all',
+        stato: 'all',
+        periodo: '24h',
+        tipo: 'all'
+    };
+    
+    loadAlerts();
+}
+
+function refreshData() {
+    loadOverview();
+    loadAlerts();
+    showToast('Dati aggiornati', 'success');
+}
+
+function runAnalysis() {
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analizzando...';
+    
+    fetch('/admin/ai/realtime/analyze', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`Analisi completata: ${data.alerts_generated} alert generati`, 'success');
+            loadOverview();
+            loadAlerts();
+        } else {
+            showToast(`Errore analisi: ${data.error}`, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Errore analisi:', error);
+        showToast('Errore durante l\'analisi', 'error');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-brain"></i> Analizza Ora';
+    });
+}
+
+function bulkCloseAlerts() {
+    if (selectedAlerts.size === 0) {
+        showToast('Seleziona almeno un alert', 'warning');
+        return;
+    }
+    
+    updateBulkAlerts('chiuso');
+}
+
+function bulkReviewAlerts() {
+    if (selectedAlerts.size === 0) {
+        showToast('Seleziona almeno un alert', 'warning');
+        return;
+    }
+    
+    updateBulkAlerts('in_revisione');
+}
+
+function updateBulkAlerts(newStatus) {
+    fetch('/admin/ai/alerts/bulk-update', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            alert_ids: Array.from(selectedAlerts),
+            nuovo_stato: newStatus
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            selectedAlerts.clear();
+            loadOverview();
+            loadAlerts();
+        } else {
+            showToast(`Errore: ${data.error}`, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Errore aggiornamento bulk:', error);
+        showToast('Errore durante l\'aggiornamento', 'error');
+    });
+}
+
+function showAlertDetails(alertId) {
+    // Implementa visualizzazione dettagli alert
+    const modal = new bootstrap.Modal(document.getElementById('alertDetailsModal'));
+    modal.show();
+}
+
+function markAlertAsReview(alertId) {
+    updateAlertStatus(alertId, 'in_revisione');
+}
+
+function markAlertAsResolved(alertId) {
+    updateAlertStatus(alertId, 'chiuso');
+}
+
+function updateAlertStatus(alertId, newStatus) {
+    fetch(`/admin/ai/alerts/${alertId}/update`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            stato: newStatus
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`Alert ${alertId} aggiornato a "${newStatus}"`, 'success');
+            loadOverview();
+            loadAlerts();
+        } else {
+            showToast(`Errore: ${data.error}`, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Errore aggiornamento alert:', error);
+        showToast('Errore durante l\'aggiornamento', 'error');
+    });
+}
+
+function toggleSelectAll() {
+    const selectAll = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('.alert-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+        if (selectAll.checked) {
+            selectedAlerts.add(parseInt(checkbox.value));
+        } else {
+            selectedAlerts.delete(parseInt(checkbox.value));
+        }
+    });
+}
+
+function updateSelectAllState() {
+    const checkboxes = document.querySelectorAll('.alert-checkbox');
+    const selectAll = document.getElementById('select-all');
+    
+    const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+    selectAll.checked = checkedCount === checkboxes.length;
+    selectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+}
+
+function startAutoRefresh() {
+    // Aggiorna ogni 30 secondi
+    autoRefreshInterval = setInterval(() => {
+        loadOverview();
+        loadAlerts();
+    }, 30000);
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.getElementById('alert-toast');
+    const toastMessage = document.getElementById('toast-message');
+    
+    toastMessage.textContent = message;
+    
+    // Cambia classe in base al tipo
+    toast.className = `toast ${type === 'success' ? 'bg-success text-white' : 
+                              type === 'error' ? 'bg-danger text-white' : 
+                              type === 'warning' ? 'bg-warning' : ''}`;
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+}
+
+function formatDateTime(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('it-IT');
+}
+
+// Cleanup
+window.addEventListener('beforeunload', () => {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+});
+</script>
+{% endblock %} 

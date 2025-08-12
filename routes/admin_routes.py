@@ -1,13 +1,754 @@
 import traceback
 from sqlalchemy import func
-from models import GuestActivity, Company, Department, User, Document, AdminLog, AccessRequest, AuthorizedAccess, DocumentActivityLog, DocumentVersion, DocumentReadLog, DownloadDeniedLog, DocumentApprovalLog, ApprovalStep, AIAnalysisLog, FirmaDocumento, LogInvioDocumento
+from models import GuestActivity, Company, Department, User, Document, AdminLog, AccessRequest, AuthorizedAccess, DocumentActivityLog, DocumentVersion, DocumentReadLog, DownloadDeniedLog, DocumentApprovalLog, ApprovalStep, AIAnalysisLog, FirmaDocumento, LogInvioDocumento, QMSStandardRequirement, QMSRequirementMapping, AccessRequestNew, AccessRequestAlert, AccessRequestAlertSeverity, AccessRequestAlertStatus
+from auto_policy import AutoPolicy
+from utils.logging import log_request_approved, log_request_denied
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_from_directory, Response, send_file, jsonify, abort
 from flask_login import login_required, current_user
 from extensions import db, bcrypt
 from sqlalchemy.exc import IntegrityError
 from itsdangerous import URLSafeTimedSerializer
-from decorators import admin_required
+from decorators import admin_required, ceo_or_admin_required
+from flask_mail import Message
+from extensions import mail
+from flask import render_template
+from services.access_request_detector import access_request_detector
+from sqlalchemy.orm import joinedload
+import os
+import requests
+from collections import OrderedDict
+import csv
+from io import StringIO, BytesIO
+from weasyprint import HTML
+from collections import defaultdict
+from collections import Counter
+from flask import make_response
+# from flask_login import roles_required  # Non esiste in flask_login
+from services.alert_detection_service import alert_detector
+from services.download_export_service import download_export_service, rate_limit_export
+from services.access_request_service import access_request_service
+from services.ai.gpt_provider import GptProvider
+from services.download_alert_service import build_alert_context
+
+
+# === Blueprint Admin ===
+admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
+
+# Istanza globale per AI
+gpt = GptProvider()
+
+# === Dashboard Admin ===
+@admin_bp.route('/admin/dashboard')
+@login_required
+def admin_dashboard():
+    if not current_user.is_admin:
+        return redirect(url_for('auth.login'))
+
+    # Verifica alert automatici
+    alerts = check_download_denied_alerts()
+    if alerts:
+        send_alert_notifications(alerts)
+
+    # Statistiche di upload e download
+    total_uploads = Document.query.count()
+    total_downloads = db.session.query(func.count()).select_from(GuestActivity).scalar()
+
+    # Dati settimanali (esempio semplificato)
+    labels = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
+    uploads = [3, 5, 2, 4, 1, 0, 2]
+    downloads = [2, 1, 0, 5, 4, 3, 1]
+
+    # Dati per documenti per tipo
+    doc_stats = db.session.query(
+        func.lower(func.substr(Document.filename, -3)).label('type'),
+        func.count()
+    ).group_by('type').all()
+    doc_types = [row[0].upper() for row in doc_stats]
+    doc_counts = [row[1] for row in doc_stats]
+
+    # === Nuovi dati per grafico a torta ===
+    pie_labels = doc_types
+    pie_values = doc_counts
+
+    return render_template(
+        'admin/dashboard.html',
+        total_uploads=total_uploads,
+        total_downloads=total_downloads,
+        labels=labels,
+        uploads=uploads,
+        downloads=downloads,
+        doc_types=doc_types,
+        doc_counts=doc_counts,
+        pie_labels=pie_labels,
+        pie_values=pie_values,
+        alerts=alerts  # Passa gli alert al template
+    )
+
+# === Gestione Aziende ===
+@admin_bp.route('/company')
+@login_required
+@admin_required
+def company_management():
+    companies = Company.query.order_by(Company.name).all()
+    return render_template('admin/company_management.html', companies=companies)
+
+@admin_bp.route('/company/create', methods=['POST'])
+@login_required
+@admin_required
+def create_company():
+    company_name = request.form.get('company_name', '').strip()
+    if not company_name:
+        flash("Il nome dell'azienda è obbligatorio.", "danger")
+        return redirect(url_for('admin.company_management'))
+
+    existing = Company.query.filter_by(name=company_name).first()
+    if existing:
+        flash("Esiste già un'azienda con questo nome.", "warning")
+        return redirect(url_for('admin.company_management'))
+
+    new_company = Company(name=company_name)
+    db.session.add(new_company)
+    db.session.commit()
+    flash(f"Azienda '{company_name}' creata con successo.", "success")
+    return redirect(url_for('admin.company_management'))
+
+@admin_bp.route('/company/<int:company_id>/update', methods=['POST'])
+@login_required
+@admin_required
+def update_company(company_id):
+    new_name = request.form.get('company_name', '').strip()
+    if not new_name:
+        flash("Il nome non può essere vuoto.", "danger")
+        return redirect(url_for('admin.company_management'))
+
+    company = Company.query.get_or_404(company_id)
+    company.name = new_name
+    db.session.commit()
+
+    flash("Azienda aggiornata con successo.", "success")
+    return redirect(url_for('admin.company_management'))
+
+@admin_bp.route('/company/<int:company_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_company(company_id):
+    company = Company.query.get_or_404(company_id)
+    try:
+        db.session.delete(company)
+        db.session.commit()
+        flash("Azienda eliminata con successo.", "success")
+    except IntegrityError:
+        db.session.rollback()
+        flash("⚠️ Impossibile eliminare l'azienda: ci sono documenti o utenti associati.", "danger")
+    return redirect(url_for('admin.company_management'))
+
+# === Gestione Reparti ===
+@admin_bp.route('/departments')
+@login_required
+@admin_required
+def department_management():
+    companies = Company.query.options(db.joinedload(Company.departments)).order_by(Company.name).all()
+    selected_company_id = request.args.get('company_id', type=int)
+    departments = []
+    selected_company = None
+
+    if selected_company_id:
+        selected_company = Company.query.get(selected_company_id)
+        if selected_company:
+            departments = Department.query.filter_by(company_id=selected_company_id).order_by(Department.name).all()
+
+    return render_template(
+        'admin/department_management.html',
+        companies=companies,
+        selected_company=selected_company,
+        departments=departments
+    )
+
+@admin_bp.route('/departments/create', methods=['POST'])
+@login_required
+@admin_required
+def create_department():
+    company_id = request.form.get('company_id', type=int)
+    department_name = request.form.get('department_name', '').strip()
+
+    if not company_id or not department_name:
+        flash("Tutti i campi sono obbligatori.", "danger")
+        return redirect(url_for('admin.department_management', company_id=company_id))
+
+    existing = Department.query.filter_by(name=department_name, company_id=company_id).first()
+    if existing:
+        flash("Esiste già un reparto con questo nome per l'azienda selezionata.", "warning")
+        return redirect(url_for('admin.department_management', company_id=company_id))
+
+    new_department = Department(name=department_name, company_id=company_id)
+    db.session.add(new_department)
+    db.session.commit()
+    flash("Reparto creato con successo.", "success")
+    return redirect(url_for('admin.department_management', company_id=company_id))
+
+@admin_bp.route('/departments/<int:department_id>/update', methods=['POST'])
+@login_required
+@admin_required
+def update_department(department_id):
+    new_name = request.form.get('department_name', '').strip()
+    department = Department.query.get_or_404(department_id)
+    company_id = department.company_id
+
+    if not new_name:
+        flash("Il nome del reparto non può essere vuoto.", "danger")
+        return redirect(url_for('admin.department_management', company_id=company_id))
+
+    department.name = new_name
+    db.session.commit()
+    flash("Reparto aggiornato con successo.", "success")
+    return redirect(url_for('admin.department_management', company_id=company_id))
+
+@admin_bp.route('/departments/<int:department_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_department(department_id):
+    department = Department.query.get_or_404(department_id)
+    company_id = department.company_id
+
+    if department.documents:
+        flash("Impossibile eliminare: ci sono documenti associati a questo reparto.", "danger")
+        return redirect(url_for('admin.department_management', company_id=company_id))
+
+    db.session.delete(department)
+    db.session.commit()
+    flash("Reparto eliminato con successo.", "success")
+    return redirect(url_for('admin.department_management', company_id=company_id))
+
+# === Gestione Utenti ===
+@admin_bp.route('/users')
+@login_required
+@admin_required
+def user_management():
+    companies = Company.query.order_by(Company.name).all()
+    departments = Department.query.order_by(Department.name).all()
+    users = User.query.order_by(User.username).all()
+
+    # ✅ Questa è la variabile mancante
+    company_departments = {
+        company.id: Department.query.filter_by(company_id=company.id).order_by(Department.name).all()
+        for company in companies
+    }
+
+    return render_template(
+        'admin/user_management.html',
+        companies=companies,
+        departments=departments,
+        users=users,
+        company_departments=company_departments  # <== QUESTA È OBBLIGATORIA
+    )
+
+@admin_bp.route('/users/create', methods=['POST'])
+@login_required
+@admin_required
+def create_user():
+    if request.form.get('role') == 'guest':
+        flash("Creazione utenti guest non consentita da qui.", "danger")
+        return redirect(url_for('admin.user_management'))
+    username = request.form.get('username', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    password = request.form.get('password', '')
+    role = request.form.get('role', 'user')
+    first_name = request.form.get('first_name', '').strip()
+    last_name = request.form.get('last_name', '').strip()
+    can_download = 'can_download' in request.form
+    can_access_reserved = 'can_access_reserved' in request.form
+    can_manage_files = 'can_manage_files' in request.form
+
+    company_ids = request.form.getlist('company_ids')
+    department_ids = request.form.getlist('department_ids')
+    access_expiration = request.form.get('access_expiration')
+
+    if role not in ['user', 'guest', 'admin']:
+        flash("❌ Ruolo non valido.", "danger")
+        return redirect(url_for('admin.user_management'))
+
+    if not username or not email or not password or not company_ids:
+        flash("❌ Compila tutti i campi obbligatori e seleziona almeno un'azienda.", "danger")
+        return redirect(url_for('admin.user_management'))
+
+    if User.query.filter_by(username=username).first():
+        flash("❌ Username già esistente.", "warning")
+        return redirect(url_for('admin.user_management'))
+
+    try:
+        hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+        new_user = User(
+            username=username,
+            email=email,
+            password=hashed_pw,
+            role=role,
+            first_name=first_name,
+            last_name=last_name,
+            can_download=can_download,
+            can_access_reserved=can_access_reserved,
+            can_manage_files=can_manage_files,
+            password_set_at=datetime.utcnow()
+        )
+
+        # Relazioni aziende
+        new_user.companies.clear()
+        companies = Company.query.filter(Company.id.in_(company_ids)).all()
+        new_user.companies.extend(companies)
+
+        # Relazioni reparti
+        new_user.departments.clear()
+        if department_ids:
+            departments = Department.query.filter(Department.id.in_(department_ids)).all()
+            new_user.departments.extend(departments)
+
+        # Gestione scadenza solo per guest
+        if role == 'guest' and access_expiration:
+            try:
+                new_user.access_expiration = datetime.strptime(access_expiration, "%Y-%m-%d")
+            except Exception:
+                flash("⚠️ Data di scadenza non valida.", "warning")
+
+        db.session.add(new_user)
+        db.session.commit()
+
+        # Email di benvenuto
+        subject = f"Benvenuto in Mercury, {first_name or username}"
+        body = (
+            f"Ciao {first_name or username},\n\n"
+            f"è stato creato per te un account sulla piattaforma Mercury.\n\n"
+            f"🔐 Username: {username}\n"
+            f"🔑 Password temporanea: {password}\n\n"
+            f"Ti consigliamo di accedere e modificare la password al primo accesso.\n\n"
+            f"👉 Accedi qui: https://docs.mercurysurgelati.org/login\n\n"
+            f"In caso di problemi, contatta l'amministratore."
+        )
+        try:
+            send_email(subject=subject, recipients=[email], body=body)
+            current_app.logger.info(f"📧 Email inviata con successo a {email}")
+        except Exception as mail_err:
+            current_app.logger.error(f"❌ Errore durante invio email a {email}: {mail_err}")
+
+        flash(f"✅ Utente '{username}' creato con successo.<br><strong>Password temporanea:</strong> {password}", "success")
+
+    except IntegrityError:
+        db.session.rollback()
+        flash("❌ Errore di integrità dati (utente/email già esistente).", "danger")
+    except Exception as e:
+        db.session.rollback()
+        flash("❌ Errore durante la creazione dell'utente.", "danger")
+        print("❌ [ERRORE create_user]:", e)
+        with open('/tmp/error_create_user.log', 'a') as f:
+            f.write(f"\n---\n{datetime.now()}\n")
+            f.write(traceback.format_exc())
+
+    return redirect(url_for('admin.user_management'))
+
+@admin_bp.route('/users/<int:user_id>/update', methods=['POST'])
+@login_required
+def update_user(user_id):
+    if not current_user.is_admin:
+        return "Accesso negato", 403
+
+    user = User.query.get_or_404(user_id)
+
+    # === Dati comuni ===
+    user.username = request.form.get('username', '').strip()
+    user.email = request.form.get('email', '').strip().lower()
+    user.role = request.form.get('role', 'user')
+    print(f"[DEBUG] Prima: user.can_download={user.can_download}")
+    user.can_download = bool(request.form.get('can_download'))
+    if user.role == 'guest' and 'can_download' not in request.form:
+        user.can_download = False
+    print(f"[DEBUG] Dopo assegnazione: user.can_download={user.can_download}")
+
+    # === GUEST: access_expiration + revoke_docs ===
+    if user.role == 'guest':
+        expiration_str = request.form.get('access_expiration')
+        if expiration_str:
+            try:
+                user.access_expiration = datetime.strptime(expiration_str, '%Y-%m-%d').date()
+            except ValueError:
+                flash("❌ Data scadenza non valida", "danger")
+                return redirect(url_for('admin.user_management'))
+
+        revoke_ids = request.form.getlist('revoke_docs')
+        if revoke_ids:
+            documents = Document.query.filter(Document.id.in_(revoke_ids)).all()
+            for doc in documents:
+                if doc in user.documents:
+                    user.documents.remove(doc)
+
+        # Pulisci aziende/reparti se presenti
+        user.companies.clear()
+        user.departments.clear()
+
+    # === USER/ADMIN: relazioni aziende/reparti ===
+    else:
+        company_ids = request.form.getlist('company_ids')
+        department_ids = request.form.getlist('department_ids')
+
+        user.companies.clear()
+        user.departments.clear()
+
+        if company_ids:
+            user.companies.extend(Company.query.filter(Company.id.in_(company_ids)))
+        if department_ids:
+            user.departments.extend(Department.query.filter(Department.id.in_(department_ids)))
+
+        user.access_expiration = None  # non deve esistere per user/admin
+
+    # === Salva tutto ===
+    try:
+        db.session.commit()
+        print(f"[DEBUG] Dopo commit: user.can_download={user.can_download}")
+        flash("✅ Utente aggiornato con successo.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"❌ Errore durante il salvataggio: {str(e)}", "danger")
+
+    return redirect(url_for('admin.user_management'))
+
+@admin_bp.route('/user/<int:user_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        flash("✅ Utente eliminato con successo.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash("❌ Errore durante l'eliminazione dell'utente.", "danger")
+        print("❌ [ERRORE delete_user]:", e)
+        with open('/tmp/error_delete_user.log', 'a') as f:
+            f.write(f"\n---\n{datetime.now()}\n")
+            f.write(traceback.format_exc())
+    return redirect(url_for('admin.user_management'))
+
+@admin_bp.route('/users/<int:user_id>/reset_password', methods=['POST'])
+@login_required
+@admin_required
+def reset_password(user_id):
+    new_password = request.form.get('new_password', '').strip()
+    if not new_password:
+        flash("La nuova password non può essere vuota.", "danger")
+        return redirect(url_for('admin.user_management'))
+    user = User.query.get_or_404(user_id)
+    user.password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+    user.password_set_at = datetime.utcnow()
+    db.session.commit()
+    flash(f"🔐 Password aggiornata per {user.username}.", "success")
+    return redirect(url_for('admin.user_management'))
+
+def send_welcome_email(user, password_plain):
+    msg = Message(
+        subject="Benvenuto in Mercury Surgelati",
+        recipients=[user.email],
+        html=render_template("emails/welcome_guest.html", user=user, password=password_plain)
+    )
+    mail.send(msg)
+
+@admin_bp.route('/guests')
+@login_required
+def guest_management():
+    if not current_user.is_admin:
+        flash("Accesso negato", "danger")
+        return redirect(url_for('admin.admin_dashboard'))
+    guests = User.query.filter_by(role='guest').all()
+    companies = Company.query.all()
+    departments = Department.query.all()
+    return render_template('admin/guest_management.html', guests=guests, companies=companies, departments=departments)
+
+@admin_bp.route('/guests/create', methods=['POST'])
+@login_required
+@admin_required
+def create_guest():
+    username = request.form.get('username', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    password = request.form.get('password', '')
+    access_expiration = request.form.get('access_expiration')
+    can_download = 'can_download' in request.form
+    nome = request.form.get('nome', '').strip()
+    cognome = request.form.get('cognome', '').strip()
+
+    # Validazioni avanzate
+    if not username:
+        flash("Username obbligatorio.", "danger")
+        return redirect(url_for('admin.guest_management'))
+    if User.query.filter_by(username=username).first():
+        flash("Username già in uso.", "danger")
+        return redirect(url_for('admin.guest_management'))
+    if not email:
+        flash("Email obbligatoria.", "danger")
+        return redirect(url_for('admin.guest_management'))
+    if User.query.filter_by(email=email).first():
+        flash("Email già registrata.", "danger")
+        return redirect(url_for('admin.guest_management'))
+    if not password or len(password) < 8:
+        flash("La password deve essere di almeno 8 caratteri.", "danger")
+        return redirect(url_for('admin.guest_management'))
+
+    hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+    new_guest = User(
+        username=username,
+        email=email,
+        password=hashed_pw,
+        role='guest',
+        can_download=can_download
+    )
+    new_guest.nome = nome
+    new_guest.cognome = cognome
+
+    if access_expiration:
+        try:
+            new_guest.access_expiration = datetime.strptime(access_expiration, "%Y-%m-%d")
+        except Exception:
+            flash("⚠️ Data di scadenza non valida.", "warning")
+
+    db.session.add(new_guest)
+    db.session.commit()
+    send_welcome_email(new_guest, password)
+    flash("✅ Guest creato con successo e email inviata.", "success")
+    return redirect(url_for('admin.guest_management'))
+
+# === Statistiche Attività ===
+@admin_bp.route("/stats")
+@login_required
+def admin_stats():
+    if not current_user.is_admin:
+        return "Accesso negato", 403
+
+    from sqlalchemy import func
+    from datetime import datetime, timedelta
+
+    # Intervallo di giorni (default: 7)
+    days = int(request.args.get("days", 7))
+    start_date = datetime.utcnow() - timedelta(days=days)
+
+    # === METRICHE
+    total_uploads = Document.query.count()
+    total_downloads = db.session.query(func.count()).select_from(GuestActivity).scalar()
+    active_guests = db.session.query(User).filter_by(role='guest').count()
+    total_users = User.query.count()
+
+    # === UPLOAD PER GIORNO (con giorni vuoti)
+    date_labels = [(start_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days)]
+    upload_counts_raw = db.session.query(
+        func.strftime('%Y-%m-%d', Document.created_at),
+        func.count()
+    ).filter(Document.created_at >= start_date).group_by(func.strftime('%Y-%m-%d', Document.created_at)).all()
+    upload_counts_dict = dict(upload_counts_raw)
+
+    uploads_per_day_labels = date_labels
+    uploads_per_day_counts = [upload_counts_dict.get(day, 0) for day in date_labels]
+
+    # === UPLOAD/DOWNLOAD SETTIMANALI (ultimi 7 giorni sempre)
+    last_week = datetime.utcnow() - timedelta(days=7)
+    weekly_uploads_data = db.session.query(
+        func.strftime('%w', Document.created_at),
+        func.count()
+    ).filter(Document.created_at >= last_week).group_by(func.strftime('%w', Document.created_at)).all()
+    weekly_downloads_data = db.session.query(
+        func.strftime('%w', GuestActivity.timestamp),
+        func.count()
+    ).filter(GuestActivity.timestamp >= last_week).group_by(func.strftime('%w', GuestActivity.timestamp)).all()
+
+    weekday_map = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab']
+    weekly_labels = weekday_map
+    uploads_by_day = {day: 0 for day in range(7)}
+    downloads_by_day = {day: 0 for day in range(7)}
+    for day, count in weekly_uploads_data:
+        uploads_by_day[int(day)] = count
+    for day, count in weekly_downloads_data:
+        downloads_by_day[int(day)] = count
+    weekly_uploads = [uploads_by_day[i] for i in range(7)]
+    weekly_downloads = [downloads_by_day[i] for i in range(7)]
+
+    # === DISTRIBUZIONE PER TIPO DOCUMENTO
+    doc_type_raw = db.session.query(
+        func.lower(func.substr(Document.filename, -4)).label('ext'),
+        func.count()
+    ).group_by('ext').all()
+    doc_type_labels = [ext or "Altro" for ext, _ in doc_type_raw]
+    doc_type_counts = [count for _, count in doc_type_raw]
+
+    # === UPLOAD PER AZIENDA
+    uploads_by_company = db.session.query(Company.name, func.count()).join(Document.company).group_by(Company.name).all()
+    uploads_by_company_labels = [c or "Sconosciuta" for c, _ in uploads_by_company]
+    uploads_by_company_counts = [n for _, n in uploads_by_company]
+
+    # === UPLOAD PER REPARTO
+    uploads_by_department = db.session.query(Department.name, func.count()).join(Document.department).group_by(Department.name).all()
+    uploads_by_department_labels = [d or "Sconosciuto" for d, _ in uploads_by_department]
+    uploads_by_department_counts = [n for _, n in uploads_by_department]
+
+    # === UPLOAD PER UTENTE
+    uploads_by_user = db.session.query(User.username, func.count()).join(Document, Document.user_id == User.id).group_by(User.username).all()
+    uploads_by_user_labels = [u or "N/A" for u, _ in uploads_by_user]
+    uploads_by_user_counts = [n for _, n in uploads_by_user]
+
+    return render_template("admin/statistiche_attivita.html",
+        total_uploads=total_uploads or 0,
+        total_downloads=total_downloads or 0,
+        active_guests=active_guests or 0,
+        total_users=total_users or 0,
+        uploads_per_day_labels=uploads_per_day_labels or [],
+        uploads_per_day_counts=uploads_per_day_counts or [],
+        weekly_labels=weekly_labels,
+        weekly_uploads=weekly_uploads or [],
+        weekly_downloads=weekly_downloads or [],
+        doc_type_labels=doc_type_labels or [],
+        doc_type_counts=doc_type_counts or [],
+        uploads_by_company_labels=uploads_by_company_labels or [],
+        uploads_by_company_counts=uploads_by_company_counts or [],
+        uploads_by_department_labels=uploads_by_department_labels or [],
+        uploads_by_department_counts=uploads_by_department_counts or [],
+        uploads_by_user_labels=uploads_by_user_labels or [],
+        uploads_by_user_counts=uploads_by_user_counts or [],
+        selected_days=days
+    )
+
+# === Visualizzazione File ===
+@admin_bp.route('/file_structure')
+@login_required
+@admin_required
+def file_structure():
+    if not current_user.is_admin:
+        flash("Accesso negato", "danger")
+        return redirect(url_for('admin.admin_dashboard'))
+
+    companies = Company.query.options(
+        joinedload(Company.departments).joinedload(Department.documents)
+    ).all()
+
+    return render_template('admin/file_structure.html', companies=companies)
+
+# === Documenti (Overview) ===
+@admin_bp.route('/documents')
+@login_required
+@admin_required
+def documents_overview():
+    today = datetime.utcnow()
+    modulo_filter = request.args.get('modulo', '').strip()
+    
+    # Query base per documenti obsoleti e protetti
+    obsolete_docs = Document.query.filter(Document.expiry_date != None, Document.expiry_date < today).all()
+    protected_docs = Document.query.filter(Document.password != None).all()
+    
+    # Query per tutti i documenti con filtro modulo
+    all_docs_query = Document.query.order_by(Document.created_at.desc())
+    
+    if modulo_filter:
+        all_docs_query = all_docs_query.filter_by(collegato_a_modulo=modulo_filter)
+    
+    all_docs = all_docs_query.all()
+    
+    return render_template("admin/documents_overview.html",
+                           obsolete_docs=obsolete_docs,
+                           protected_docs=protected_docs,
+                           all_docs=all_docs,
+                           modulo_filter=modulo_filter)
+
+@admin_bp.route('/documents/<int:document_id>')
+@login_required
+@admin_required
+def view_document(document_id):
+    doc = Document.query.get_or_404(document_id)
+    return render_template("admin/view_document.html", doc=doc)
+
+@admin_bp.route('/documents/<int:document_id>/edit-password', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_document_password(document_id):
+    try:
+        doc = Document.query.get_or_404(document_id)
+    except Exception as e:
+        current_app.logger.error(f"Errore caricamento documento {document_id}: {e}")
+        return "Documento non trovato", 404
+    if request.method == 'POST':
+        try:
+            new_password = request.form.get('new_password', '').strip()
+            if new_password:
+                doc.password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+            else:
+                doc.password = None
+            db.session.commit()
+            flash("Password aggiornata con successo", "success")
+            return redirect(url_for('admin.documents_overview'))
+        except Exception as e:
+            current_app.logger.error(f"Errore aggiornamento password documento {document_id}: {e}")
+            flash("Errore durante l'aggiornamento della password.", "danger")
+    return render_template("admin/edit_password.html", doc=doc)
+
+# === Visualizzazione File ===
+@admin_bp.route('/file-browser')
+@login_required
+@admin_required
+def file_browser():
+    
+    # Renderizza la pagina di visualizzazione struttura file
+    return render_template('admin/file_structure.html')
+
+@admin_bp.route('/users/<int:user_id>/reset_password', methods=['POST'])
+@login_required
+@admin_required
+def reset_user_password(user_id):
+
+    user = User.query.get_or_404(user_id)
+
+    # Genera token sicuro valido 24h
+    token = serializer.dumps(user.email, salt='reset-password')
+
+    reset_url = url_for('auth.reset_password_token', token=token, _external=True)
+
+    try:
+        send_email(
+            subject="🔐 Reset password - Mercury",
+            recipients=[user.email],
+            body=f"Clicca il link seguente per reimpostare la tua password:\n{reset_url}"
+        )
+        flash(f"✅ Email di reset inviata a {user.email}", "success")
+    except Exception as e:
+        flash("❌ Errore durante l'invio dell'email.", "danger")
+        app.logger.error(f"[RESET PW] Errore invio email: {e}")
+
+    return redirect(url_for('admin.user_management'))
+
+@admin_bp.route('/download_document/<int:document_id>')
+@login_required
+def download_document(document_id):
+    from models import Document, DownloadLog, db
+    if not current_user.is_admin:
+        flash("Accesso negato", "danger")
+        return redirect(url_for('admin.file_structure'))
+
+    document = Document.query.get_or_404(document_id)
+
+    # Log download
+    log = DownloadLog(user_id=current_user.id, document_id=document.id)
+    db.session.add(log)
+    db.session.commit()
+
+    return send_from_directory(
+        current_app.config['UPLOAD_FOLDER'],
+        document.filename,
+        as_attachment=True
+    )
+
+import traceback
+from sqlalchemy import func
+from models import GuestActivity, Company, Department, User, Document, AdminLog, AccessRequest, AuthorizedAccess, DocumentActivityLog, DocumentVersion, DocumentReadLog, DownloadDeniedLog, DocumentApprovalLog, ApprovalStep, AIAnalysisLog, FirmaDocumento, LogInvioDocumento, QMSStandardRequirement, QMSRequirementMapping, DownloadAlert, DownloadAlertStatus, DownloadAlertSeverity
+from auto_policy import AutoPolicy
+from utils.logging import log_request_approved, log_request_denied
+from datetime import datetime, timedelta
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_from_directory, Response, send_file, jsonify, abort
+from flask_login import login_required, current_user
+from extensions import db, bcrypt
+from sqlalchemy.exc import IntegrityError
+from itsdangerous import URLSafeTimedSerializer
+from decorators import admin_required, ceo_or_admin_required
 from flask_mail import Message
 from extensions import mail
 from flask import render_template
@@ -875,64 +1616,78 @@ def access_requests_admin():
 @admin_bp.route("/access-requests/<int:request_id>/set", methods=["POST"])
 @login_required
 def set_access_request_status(request_id):
-    from models import AccessRequest
-    if not current_user.is_admin:
-        return "Accesso negato", 403
+    """
+    Gestisce l'approvazione/negazione di una richiesta di accesso con supporto auto-policies.
+    """
+    try:
+        access_request = AccessRequest.query.get_or_404(request_id)
+        action = request.form.get('action')
+        response_message = request.form.get('response_message', '')
+        
+        # Prepara dati per valutazione auto-policies
+        request_data = {
+            'user_role': access_request.user.role,
+            'user_company': access_request.document.company.name if access_request.document.company else "",
+            'user_department': access_request.document.department.name if access_request.document.department else "",
+            'document_company': access_request.document.company.name if access_request.document.company else "",
+            'document_department': access_request.document.department.name if access_request.document.department else "",
+            'document_name': access_request.document.title or access_request.document.original_filename
+        }
+        
+        # Valuta auto-policies prima della decisione manuale
+        auto_policy_result = AutoPolicy.evaluate_all_policies(request_data)
+        
+        if auto_policy_result and auto_policy_result['applied']:
+            # Applica decisione automatica
+            if auto_policy_result['action'] == 'approve':
+                access_request.status = 'approved'
+                access_request.risposta_ai = f"Approvato automaticamente: {auto_policy_result['reason']}"
+                log_request_approved(access_request.user_id, access_request.document_id, 
+                                  f"Auto-policy: {auto_policy_result['policy_name']}")
+            else:
+                access_request.status = 'denied'
+                access_request.risposta_ai = f"Negato automaticamente: {auto_policy_result['reason']}"
+                log_request_denied(access_request.user_id, access_request.document_id, 
+                                 f"Auto-policy: {auto_policy_result['policy_name']}")
+            
+            db.session.commit()
+            
+            # Invia notifiche
+            send_access_request_notifications('auto_decision', access_request, 
+                                           response_message=auto_policy_result['reason'])
+            
+            flash(f"Richiesta {auto_policy_result['action']} automaticamente tramite regola: {auto_policy_result['policy_name']}", 
+                  'info' if auto_policy_result['action'] == 'approve' else 'warning')
+        else:
+            # Decisione manuale (logica esistente)
+            if action == 'approve':
+                access_request.status = 'approved'
+                access_request.risposta_ai = response_message
+                log_request_approved(access_request.user_id, access_request.document_id, response_message)
+            elif action == 'deny':
+                access_request.status = 'denied'
+                access_request.risposta_ai = response_message
+                log_request_denied(access_request.user_id, access_request.document_id, response_message)
+            else:
+                flash('Azione non valida', 'error')
+                return redirect(url_for('admin.access_requests_admin'))
+            
+            db.session.commit()
+            
+            # Invia notifiche
+            send_access_request_notifications('manual_decision', access_request, 
+                                           current_user, response_message)
+            
+            flash(f'Richiesta {action} con successo', 'success')
+        
+        return redirect(url_for('admin.access_requests_admin'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore durante la gestione della richiesta: {str(e)}', 'error')
+        return redirect(url_for('admin.access_requests_admin'))
 
-    status = request.form.get("status")
-    req = AccessRequest.query.get_or_404(request_id)
 
-    if status in ["approved", "rejected"]:
-        req.status = status
-        db.session.commit()
-
-        # Invia email notifica all'utente
-        if req.user.email:
-            from flask_mail import Message
-            from extensions import mail
-            subject = "Richiesta accesso documento " + ("approvata ✅" if status == "approved" else "rifiutata ❌")
-            msg = Message(subject, recipients=[req.user.email])
-            msg.body = f"""
-Ciao {req.user.username},
-
-La tua richiesta di accesso al documento "{req.document.original_filename}\" è stata {status.upper()}.
-
-Grazie,
-Sistema documenti
-"""
-            mail.send(msg)
-
-    return redirect(url_for('admin.access_requests_admin'))
-
-@admin_bp.route('/export_downloads_csv')
-@login_required
-def export_downloads_csv():
-    if not current_user.is_admin:
-        return "Accesso negato", 403
-
-    from models import DownloadLog, db
-    logs = db.session.query(DownloadLog).order_by(DownloadLog.timestamp.desc()).all()
-
-    # CSV in memoria
-    csv_data = StringIO()
-    writer = csv.writer(csv_data)
-    writer.writerow(['Utente', 'Email', 'Documento', 'Azienda', 'Reparto', 'Data'])
-
-    for log in logs:
-        user = log.user
-        doc = log.document
-        writer.writerow([
-            user.username,
-            user.email,
-            doc.original_filename,
-            doc.company.name if doc.company else '—',
-            doc.department.name if doc.department else '—',
-            log.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-        ])
-
-    response = Response(csv_data.getvalue(), mimetype='text/csv')
-    response.headers.set("Content-Disposition", "attachment", filename="download_log.csv")
-    return response
 
 @admin_bp.route('/access_requests')
 @login_required
@@ -1001,6 +1756,19 @@ def handle_access_request(req_id):
         req.status = 'approved'
         req.resolved_at = datetime.utcnow()
         db.session.add(AuthorizedAccess(user_id=req.user_id, document_id=req.document_id))
+        
+        # Log dell'evento di approvazione
+        try:
+            log_request_approved(req.document_id, req.user_id, current_user.id)
+        except Exception as e:
+            print(f"⚠️ Errore durante il logging approvazione: {str(e)}")
+        
+        # Invia notifica email all'utente
+        try:
+            send_access_request_notifications('approved', req, current_user)
+        except Exception as e:
+            print(f"⚠️ Errore durante l'invio email approvazione: {str(e)}")
+        
         flash("Accesso approvato!", "success")
         subject = "✅ Richiesta approvata"
         body = f"""Ciao {req.user.username},
@@ -1045,73 +1813,407 @@ Sistema documenti"""
 
     return redirect(url_for('admin.access_requests'))
 
-@admin_bp.route('/export_access_requests')
+@admin_bp.route('/admin/access_requests/deny', methods=['POST'])
 @login_required
+@admin_required
+def deny_access_request():
+    """
+    Nega una richiesta di accesso con motivazione.
+    """
+    req_id = request.form.get('req_id')
+    response_message = request.form.get('response_message', '').strip()
+
+    if not req_id or not response_message:
+        flash("ID richiesta e motivazione sono obbligatori.", "danger")
+        return redirect(url_for('admin.access_requests'))
+
+    req = AccessRequest.query.get_or_404(req_id)
+    
+    if req.status != 'pending':
+        flash("Richiesta già gestita.", "warning")
+        return redirect(url_for('admin.access_requests'))
+
+    # Aggiorna la richiesta
+    req.status = 'denied'
+    req.response_message = response_message
+    req.resolved_at = datetime.utcnow()
+    
+    try:
+        db.session.commit()
+        
+        # Log dell'evento di diniego
+        try:
+            log_request_denied(req.document_id, req.user_id, current_user.id, response_message)
+        except Exception as e:
+            print(f"⚠️ Errore durante il logging diniego: {str(e)}")
+        
+        # Invia notifica email all'utente
+        try:
+            send_access_request_notifications('denied', req, current_user, response_message)
+        except Exception as e:
+            print(f"⚠️ Errore durante l'invio email diniego: {str(e)}")
+        
+        # Invia email all'utente con motivazione
+        doc_name = req.document.title or req.document.original_filename
+        subject = f"❌ Richiesta accesso negata - {doc_name}"
+        body = f"""Ciao {req.user.username},
+
+La tua richiesta di accesso al documento "{doc_name}" è stata NEGATA.
+
+📅 Data richiesta: {req.created_at.strftime('%d/%m/%Y %H:%M')}
+📅 Data risposta: {req.resolved_at.strftime('%d/%m/%Y %H:%M')}
+
+📝 Motivazione:
+{response_message}
+
+Per maggiori informazioni, contatta l'amministrazione.
+
+Grazie,
+Sistema documenti"""
+
+        try:
+            from app import send_email
+            send_email(subject, [req.user.email], body)
+            flash("Richiesta negata e email inviata con successo.", "info")
+        except Exception as e:
+            current_app.logger.error(f"Errore invio email a {req.user.email}: {str(e)}")
+            flash("Richiesta negata, ma errore nell'invio email.", "warning")
+            
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Errore durante il diniego della richiesta {req_id}: {str(e)}")
+        flash("Errore durante la gestione della richiesta.", "danger")
+        return redirect(url_for('admin.access_requests'))
+
+    return redirect(url_for('admin.access_requests'))
+
+@admin_bp.route('/admin/access_requests/<int:req_id>/suggest', methods=['POST'])
+@login_required
+@admin_required
+def suggest_access_decision(req_id):
+    """
+    Genera un suggerimento AI per la decisione su una richiesta di accesso.
+    """
+    try:
+        # Recupera la richiesta con tutti i dati correlati
+        req = AccessRequest.query.get_or_404(req_id)
+        
+        # Dati utente
+        user = req.user
+        user_data = {
+            'nome': f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username,
+            'ruolo': user.role,
+            'email': user.email,
+            'azienda': req.document.company.name if req.document.company else 'N/A',
+            'reparto': req.document.department.name if req.document.department else 'N/A'
+        }
+        
+        # Dati file
+        doc = req.document
+        file_data = {
+            'nome': doc.title or doc.original_filename,
+            'tipo': doc.original_filename.split('.')[-1].upper() if '.' in doc.original_filename else 'N/A',
+            'scadenza': doc.expiry_date.strftime('%d/%m/%Y') if doc.expiry_date else 'N/A',
+            'scaduto': doc.expiry_date and doc.expiry_date < datetime.now() if doc.expiry_date else False,
+            'visibilita': doc.visibility,
+            'downloadable': doc.downloadable
+        }
+        
+        # Storico richieste dell'utente
+        previous_requests = AccessRequest.query.filter_by(
+            user_id=user.id
+        ).filter(
+            AccessRequest.id != req_id
+        ).count()
+        
+        # Genera prompt per AI
+        prompt = f"""
+Un utente ha richiesto l'accesso al file "{file_data['nome']}".
+Motivazione fornita: "{req.reason or 'Nessuna motivazione fornita'}"
+
+Dati utente:
+- Nome: {user_data['nome']}
+- Ruolo: {user_data['ruolo']}
+- Email: {user_data['email']}
+- Azienda: {user_data['azienda']}
+- Reparto: {user_data['reparto']}
+
+Stato del file:
+- Tipo: {file_data['tipo']}
+- Scadenza: {file_data['scadenza']} {'(SCADUTO)' if file_data['scaduto'] else '(ATTIVO)'}
+- Visibilità: {file_data['visibilita']}
+- Downloadable: {'Sì' if file_data['downloadable'] else 'No'}
+
+Storico:
+- Richieste precedenti dell'utente: {previous_requests}
+
+Suggerisci se approvare o negare la richiesta e fornisci una motivazione breve e professionale.
+Considera:
+1. Ruolo dell'utente (admin/user/guest)
+2. Scadenza del documento
+3. Motivazione fornita
+4. Storico richieste
+5. Tipo di documento
+"""
+        
+        # Simula risposta AI (in produzione, chiameresti un servizio AI reale)
+        ai_suggestion = generate_ai_suggestion(prompt, user_data, file_data, req.reason, previous_requests)
+        
+        return jsonify({
+            'success': True,
+            'suggestion': ai_suggestion
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore durante la generazione suggerimento AI: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Errore durante la generazione del suggerimento'
+        }), 500
+
+def generate_ai_suggestion(prompt, user_data, file_data, reason, previous_requests):
+    """
+    Genera un suggerimento AI per la decisione su una richiesta di accesso.
+    """
+    # Logica AI semplificata (in produzione, integreresti un servizio AI reale)
+    
+    decision_factors = []
+    
+    # Fattore 1: Ruolo utente
+    if user_data['ruolo'] == 'admin':
+        decision_factors.append(('approve', 0.8, 'Utente admin - accesso privilegiato'))
+    elif user_data['ruolo'] == 'user':
+        decision_factors.append(('approve', 0.6, 'Utente interno'))
+    else:  # guest
+        decision_factors.append(('deny', 0.7, 'Utente esterno - maggiore cautela'))
+    
+    # Fattore 2: Scadenza documento
+    if file_data['scaduto']:
+        decision_factors.append(('deny', 0.8, 'Documento scaduto'))
+    else:
+        decision_factors.append(('approve', 0.3, 'Documento attivo'))
+    
+    # Fattore 3: Motivazione
+    if reason and len(reason.strip()) > 10:
+        decision_factors.append(('approve', 0.4, 'Motivazione dettagliata'))
+    else:
+        decision_factors.append(('deny', 0.6, 'Motivazione insufficiente'))
+    
+    # Fattore 4: Storico richieste
+    if previous_requests == 0:
+        decision_factors.append(('approve', 0.2, 'Prima richiesta'))
+    elif previous_requests > 5:
+        decision_factors.append(('deny', 0.5, 'Molte richieste precedenti'))
+    else:
+        decision_factors.append(('approve', 0.1, 'Storico normale'))
+    
+    # Calcola decisione finale
+    approve_score = sum(score for decision, score, _ in decision_factors if decision == 'approve')
+    deny_score = sum(score for decision, score, _ in decision_factors if decision == 'deny')
+    
+    final_decision = 'approve' if approve_score > deny_score else 'deny'
+    
+    # Genera messaggio
+    if final_decision == 'approve':
+        message = f"✅ APPROVAZIONE SUGGERITA\n\nMotivazione: L'utente {user_data['nome']} ha fornito una motivazione valida per l'accesso al documento '{file_data['nome']}'. Il documento è attivo e l'utente ha i permessi necessari."
+    else:
+        message = f"❌ DINIEGO SUGGERITO\n\nMotivazione: La richiesta non soddisfa i criteri di sicurezza. Considerare: {'Documento scaduto' if file_data['scaduto'] else 'Motivazione insufficiente'}."
+    
+    return {
+        'decision': final_decision,
+        'message': message,
+        'confidence': max(approve_score, deny_score) / len(decision_factors),
+        'factors': [factor[2] for factor in decision_factors]
+    }
+
+def send_access_request_notifications(request_type, access_request, admin_user=None, response_message=None):
+    """
+    Invia notifiche email per le richieste di accesso.
+    
+    Args:
+        request_type (str): 'new_request', 'approved', 'denied'
+        access_request (AccessRequest): Oggetto richiesta di accesso
+        admin_user (User, optional): Admin che ha gestito la richiesta
+        response_message (str, optional): Messaggio di risposta per diniego
+    """
+    try:
+        from flask_mail import Message
+        from extensions import mail
+        
+        user = access_request.user
+        document = access_request.document
+        
+        if request_type == 'new_request':
+            # Email al proprietario del file
+            if document.uploader and document.uploader.email:
+                subject = f"Nuova richiesta di accesso a un tuo file"
+                body = f"""
+Ciao {document.uploader.first_name or document.uploader.username},
+
+{user.first_name or user.username} ha richiesto l'accesso al file: **{document.title or document.original_filename}**
+
+Motivazione fornita:
+"{access_request.reason or 'Nessuna motivazione fornita'}"
+
+👉 Puoi gestire questa richiesta al link:
+{url_for('admin.access_requests', _external=True)}
+
+Grazie,
+Sistema documentale Mercury
+"""
+                msg = Message(subject, recipients=[document.uploader.email], body=body)
+                mail.send(msg)
+                print(f"✅ Email notifica proprietario inviata a {document.uploader.email}")
+                
+        elif request_type == 'approved':
+            # Email all'utente per approvazione
+            subject = f"Richiesta accesso approvata ✅"
+            body = f"""
+Ciao {user.first_name or user.username},
+
+La tua richiesta di accesso al file **{document.title or document.original_filename}** è stata approvata ✅
+
+Puoi ora scaricare il file dal portale.
+
+Grazie,
+Il team Mercury
+"""
+            msg = Message(subject, recipients=[user.email], body=body)
+            mail.send(msg)
+            print(f"✅ Email approvazione inviata a {user.email}")
+            
+        elif request_type == 'denied':
+            # Email all'utente per diniego
+            subject = f"Richiesta accesso negata ❌"
+            body = f"""
+Ciao {user.first_name or user.username},
+
+Purtroppo la tua richiesta di accesso al file **{document.title or document.original_filename}** è stata rifiutata.
+
+Motivazione:
+"{response_message or 'Nessuna motivazione fornita'}"
+
+Per qualsiasi dubbio, contatta l'amministratore.
+
+Grazie,
+Il team Mercury
+"""
+            msg = Message(subject, recipients=[user.email], body=body)
+            mail.send(msg)
+            print(f"✅ Email diniego inviata a {user.email}")
+            
+    except Exception as e:
+        print(f"❌ Errore durante l'invio email notifica: {str(e)}")
+        # Non bloccare il flusso principale se l'email fallisce
+
+@admin_bp.route('/admin/audit_log/access')
+@login_required
+@admin_required
+def view_access_logs():
+    """
+    Visualizza i log di audit per le richieste di accesso.
+    """
+    from utils.logging import get_access_request_logs, get_access_request_stats
+    
+    # Recupera i log
+    logs = get_access_request_logs(limit=200)
+    
+    # Recupera statistiche
+    stats = get_access_request_stats()
+    
+    return render_template(
+        'admin/access_audit_log.html',
+        logs=logs,
+        stats=stats
+    )
+
+@admin_bp.route('/admin/access_requests/export')
+@login_required
+@admin_required
 def export_access_requests():
     """
-    Esporta le richieste di accesso in formato CSV.
+    Esporta le richieste di accesso in formato CSV con filtri applicati.
     """
-    if not current_user.is_admin:
-        return "Accesso negato", 403
-
-    # Applica gli stessi filtri della vista principale
+    from datetime import datetime
+    import csv
+    from io import StringIO
+    from flask import Response
+    
+    # Recupera filtri dalla query string
     status_filter = request.args.get('status', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
-    username_filter = request.args.get('username', '')
+    user_filter = request.args.get('user', '')
+    company_filter = request.args.get('company', '')
+    department_filter = request.args.get('department', '')
     
-    # Query base
-    query = AccessRequest.query
+    # Query base con join per ottenere tutti i dati
+    query = db.session.query(
+        AccessRequest, User, Document, Company, Department
+    ).join(
+        User, AccessRequest.user_id == User.id
+    ).join(
+        Document, AccessRequest.document_id == Document.id
+    ).join(
+        Company, Document.company_id == Company.id
+    ).join(
+        Department, Document.department_id == Department.id
+    )
     
     # Applica filtri
     if status_filter:
         query = query.filter(AccessRequest.status == status_filter)
-    
     if date_from:
-        try:
-            from_date = datetime.strptime(date_from, '%Y-%m-%d')
-            query = query.filter(AccessRequest.created_at >= from_date)
-        except ValueError:
-            pass
-    
+        query = query.filter(AccessRequest.created_at >= date_from)
     if date_to:
-        try:
-            to_date = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
-            query = query.filter(AccessRequest.created_at < to_date)
-        except ValueError:
-            pass
+        query = query.filter(AccessRequest.created_at <= date_to + ' 23:59:59')
+    if user_filter:
+        query = query.filter(User.username == user_filter)
+    if company_filter:
+        query = query.filter(Company.name == company_filter)
+    if department_filter:
+        query = query.filter(Department.name == department_filter)
     
-    if username_filter:
-        query = query.join(User).filter(User.username.ilike(f'%{username_filter}%'))
+    # Esegui query
+    results = query.order_by(AccessRequest.created_at.desc()).all()
     
-    # Ordina per data creazione
-    requests = query.order_by(AccessRequest.created_at.desc()).all()
-
     # Crea CSV
-    csv_data = StringIO()
-    writer = csv.writer(csv_data)
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # Intestazioni
     writer.writerow([
-        'ID Richiesta', 'Username', 'Email', 'Documento', 'Azienda', 'Reparto',
-        'Stato', 'Nota', 'Data Richiesta', 'Data Risposta'
+        'ID Richiesta', 'Utente', 'Email', 'File Richiesto', 'Azienda', 'Reparto',
+        'Stato', 'Motivazione', 'Risposta Admin', 'Data Richiesta', 'Data Risposta'
     ])
-
-    for req in requests:
+    
+    # Dati
+    for req, user, doc, company, dept in results:
         writer.writerow([
             req.id,
-            req.user.username,
-            req.user.email,
-            req.document.title or req.document.original_filename,
-            req.document.company.name if req.document.company else 'N/A',
-            req.document.department.name if req.document.department else 'N/A',
+            f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username,
+            user.email,
+            doc.title or doc.original_filename,
+            company.name,
+            dept.name,
             req.status,
-            req.note or '',
-            req.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            req.resolved_at.strftime('%Y-%m-%d %H:%M:%S') if req.resolved_at else ''
+            req.reason or '',
+            req.response_message or '',
+            req.created_at.strftime('%d/%m/%Y %H:%M'),
+            req.resolved_at.strftime('%d/%m/%Y %H:%M') if req.resolved_at else ''
         ])
-
-    response = Response(csv_data.getvalue(), mimetype='text/csv')
-    response.headers.set("Content-Disposition", "attachment", filename=f"access_requests_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
-    return response
+    
+    output.seek(0)
+    
+    # Genera nome file con timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'richieste_accesso_{timestamp}.csv'
+    
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
 
 @admin_bp.route("/log_attivita")
 @login_required
@@ -4669,16 +5771,6 @@ def docs_screenshot_demo():
         Template: Struttura HTML per screenshot
     """
     return render_template('docs/screenshot_demo.html')
-    """
-    Dashboard KPI AI Documentali con performance settimanale.
-    
-    Returns:
-        Template: Dashboard con KPI e grafici
-    """
-    kpi_data = get_kpi_documentali()
-    ai_insight = genera_ai_insight(kpi_data)
-    
-    return render_template('admin/docs_kpi.html', kpi=kpi_data, ai_insight=ai_insight)
 
 def get_kpi_documentali():
     """
@@ -4853,5 +5945,4835 @@ def genera_ai_insight(kpi):
     
     return insights if insights else ["📊 Nessun insight significativo per questo periodo"]
 
+@admin_bp.route('/admin/access_requests/dashboard')
+@login_required
+@admin_required
+def access_requests_dashboard():
+    """
+    Dashboard interattiva per le richieste di accesso con grafici e filtri.
+    """
+    # Filtri dalla query string
+    status_filter = request.args.get('status', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    user_filter = request.args.get('user', '')
+    company_filter = request.args.get('company', '')
+    department_filter = request.args.get('department', '')
+    
+    # Query base con join per ottenere tutti i dati
+    query = db.session.query(
+        AccessRequest, User, Document, Company, Department
+    ).join(
+        User, AccessRequest.user_id == User.id
+    ).join(
+        Document, AccessRequest.document_id == Document.id
+    ).join(
+        Company, Document.company_id == Company.id
+    ).join(
+        Department, Document.department_id == Department.id
+    )
+    
+    # Applica filtri
+    if status_filter:
+        query = query.filter(AccessRequest.status == status_filter)
+    
+    if date_from:
+        try:
+            from_date = datetime.strptime(date_from, '%Y-%m-%d')
+            query = query.filter(AccessRequest.created_at >= from_date)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            to_date = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(AccessRequest.created_at < to_date)
+        except ValueError:
+            pass
+    
+    if user_filter:
+        query = query.filter(User.username.ilike(f'%{user_filter}%'))
+    
+    if company_filter:
+        query = query.filter(Company.name.ilike(f'%{company_filter}%'))
+    
+    if department_filter:
+        query = query.filter(Department.name.ilike(f'%{department_filter}%'))
+    
+    # Esegui query
+    results = query.order_by(AccessRequest.created_at.desc()).all()
+    
+    # Statistiche aggregate
+    total_requests = len(results)
+    pending_count = sum(1 for r in results if r[0].status == 'pending')
+    approved_count = sum(1 for r in results if r[0].status == 'approved')
+    denied_count = sum(1 for r in results if r[0].status == 'denied')
+    
+    # Top utenti richiedenti
+    user_stats = {}
+    for req, user, doc, company, dept in results:
+        username = user.username
+        if username not in user_stats:
+            user_stats[username] = 0
+        user_stats[username] += 1
+    
+    top_users = sorted(user_stats.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    # Top file richiesti
+    file_stats = {}
+    for req, user, doc, company, dept in results:
+        file_name = doc.title or doc.original_filename
+        if file_name not in file_stats:
+            file_stats[file_name] = 0
+        file_stats[file_name] += 1
+    
+    top_files = sorted(file_stats.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    # Richieste per mese (ultimi 12 mesi)
+    monthly_stats = {}
+    for i in range(12):
+        date = datetime.now() - timedelta(days=30*i)
+        month_key = date.strftime('%Y-%m')
+        monthly_stats[month_key] = 0
+    
+    for req, user, doc, company, dept in results:
+        month_key = req.created_at.strftime('%Y-%m')
+        if month_key in monthly_stats:
+            monthly_stats[month_key] += 1
+    
+    # Dati per grafici
 
+@admin_bp.route('/admin/all_access_requests', methods=['GET'])
+@login_required
+@admin_required
+def all_access_requests():
+    """
+    Vista admin per lo storico di tutte le richieste di accesso.
+    """
+    from sqlalchemy import or_
+
+    stato = request.args.get('status')
+    user_id = request.args.get('user_id')
+    file_id = request.args.get('file_id')
+
+    query = AccessRequest.query.join(User).join(Document).outerjoin(Company, Document.company_id == Company.id).outerjoin(Department, Document.department_id == Department.id)
+
+    if stato:
+        query = query.filter(AccessRequest.status == stato)
+    if user_id:
+        query = query.filter(AccessRequest.user_id == user_id)
+    if file_id:
+        query = query.filter(AccessRequest.document_id == file_id)
+
+    access_requests = query.order_by(AccessRequest.created_at.desc()).all()
+    users = User.query.order_by(User.first_name, User.last_name).all()
+    documents = Document.query.order_by(Document.title).all()
+
+    return render_template("admin/all_access_requests.html", requests=access_requests, users=users, files=documents)
+
+@admin_bp.route('/admin/all_access_requests/export/csv', methods=['GET'])
+@login_required
+@admin_required
+def export_all_access_requests_csv():
+    """
+    Esporta lo storico delle richieste di accesso in formato CSV.
+    """
+    stato = request.args.get('status')
+    user_id = request.args.get('user_id')
+    file_id = request.args.get('file_id')
+
+    query = AccessRequest.query.join(User).join(Document).outerjoin(Company, Document.company_id == Company.id).outerjoin(Department, Document.department_id == Department.id)
+
+    if stato:
+        query = query.filter(AccessRequest.status == stato)
+    if user_id:
+        query = query.filter(AccessRequest.user_id == user_id)
+    if file_id:
+        query = query.filter(AccessRequest.document_id == file_id)
+
+    rows = query.order_by(AccessRequest.created_at.desc()).all()
+
+    import csv
+    from io import StringIO
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(["Data richiesta", "Utente", "Email", "File", "Azienda", "Reparto", "Motivazione", "Stato", "Risposta admin"])
+
+    for r in rows:
+        # Nome utente completo
+        user_name = f"{r.user.first_name or ''} {r.user.last_name or ''}".strip() or r.user.username
+        
+        # Nome documento
+        document_name = r.document.title or r.document.original_filename or 'Documento non trovato'
+        
+        # Nome azienda e reparto
+        company_name = r.document.company.name if r.document.company else ""
+        department_name = r.document.department.name if r.document.department else ""
+        
+        writer.writerow([
+            r.created_at.strftime('%d/%m/%Y %H:%M'),
+            user_name,
+            r.user.email,
+            document_name,
+            company_name,
+            department_name,
+            r.note or "",
+            r.status,
+            r.risposta_ai or ""
+        ])
+
+    from flask import Response
+    si.seek(0)
+    return Response(
+        si.getvalue(),
+        mimetype='text/csv',
+        headers={"Content-Disposition": f"attachment;filename=storico_richieste_accesso_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+    )
+
+@admin_bp.route('/admin/all_access_requests/export/pdf', methods=['GET'])
+@login_required
+@admin_required
+def export_all_access_requests_pdf():
+    """
+    Esporta lo storico delle richieste di accesso in formato PDF.
+    """
+    stato = request.args.get('status')
+    user_id = request.args.get('user_id')
+    file_id = request.args.get('file_id')
+
+    query = AccessRequest.query.join(User).join(Document).outerjoin(Company, Document.company_id == Company.id).outerjoin(Department, Document.department_id == Department.id)
+
+    if stato:
+        query = query.filter(AccessRequest.status == stato)
+    if user_id:
+        query = query.filter(AccessRequest.user_id == user_id)
+    if file_id:
+        query = query.filter(AccessRequest.document_id == file_id)
+
+    rows = query.order_by(AccessRequest.created_at.desc()).all()
+
+    html = render_template("admin/pdf_all_access_requests.html", requests=rows)
+    
+    try:
+        from weasyprint import HTML
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
+            HTML(string=html).write_pdf(tmp.name)
+            tmp.seek(0)
+            pdf_data = tmp.read()
+
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=storico_richieste_accesso_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        return response
+    except ImportError:
+        flash("Errore: WeasyPrint non installato. Impossibile generare PDF.", "danger")
+        return redirect(url_for('admin.all_access_requests'))
+    except Exception as e:
+        flash(f"Errore durante la generazione del PDF: {str(e)}", "danger")
+        return redirect(url_for('admin.all_access_requests'))
+
+@admin_bp.route('/admin/all_access_requests/stats', methods=['GET'])
+@login_required
+@admin_required
+def all_access_requests_stats():
+    """
+    Vista analitica con statistiche e grafici per le richieste di accesso.
+    """
+    from sqlalchemy import func, extract
+    from datetime import datetime, timedelta
+    
+    # Parametri filtro opzionali
+    period = request.args.get('period', '12')  # ultimi 12 mesi di default
+    user_filter = request.args.get('user_id')
+    file_filter = request.args.get('file_id')
+    
+    # Data di inizio per il filtro temporale
+    start_date = datetime.now() - timedelta(days=int(period) * 30)
+    
+    # Query base
+    base_query = AccessRequest.query.join(User).join(Document)
+    
+    # Applica filtri
+    if user_filter:
+        base_query = base_query.filter(AccessRequest.user_id == user_filter)
+    if file_filter:
+        base_query = base_query.filter(AccessRequest.document_id == file_filter)
+    
+    # Filtro temporale
+    base_query = base_query.filter(AccessRequest.created_at >= start_date)
+    
+    # === STATISTICHE PER STATO ===
+    status_stats = db.session.query(
+        AccessRequest.status,
+        func.count(AccessRequest.id).label('count')
+    ).filter(
+        AccessRequest.created_at >= start_date
+    ).group_by(AccessRequest.status).all()
+    
+    status_data = {
+        'labels': [stat[0] for stat in status_stats],
+        'data': [stat[1] for stat in status_stats],
+        'colors': ['#ffc107', '#28a745', '#dc3545']  # warning, success, danger
+    }
+    
+    # === RICHIESTE PER MESE (ULTIMI 12 MESI) ===
+    monthly_stats = db.session.query(
+        extract('year', AccessRequest.created_at).label('year'),
+        extract('month', AccessRequest.created_at).label('month'),
+        func.count(AccessRequest.id).label('count')
+    ).filter(
+        AccessRequest.created_at >= start_date
+    ).group_by(
+        extract('year', AccessRequest.created_at),
+        extract('month', AccessRequest.created_at)
+    ).order_by('year', 'month').all()
+    
+    # Prepara dati per grafico lineare
+    months = []
+    counts = []
+    for stat in monthly_stats:
+        month_name = datetime(stat[0], stat[1], 1).strftime('%b %Y')
+        months.append(month_name)
+        counts.append(stat[2])
+    
+    monthly_data = {
+        'labels': months,
+        'data': counts
+    }
+    
+    # === TOP 10 UTENTI ===
+    top_users = db.session.query(
+        User.first_name,
+        User.last_name,
+        User.email,
+        func.count(AccessRequest.id).label('request_count')
+    ).join(AccessRequest).filter(
+        AccessRequest.created_at >= start_date
+    ).group_by(User.id).order_by(
+        func.count(AccessRequest.id).desc()
+    ).limit(10).all()
+    
+    users_data = {
+        'labels': [f"{user[0] or ''} {user[1] or ''}".strip() or user[2] for user in top_users],
+        'data': [user[3] for user in top_users]
+    }
+    
+    # === TOP 10 FILE ===
+    top_files = db.session.query(
+        Document.title,
+        Document.original_filename,
+        func.count(AccessRequest.id).label('request_count')
+    ).join(AccessRequest).filter(
+        AccessRequest.created_at >= start_date
+    ).group_by(Document.id).order_by(
+        func.count(AccessRequest.id).desc()
+    ).limit(10).all()
+    
+    files_data = {
+        'labels': [file[0] or file[1] or 'Documento non trovato' for file in top_files],
+        'data': [file[2] for file in top_files]
+    }
+    
+    # === STATISTICHE GENERALI ===
+    total_requests = sum(status_data['data'])
+    pending_requests = next((stat[1] for stat in status_stats if stat[0] == 'pending'), 0)
+    approved_requests = next((stat[1] for stat in status_stats if stat[0] == 'approved'), 0)
+    denied_requests = next((stat[1] for stat in status_stats if stat[0] == 'denied'), 0)
+    
+    # Calcola percentuali
+    pending_percent = (pending_requests / total_requests * 100) if total_requests > 0 else 0
+    approved_percent = (approved_requests / total_requests * 100) if total_requests > 0 else 0
+    denied_percent = (denied_requests / total_requests * 100) if total_requests > 0 else 0
+    
+    general_stats = {
+        'total_requests': total_requests,
+        'pending_requests': pending_requests,
+        'approved_requests': approved_requests,
+        'denied_requests': denied_requests,
+        'pending_percent': round(pending_percent, 1),
+        'approved_percent': round(approved_percent, 1),
+        'denied_percent': round(denied_percent, 1),
+        'period_days': int(period) * 30
+    }
+    
+    # Prepara dati per template
+    chart_data = {
+        'status': status_data,
+        'monthly': monthly_data,
+        'users': users_data,
+        'files': files_data
+    }
+    
+    # Lista utenti e file per filtri
+    users = User.query.order_by(User.first_name, User.last_name).all()
+    documents = Document.query.order_by(Document.title).all()
+    
+    return render_template("admin/all_access_requests_stats.html", 
+                         stats=general_stats, 
+                         chart_data=chart_data,
+                         users=users,
+                         documents=documents,
+                                                   filters={
+                              'period': period,
+                              'user_id': user_filter,
+                              'file_id': file_filter
+                          })
+
+@admin_bp.route('/admin/all_access_requests/ai_analysis', methods=['GET'])
+@login_required
+@admin_required
+def ai_access_requests_analysis():
+    """
+    Analisi AI delle richieste di accesso per identificare pattern e insight.
+    """
+    # Recupera tutte le richieste con join
+    rows = AccessRequest.query.join(User).join(Document).outerjoin(Company, Document.company_id == Company.id).outerjoin(Department, Document.department_id == Department.id) \
+        .order_by(AccessRequest.created_at.desc()).all()
+    
+    # Trasforma in formato analizzabile
+    data = []
+    for r in rows:
+        # Nome utente completo
+        user_name = f"{r.user.first_name or ''} {r.user.last_name or ''}".strip() or r.user.username
+        
+        # Nome documento
+        document_name = r.document.title or r.document.original_filename or 'Documento non trovato'
+        
+        # Nome azienda e reparto
+        company_name = r.document.company.name if r.document.company else ""
+        department_name = r.document.department.name if r.document.department else ""
+        
+        data.append({
+            "data": r.created_at.strftime('%Y-%m-%d'),
+            "ora": r.created_at.strftime('%H:%M'),
+            "utente": user_name,
+            "email": r.user.email,
+            "ruolo": r.user.role,
+            "azienda": company_name,
+            "reparto": department_name,
+            "file": document_name,
+            "stato": r.status,
+            "motivazione": r.note or "",
+            "risposta_admin": r.risposta_ai or ""
+        })
+
+    # Prompt per AI
+    import json
+    prompt_text = f"""
+Analizza il seguente elenco di richieste di accesso ai documenti aziendali:
+{json.dumps(data, ensure_ascii=False, indent=2)}
+
+Identifica e fornisci insight su:
+
+1. **UTENTI A RISCHIO**: Utenti con alto tasso di richieste negate e possibili motivi
+2. **DOCUMENTI PROBLEMATICI**: File più frequentemente richiesti ma non concessi
+3. **PATTERN TEMPORALI**: Picchi di richieste, giorni/ore più attive
+4. **ANOMALIE REPARTI**: Reparti o aziende con pattern anomali di richieste
+5. **SUGGERIMENTI POLITICHE**: Raccomandazioni per migliorare le politiche di accesso
+
+Analisi richiesta:
+- Identifica trend e pattern significativi
+- Evidenzia anomalie e comportamenti sospetti
+- Suggerisci azioni concrete per gli admin
+- Fornisci metriche quantitative quando possibile
+
+Fornisci una risposta in italiano, strutturata e sintetica, con sezioni chiare per ogni punto.
+"""
+    
+    try:
+        # Simula analisi AI (in produzione si userebbe OpenAI o altro servizio)
+        analysis = generate_ai_access_analysis(data)
+        return render_template("admin/ai_access_requests_analysis.html", analysis=analysis)
+    except Exception as e:
+        error_msg = f"Errore durante l'analisi AI: {str(e)}"
+        return render_template("admin/ai_access_requests_analysis.html", analysis=error_msg)
+
+def generate_ai_access_analysis(data):
+    """
+    Genera analisi AI simulata delle richieste di accesso.
+    In produzione, questa funzione chiamerebbe un servizio AI reale.
+    """
+    if not data:
+        return "Nessun dato disponibile per l'analisi."
+    
+    # Analisi statistica dei dati
+    total_requests = len(data)
+    status_counts = {}
+    user_requests = {}
+    file_requests = {}
+    department_requests = {}
+    time_patterns = {}
+    
+    for item in data:
+        # Conta stati
+        status = item['stato']
+        status_counts[status] = status_counts.get(status, 0) + 1
+        
+        # Conta richieste per utente
+        user = item['utente']
+        if user not in user_requests:
+            user_requests[user] = {'total': 0, 'denied': 0, 'approved': 0, 'pending': 0}
+        user_requests[user]['total'] += 1
+        user_requests[user][status] += 1
+        
+        # Conta richieste per file
+        file = item['file']
+        if file not in file_requests:
+            file_requests[file] = {'total': 0, 'denied': 0, 'approved': 0, 'pending': 0}
+        file_requests[file]['total'] += 1
+        file_requests[file][status] += 1
+        
+        # Conta richieste per reparto
+        dept = item['reparto']
+        if dept and dept not in department_requests:
+            department_requests[dept] = {'total': 0, 'denied': 0, 'approved': 0, 'pending': 0}
+        if dept:
+            department_requests[dept]['total'] += 1
+            department_requests[dept][status] += 1
+        
+        # Analizza pattern temporali
+        hour = int(item['ora'].split(':')[0])
+        time_patterns[hour] = time_patterns.get(hour, 0) + 1
+    
+    # Genera analisi strutturata
+    analysis = f"""🧠 ANALISI AI RICHIESTE ACCESSO DOCUMENTI
+
+📊 PANORAMICA GENERALE:
+• Totale richieste analizzate: {total_requests}
+• Distribuzione stati: {', '.join([f'{k}: {v}' for k, v in status_counts.items()])}
+
+🔍 INSIGHT PRINCIPALI:
+
+1. UTENTI A RISCHIO:
+"""
+    
+    # Identifica utenti con alto tasso di negazioni
+    high_risk_users = []
+    for user, stats in user_requests.items():
+        if stats['total'] >= 3:  # Almeno 3 richieste
+            denied_rate = (stats['denied'] / stats['total']) * 100
+            if denied_rate > 50:  # Più del 50% negate
+                high_risk_users.append((user, denied_rate, stats['total']))
+    
+    if high_risk_users:
+        analysis += "• Utenti con alto tasso di richieste negate:\n"
+        for user, rate, total in sorted(high_risk_users, key=lambda x: x[1], reverse=True)[:5]:
+            analysis += f"  - {user}: {rate:.1f}% negate ({total} richieste totali)\n"
+    else:
+        analysis += "• Nessun utente con pattern di rischio identificato\n"
+    
+    analysis += f"""
+2. DOCUMENTI PROBLEMATICI:
+"""
+    
+    # Identifica file più richiesti ma negati
+    problematic_files = []
+    for file, stats in file_requests.items():
+        if stats['total'] >= 2:  # Almeno 2 richieste
+            denied_rate = (stats['denied'] / stats['total']) * 100
+            if denied_rate > 60:  # Più del 60% negate
+                problematic_files.append((file, denied_rate, stats['total']))
+    
+    if problematic_files:
+        analysis += "• File con alto tasso di negazioni:\n"
+        for file, rate, total in sorted(problematic_files, key=lambda x: x[1], reverse=True)[:5]:
+            analysis += f"  - {file}: {rate:.1f}% negate ({total} richieste totali)\n"
+    else:
+        analysis += "• Nessun file con pattern problematico identificato\n"
+    
+    analysis += f"""
+3. PATTERN TEMPORALI:
+"""
+    
+    # Analizza picchi orari
+    if time_patterns:
+        peak_hours = sorted(time_patterns.items(), key=lambda x: x[1], reverse=True)[:3]
+        analysis += "• Ore di picco per richieste:\n"
+        for hour, count in peak_hours:
+            analysis += f"  - {hour}:00: {count} richieste\n"
+    
+    analysis += f"""
+4. ANALISI REPARTI:
+"""
+    
+    # Analizza reparti con pattern anomali
+    if department_requests:
+        dept_analysis = []
+        for dept, stats in department_requests.items():
+            if stats['total'] >= 2:
+                denied_rate = (stats['denied'] / stats['total']) * 100
+                dept_analysis.append((dept, denied_rate, stats['total']))
+        
+        if dept_analysis:
+            analysis += "• Reparti con tasso di negazioni:\n"
+            for dept, rate, total in sorted(dept_analysis, key=lambda x: x[1], reverse=True):
+                analysis += f"  - {dept}: {rate:.1f}% negate ({total} richieste)\n"
+    
+    analysis += f"""
+5. SUGGERIMENTI PER POLITICHE DI ACCESSO:
+
+🎯 RACCOMANDAZIONI IMMEDIATE:
+"""
+    
+    # Suggerimenti basati sui dati
+    if high_risk_users:
+        analysis += "• Rivedere le politiche di accesso per utenti con alto tasso di negazioni\n"
+    if problematic_files:
+        analysis += "• Valutare la necessità di accesso ai documenti più frequentemente negati\n"
+    if time_patterns:
+        analysis += "• Considerare l'implementazione di approvazioni automatiche per orari di picco\n"
+    
+    analysis += """• Implementare formazione specifica per i reparti con maggiori negazioni
+• Considerare l'automazione di approvazioni per documenti di routine
+• Monitorare continuamente i pattern di richieste per identificare nuove tendenze
+
+📈 METRICHE DI MONITORAGGIO:
+• Tasso di approvazione per reparto
+• Tempo medio di risposta alle richieste
+• Frequenza di richieste per documento
+• Pattern temporali ricorrenti
+
+⚠️ ATTENZIONE: Questa analisi è basata sui dati storici disponibili. 
+Si raccomanda di verificare i risultati con i responsabili dei reparti coinvolti.
+"""
+    
+    return analysis
+
+# === AI Auto-Policies per Richieste Accesso ===
+
+@admin_bp.route('/admin/access_requests/ai_policies', methods=['GET'])
+@login_required
+@admin_required
+def manage_ai_policies():
+    """
+    Dashboard per gestione regole AI automatiche.
+    """
+    # Recupera regole attive e in attesa
+    active_policies = AutoPolicy.get_active_policies()
+    pending_policies = AutoPolicy.get_pending_policies()
+    
+    # Statistiche
+    total_active = len(active_policies)
+    total_pending = len(pending_policies)
+    
+    return render_template(
+        'admin/manage_ai_policies.html',
+        active_policies=active_policies,
+        pending_policies=pending_policies,
+        total_active=total_active,
+        total_pending=total_pending
+    )
+
+@admin_bp.route('/admin/access_requests/ai_policies/generate', methods=['POST'])
+@login_required
+@admin_required
+def ai_generate_policies():
+    """
+    Genera regole AI avanzate utilizzando OpenAI basate sull'analisi storica delle richieste.
+    """
+    try:
+        # Recupera storico richieste per analisi
+        historical_requests = AccessRequest.query.join(User).join(Document).outerjoin(Company, Document.company_id == Company.id).outerjoin(Department, Document.department_id == Department.id) \
+            .order_by(AccessRequest.created_at.desc()).limit(1000).all()
+        
+        # Trasforma in formato analizzabile per OpenAI
+        analysis_data = []
+        for req in historical_requests:
+            user_name = f"{req.user.first_name or ''} {req.user.last_name or ''}".strip() or req.user.username
+            document_name = req.document.title or req.document.original_filename or 'Documento non trovato'
+            company_name = req.document.company.name if req.document.company else ""
+            department_name = req.document.department.name if req.document.department else ""
+            
+            # Estrai tag del documento se disponibili
+            document_tags = []
+            if hasattr(req.document, 'tags') and req.document.tags:
+                document_tags = [tag.name for tag in req.document.tags]
+            
+            analysis_data.append({
+                "utente": user_name,
+                "ruolo": req.user.role,
+                "azienda": company_name,
+                "reparto": department_name,
+                "file": document_name,
+                "tags": document_tags,
+                "stato": req.status,
+                "motivazione": req.note or "",
+                "data_richiesta": req.created_at.strftime('%Y-%m-%d %H:%M')
+            })
+        
+        # Genera prompt per OpenAI
+        import json
+        prompt_text = f"""
+Sei un assistente di sicurezza documentale esperto in analisi di pattern e creazione di policy automatiche.
+
+Analizza il seguente storico di richieste di accesso ai documenti aziendali:
+{json.dumps(analysis_data, ensure_ascii=False, indent=2)}
+
+INSTRUZIONI:
+1. Identifica pattern ricorrenti di approvazione o diniego
+2. Analizza correlazioni tra: ruolo utente, azienda, reparto, tag file, motivazioni
+3. Suggerisci regole operative chiare del tipo "SE [condizione] ALLORA [azione approve/deny]"
+4. Considera fattori di sicurezza e compliance aziendale
+
+REGOLE DA GENERARE:
+- Usa condizioni basate su: ruolo utente, azienda, reparto, tag del file, storico richieste
+- Priorità: sicurezza > efficienza > automazione
+- Considera pattern temporali e frequenza richieste
+- Evita regole troppo permissive o restrittive
+
+FORMATO RISPOSTA:
+Restituisci le regole in formato JSON con questa struttura:
+{{
+    "rules": [
+        {{
+            "name": "Nome regola",
+            "description": "Descrizione dettagliata",
+            "condition": "{{"field": "campo", "operator": "operatore", "value": "valore"}}",
+            "condition_type": "json",
+            "action": "approve|deny",
+            "priority": 1-10,
+            "confidence": 0-100,
+            "explanation": "Spiegazione del pattern identificato"
+        }}
+    ],
+    "analysis": "Analisi generale dei pattern identificati"
+}}
+
+CRITERI DI VALIDAZIONE:
+- Regole devono essere specifiche e misurabili
+- Evita condizioni troppo generiche
+- Considera il contesto aziendale
+- Priorità basata su frequenza e sicurezza
+"""
+        
+        # Chiamata a OpenAI (simulata per ora)
+        try:
+            # In produzione, qui si chiamerebbe OpenAI
+            # ai_response = openai.ChatCompletion.create(...)
+            
+            # Per ora usiamo la generazione locale avanzata
+            generated_policies = generate_advanced_ai_policies(analysis_data)
+            
+            return jsonify({
+                'success': True,
+                'policies': generated_policies['rules'],
+                'analysis': generated_policies['analysis'],
+                'message': f'Generate {len(generated_policies["rules"])} regole AI avanzate'
+            })
+            
+        except Exception as ai_error:
+            # Fallback alla generazione locale
+            generated_policies = generate_ai_policies(analysis_data)
+            return jsonify({
+                'success': True,
+                'policies': generated_policies,
+                'analysis': "Analisi basata su pattern locali (OpenAI non disponibile)",
+                'message': f'Generate {len(generated_policies)} regole AI (fallback locale)'
+            })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Errore generazione regole: {str(e)}'
+        }), 500
+
+def generate_advanced_ai_policies(analysis_data):
+    """
+    Genera regole AI avanzate con analisi approfondita dei pattern.
+    
+    Args:
+        analysis_data: Lista di richieste storiche per analisi
+        
+    Returns:
+        dict: Regole generate con analisi
+    """
+    # Analisi statistica avanzata
+    user_patterns = {}
+    company_patterns = {}
+    department_patterns = {}
+    role_patterns = {}
+    tag_patterns = {}
+    time_patterns = {}
+    
+    for data in analysis_data:
+        # Pattern per utente
+        user_key = data['utente']
+        if user_key not in user_patterns:
+            user_patterns[user_key] = {'total': 0, 'approved': 0, 'denied': 0, 'pending': 0}
+        user_patterns[user_key]['total'] += 1
+        user_patterns[user_key][data['stato']] += 1
+        
+        # Pattern per azienda
+        company_key = f"{data['ruolo']}_{data['azienda']}"
+        if company_key not in company_patterns:
+            company_patterns[company_key] = {'total': 0, 'approved': 0, 'denied': 0}
+        company_patterns[company_key]['total'] += 1
+        company_patterns[company_key][data['stato']] += 1
+        
+        # Pattern per reparto
+        dept_key = f"{data['ruolo']}_{data['reparto']}"
+        if dept_key not in department_patterns:
+            department_patterns[dept_key] = {'total': 0, 'approved': 0, 'denied': 0}
+        department_patterns[dept_key]['total'] += 1
+        department_patterns[dept_key][data['stato']] += 1
+        
+        # Pattern per ruolo
+        role = data['ruolo']
+        if role not in role_patterns:
+            role_patterns[role] = {'total': 0, 'approved': 0, 'denied': 0}
+        role_patterns[role]['total'] += 1
+        role_patterns[role][data['stato']] += 1
+        
+        # Pattern per tag
+        for tag in data['tags']:
+            if tag not in tag_patterns:
+                tag_patterns[tag] = {'total': 0, 'approved': 0, 'denied': 0}
+            tag_patterns[tag]['total'] += 1
+            tag_patterns[tag][data['stato']] += 1
+        
+        # Pattern temporali
+        hour = int(data['data_richiesta'].split(' ')[1].split(':')[0])
+        if hour not in time_patterns:
+            time_patterns[hour] = 0
+        time_patterns[hour] += 1
+    
+    rules = []
+    
+    # 1. Regola: Approva automaticamente admin stessa azienda
+    admin_same_company_approvals = 0
+    admin_same_company_total = 0
+    for key, stats in company_patterns.items():
+        if key.startswith('admin_') and stats['total'] >= 3:
+            admin_same_company_total += stats['total']
+            admin_same_company_approvals += stats['approved']
+    
+    if admin_same_company_total > 0:
+        approval_rate = (admin_same_company_approvals / admin_same_company_total) * 100
+        if approval_rate > 85:
+            rules.append({
+                "name": "Approva Admin Stessa Azienda",
+                "description": f"Approva automaticamente le richieste da admin per documenti della stessa azienda (tasso approvazione: {approval_rate:.1f}%)",
+                "condition": '{"field": "user_role", "operator": "equals", "value": "admin"}',
+                "condition_type": "json",
+                "action": "approve",
+                "priority": 1,
+                "confidence": approval_rate,
+                "explanation": f"Gli admin hanno un tasso di approvazione del {approval_rate:.1f}% per documenti della stessa azienda"
+            })
+    
+    # 2. Regola: Nega guest per documenti confidenziali
+    confidential_denials = 0
+    confidential_total = 0
+    for tag, stats in tag_patterns.items():
+        if 'confidenziale' in tag.lower() or 'riservato' in tag.lower():
+            confidential_total += stats['total']
+            confidential_denials += stats['denied']
+    
+    if confidential_total > 0:
+        denial_rate = (confidential_denials / confidential_total) * 100
+        if denial_rate > 70:
+            rules.append({
+                "name": "Nega Guest Documenti Confidenziali",
+                "description": f"Nega automaticamente le richieste da guest per documenti confidenziali (tasso negazione: {denial_rate:.1f}%)",
+                "condition": '{"field": "user_role", "operator": "equals", "value": "guest"}',
+                "condition_type": "json",
+                "action": "deny",
+                "priority": 2,
+                "confidence": denial_rate,
+                "explanation": f"I documenti confidenziali hanno un tasso di negazione del {denial_rate:.1f}% per utenti guest"
+            })
+    
+    # 3. Regola: Approva utenti stesso reparto
+    same_dept_approvals = 0
+    same_dept_total = 0
+    for key, stats in department_patterns.items():
+        if stats['total'] >= 5:  # Almeno 5 richieste per pattern
+            same_dept_total += stats['total']
+            same_dept_approvals += stats['approved']
+    
+    if same_dept_total > 0:
+        approval_rate = (same_dept_approvals / same_dept_total) * 100
+        if approval_rate > 80:
+            rules.append({
+                "name": "Approva Stesso Reparto",
+                "description": f"Approva automaticamente le richieste per documenti dello stesso reparto (tasso approvazione: {approval_rate:.1f}%)",
+                "condition": '{"field": "user_department", "operator": "field_equals", "value": "document_department"}',
+                "condition_type": "json",
+                "action": "approve",
+                "priority": 3,
+                "confidence": approval_rate,
+                "explanation": f"Le richieste per lo stesso reparto hanno un tasso di approvazione del {approval_rate:.1f}%"
+            })
+    
+    # 4. Regola: Nega richieste fuori orario
+    if time_patterns:
+        peak_hours = sorted(time_patterns.items(), key=lambda x: x[1], reverse=True)[:3]
+        off_peak_hours = [h for h in range(24) if h not in [ph[0] for ph in peak_hours]]
+        
+        if len(off_peak_hours) > 0:
+            rules.append({
+                "name": "Revisione Richieste Fuori Orario",
+                "description": "Richiede revisione manuale per richieste fuori orario di picco",
+                "condition": '{"field": "request_hour", "operator": "not_in", "value": [9, 10, 11, 14, 15, 16]}',
+                "condition_type": "json",
+                "action": "deny",
+                "priority": 4,
+                "confidence": 60,
+                "explanation": "Le richieste fuori orario di picco richiedono maggiore attenzione"
+            })
+    
+    # 5. Regola: Approva utenti con storico positivo
+    positive_users = []
+    for user, stats in user_patterns.items():
+        if stats['total'] >= 5:  # Almeno 5 richieste
+            approval_rate = (stats['approved'] / stats['total']) * 100
+            if approval_rate > 90:
+                positive_users.append(user)
+    
+    if positive_users:
+        rules.append({
+            "name": "Approva Utenti Affidabili",
+            "description": f"Approva automaticamente le richieste da utenti con storico positivo ({len(positive_users)} utenti)",
+            "condition": '{"field": "user_name", "operator": "in", "value": ' + str(positive_users) + '}',
+            "condition_type": "json",
+            "action": "approve",
+            "priority": 5,
+            "confidence": 90,
+            "explanation": f"Gli utenti con tasso di approvazione >90% sono considerati affidabili"
+        })
+    
+    # Analisi generale
+    total_requests = len(analysis_data)
+    total_approved = sum(1 for d in analysis_data if d['stato'] == 'approved')
+    total_denied = sum(1 for d in analysis_data if d['stato'] == 'denied')
+    
+    analysis = f"""
+ANALISI PATTERN IDENTIFICATI:
+• Totale richieste analizzate: {total_requests}
+• Tasso approvazione generale: {(total_approved/total_requests*100):.1f}%
+• Tasso negazione generale: {(total_denied/total_requests*100):.1f}%
+• Pattern più frequenti: {len(rules)} regole identificate
+• Priorità: Sicurezza > Efficienza > Automazione
+
+RACCOMANDAZIONI:
+• Attivare regole gradualmente per monitorare l'impatto
+• Rivedere regole ogni 30 giorni basandosi sui nuovi dati
+• Considerare eccezioni per casi speciali
+• Mantenere sempre la possibilità di revisione manuale
+"""
+    
+    return {
+        "rules": rules,
+        "analysis": analysis
+    }
+
+def generate_ai_policies(analysis_data):
+    """
+    Genera regole AI basate sui dati storici.
+    
+    Args:
+        analysis_data: Lista di richieste storiche per analisi
+        
+    Returns:
+        list: Lista di regole generate
+    """
+    policies = []
+    
+    # Analizza pattern per generare regole
+    user_company_patterns = {}
+    user_department_patterns = {}
+    role_patterns = {}
+    document_patterns = {}
+    
+    for data in analysis_data:
+        # Pattern per azienda
+        key = f"{data['user_role']}_{data['user_company']}_{data['document_company']}"
+        if key not in user_company_patterns:
+            user_company_patterns[key] = {'total': 0, 'approved': 0, 'denied': 0}
+        user_company_patterns[key]['total'] += 1
+        if data['status'] == 'approved':
+            user_company_patterns[key]['approved'] += 1
+        elif data['status'] == 'denied':
+            user_company_patterns[key]['denied'] += 1
+        
+        # Pattern per reparto
+        key = f"{data['user_role']}_{data['user_department']}_{data['document_department']}"
+        if key not in user_department_patterns:
+            user_department_patterns[key] = {'total': 0, 'approved': 0, 'denied': 0}
+        user_department_patterns[key]['total'] += 1
+        if data['status'] == 'approved':
+            user_department_patterns[key]['approved'] += 1
+        elif data['status'] == 'denied':
+            user_department_patterns[key]['denied'] += 1
+        
+        # Pattern per ruolo
+        if data['user_role'] not in role_patterns:
+            role_patterns[data['user_role']] = {'total': 0, 'approved': 0, 'denied': 0}
+        role_patterns[data['user_role']]['total'] += 1
+        if data['status'] == 'approved':
+            role_patterns[data['user_role']]['approved'] += 1
+        elif data['status'] == 'denied':
+            role_patterns[data['user_role']]['denied'] += 1
+    
+    # Genera regole basate sui pattern
+    
+    # 1. Regola: Approva automaticamente se utente e documento sono della stessa azienda
+    same_company_approvals = 0
+    same_company_total = 0
+    for key, stats in user_company_patterns.items():
+        if key.split('_')[1] == key.split('_')[2] and key.split('_')[1]:  # Stessa azienda
+            same_company_total += stats['total']
+            same_company_approvals += stats['approved']
+    
+    if same_company_total > 0:
+        approval_rate = (same_company_approvals / same_company_total) * 100
+        if approval_rate > 80:  # Se più dell'80% delle richieste per stessa azienda sono approvate
+            policies.append({
+                'name': 'Approva Richieste Stessa Azienda',
+                'description': f'Approva automaticamente le richieste quando utente e documento appartengono alla stessa azienda (tasso approvazione: {approval_rate:.1f}%)',
+                'condition': '{"field": "user_company", "operator": "field_equals", "value": "document_company"}',
+                'condition_type': 'json',
+                'action': 'approve',
+                'priority': 1,
+                'confidence': approval_rate
+            })
+    
+    # 2. Regola: Approva automaticamente se utente e documento sono dello stesso reparto
+    same_dept_approvals = 0
+    same_dept_total = 0
+    for key, stats in user_department_patterns.items():
+        if key.split('_')[1] == key.split('_')[2] and key.split('_')[1]:  # Stesso reparto
+            same_dept_total += stats['total']
+            same_dept_approvals += stats['approved']
+    
+    if same_dept_total > 0:
+        approval_rate = (same_dept_approvals / same_dept_total) * 100
+        if approval_rate > 75:  # Se più del 75% delle richieste per stesso reparto sono approvate
+            policies.append({
+                'name': 'Approva Richieste Stesso Reparto',
+                'description': f'Approva automaticamente le richieste quando utente e documento appartengono allo stesso reparto (tasso approvazione: {approval_rate:.1f}%)',
+                'condition': '{"field": "user_department", "operator": "field_equals", "value": "document_department"}',
+                'condition_type': 'json',
+                'action': 'approve',
+                'priority': 2,
+                'confidence': approval_rate
+            })
+    
+    # 3. Regola: Nega automaticamente richieste da guest per documenti confidenziali
+    if 'guest' in role_patterns:
+        guest_stats = role_patterns['guest']
+        if guest_stats['total'] > 5:  # Almeno 5 richieste da guest
+            denial_rate = (guest_stats['denied'] / guest_stats['total']) * 100
+            if denial_rate > 60:  # Se più del 60% delle richieste da guest sono negate
+                policies.append({
+                    'name': 'Nega Richieste Guest Confidenziali',
+                    'description': f'Nega automaticamente le richieste da utenti guest per documenti confidenziali (tasso negazione guest: {denial_rate:.1f}%)',
+                    'condition': '{"field": "user_role", "operator": "equals", "value": "guest"}',
+                    'condition_type': 'json',
+                    'action': 'deny',
+                    'priority': 3,
+                    'confidence': denial_rate
+                })
+    
+    # 4. Regola: Approva automaticamente richieste da admin
+    if 'admin' in role_patterns:
+        admin_stats = role_patterns['admin']
+        if admin_stats['total'] > 3:  # Almeno 3 richieste da admin
+            approval_rate = (admin_stats['approved'] / admin_stats['total']) * 100
+            if approval_rate > 90:  # Se più del 90% delle richieste da admin sono approvate
+                policies.append({
+                    'name': 'Approva Richieste Admin',
+                    'description': f'Approva automaticamente le richieste da utenti admin (tasso approvazione: {approval_rate:.1f}%)',
+                    'condition': '{"field": "user_role", "operator": "equals", "value": "admin"}',
+                    'condition_type': 'json',
+                    'action': 'approve',
+                    'priority': 4,
+                    'confidence': approval_rate
+                })
+    
+    return policies
+
+@admin_bp.route('/admin/access_requests/ai_policies/activate', methods=['POST'])
+@login_required
+@admin_required
+def activate_ai_policy():
+    """
+    Attiva una regola AI proposta.
+    """
+    try:
+        data = request.get_json()
+        policy_data = data.get('policy')
+        
+        if not policy_data:
+            return jsonify({'success': False, 'error': 'Dati regola mancanti'}), 400
+        
+        # Crea nuova regola
+        new_policy = AutoPolicy(
+            name=policy_data['name'],
+            description=policy_data['description'],
+            condition=policy_data['condition'],
+            condition_type=policy_data['condition_type'],
+            action=policy_data['action'],
+            priority=policy_data['priority'],
+            created_by=current_user.id
+        )
+        
+        db.session.add(new_policy)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Regola "{policy_data["name"]}" creata con successo',
+            'policy_id': new_policy.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Errore attivazione regola: {str(e)}'
+        }), 500
+
+@admin_bp.route('/admin/access_requests/ai_policies/<int:policy_id>/activate', methods=['POST'])
+@login_required
+@admin_required
+def activate_existing_policy(policy_id):
+    """
+    Attiva una regola esistente.
+    """
+    try:
+        policy = AutoPolicy.query.get_or_404(policy_id)
+        policy.activate(current_user.id)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Regola "{policy.name}" attivata con successo'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Errore attivazione regola: {str(e)}'
+        }), 500
+
+@admin_bp.route('/admin/access_requests/ai_policies/<int:policy_id>/deactivate', methods=['POST'])
+@login_required
+@admin_required
+def deactivate_policy(policy_id):
+    """
+    Disattiva una regola attiva.
+    """
+    try:
+        policy = AutoPolicy.query.get_or_404(policy_id)
+        policy.deactivate()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Regola "{policy.name}" disattivata con successo'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Errore disattivazione regola: {str(e)}'
+        }), 500
+
+@admin_bp.route('/admin/access_requests/ai_policies/<int:policy_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_policy(policy_id):
+    """
+    Elimina una regola con audit log.
+    """
+    try:
+        policy = AutoPolicy.query.get_or_404(policy_id)
+        policy_name = policy.name
+        policy_id_value = policy.id
+        
+        # Log audit prima dell'eliminazione
+        from utils.audit_logger import log_admin_action
+        log_admin_action(
+            action="policy_deleted",
+            performed_by=current_user.id,
+            extra_info={
+                'policy_id': policy_id_value,
+                'policy_name': policy_name,
+                'policy_action': policy.action,
+                'policy_condition': policy.condition
+            }
+        )
+        
+        db.session.delete(policy)
+        db.session.commit()
+        
+        flash(f'Regola "{policy_name}" eliminata con successo.', 'success')
+        return redirect(url_for('admin.manage_ai_policies'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore eliminazione regola: {str(e)}', 'error')
+        return redirect(url_for('admin.manage_ai_policies'))
+
+@admin_bp.route('/admin/access_requests/ai_policies/<int:policy_id>/toggle', methods=['POST'])
+@login_required
+@admin_required
+def toggle_policy(policy_id):
+    """
+    Attiva/disattiva una regola con audit log.
+    """
+    try:
+        policy = AutoPolicy.query.get_or_404(policy_id)
+        old_status = policy.active
+        new_status = policy.toggle()
+        
+        # Log audit
+        from utils.audit_logger import log_admin_action
+        log_admin_action(
+            action="policy_toggled",
+            performed_by=current_user.id,
+            extra_info={
+                'policy_id': policy.id,
+                'policy_name': policy.name,
+                'old_status': old_status,
+                'new_status': new_status,
+                'policy_action': policy.action
+            }
+        )
+        
+        status_text = "attivata" if new_status else "disattivata"
+        flash(f'Regola "{policy.name}" {status_text} con successo.', 'success')
+        return redirect(url_for('admin.manage_ai_policies'))
+        
+    except Exception as e:
+        flash(f'Errore modifica regola: {str(e)}', 'error')
+        return redirect(url_for('admin.manage_ai_policies'))
+
+@admin_bp.route('/admin/access_requests/ai_policies/<int:policy_id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_policy(policy_id):
+    """
+    Modifica una regola esistente.
+    """
+    policy = AutoPolicy.query.get_or_404(policy_id)
+    
+    if request.method == 'POST':
+        try:
+            # Aggiorna i campi della regola
+            policy.name = request.form.get('name', policy.name)
+            policy.description = request.form.get('description', policy.description)
+            policy.condition = request.form.get('condition', policy.condition)
+            policy.action = request.form.get('action', policy.action)
+            policy.priority = int(request.form.get('priority', policy.priority))
+            
+            # Log audit
+            from utils.audit_logger import log_admin_action
+            log_admin_action(
+                action="policy_edited",
+                performed_by=current_user.id,
+                extra_info={
+                    'policy_id': policy.id,
+                    'policy_name': policy.name,
+                    'old_action': policy.action,
+                    'new_action': request.form.get('action', policy.action)
+                }
+            )
+            
+            db.session.commit()
+            flash(f'Regola "{policy.name}" modificata con successo.', 'success')
+            return redirect(url_for('admin.manage_ai_policies'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Errore modifica regola: {str(e)}', 'error')
+    
+    return render_template('admin/edit_policy.html', policy=policy)
+
+@admin_bp.route('/admin/access_requests/ai_policies/<int:policy_id>/simulate', methods=['GET'])
+@login_required
+@admin_required
+def simulate_policy(policy_id):
+    """
+    Simula una policy sui dati storici delle richieste di accesso.
+    """
+    try:
+        policy = AutoPolicy.query.get_or_404(policy_id)
+        
+        # Recupera tutte le richieste storiche
+        from models import AccessRequest, User, Document
+        all_requests = AccessRequest.query.join(User).join(Document).all()
+        
+        # Simula applicazione policy
+        from utils.policies import match_policy
+        
+        results = {
+            "approve": 0, 
+            "deny": 0, 
+            "match": 0, 
+            "total": len(all_requests), 
+            "matches": [],
+            "impact_analysis": {}
+        }
+        
+        for req in all_requests:
+            if match_policy(policy, req.user, req.document, req.note or ""):
+                results["match"] += 1
+                results[policy.action] += 1
+                results["matches"].append(req)
+        
+        # Analisi impatto
+        if results["total"] > 0:
+            results["impact_analysis"] = {
+                "match_percentage": (results["match"] / results["total"]) * 100,
+                "approve_percentage": (results["approve"] / results["total"]) * 100,
+                "deny_percentage": (results["deny"] / results["total"]) * 100,
+                "efficiency_score": results["match"] / results["total"] if results["total"] > 0 else 0
+            }
+        
+        # Log audit simulazione
+        from utils.logging import log_audit_event
+        log_audit_event(
+            action="policy_simulated",
+            details=f"Policy {policy.id} simulata su {results['total']} richieste",
+            user_id=current_user.id,
+            extra_info={
+                'policy_id': policy.id,
+                'policy_name': policy.name,
+                'total_requests': results['total'],
+                'matched_requests': results['match'],
+                'auto_approve': results['approve'],
+                'auto_deny': results['deny']
+            }
+        )
+        
+        return render_template("admin/simulate_policy.html", policy=policy, results=results)
+        
+    except Exception as e:
+        flash(f"Errore durante la simulazione: {str(e)}", "error")
+        return redirect(url_for('admin.manage_ai_policies'))
+
+@admin_bp.route('/admin/access_requests/ai_policies/simulate_batch', methods=['POST'])
+@login_required
+@admin_required
+def simulate_batch_policies():
+    """
+    Simula multiple policy contemporaneamente.
+    """
+    try:
+        policy_ids = request.form.getlist('policy_ids')
+        if not policy_ids:
+            flash("Seleziona almeno una policy da simulare.", "warning")
+            return redirect(url_for('admin.manage_ai_policies'))
+        
+        from models import AccessRequest, User, Document
+        from utils.policies import match_policy
+        
+        all_requests = AccessRequest.query.join(User).join(Document).all()
+        batch_results = {}
+        
+        for policy_id in policy_ids:
+            policy = AutoPolicy.query.get(policy_id)
+            if policy:
+                results = {
+                    "approve": 0, "deny": 0, "match": 0, 
+                    "total": len(all_requests), "matches": []
+                }
+                
+                for req in all_requests:
+                    if match_policy(policy, req.user, req.document, req.note or ""):
+                        results["match"] += 1
+                        results[policy.action] += 1
+                        results["matches"].append(req)
+                
+                batch_results[policy_id] = {
+                    'policy': policy,
+                    'results': results
+                }
+        
+        return render_template("admin/simulate_batch_policies.html", batch_results=batch_results)
+        
+    except Exception as e:
+        flash(f"Errore durante la simulazione batch: {str(e)}", "error")
+        return redirect(url_for('admin.manage_ai_policies'))
+
+@admin_bp.route('/admin/policy_reviews', methods=['GET'])
+@login_required
+@admin_required
+def policy_reviews_list():
+    """
+    Lista dei report di revisione AI delle policy.
+    """
+    from models import PolicyReview
+    
+    # Paginazione
+    page = request.args.get('page', 1, type=int)
+    per_page = 10
+    
+    reviews = PolicyReview.query.order_by(PolicyReview.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # Statistiche
+    stats = PolicyReview.get_review_statistics()
+    
+    return render_template('admin/policy_reviews_list.html', reviews=reviews, stats=stats)
+
+@admin_bp.route('/admin/policy_reviews/<int:review_id>', methods=['GET'])
+@login_required
+@admin_required
+def view_policy_review(review_id):
+    """
+    Visualizza un report di revisione AI specifico.
+    """
+    from models import PolicyReview
+    
+    review = PolicyReview.query.get_or_404(review_id)
+    
+    return render_template('admin/policy_review.html', review=review)
+
+@admin_bp.route('/admin/policy_reviews/<int:review_id>/apply_suggestion', methods=['POST'])
+@login_required
+@admin_required
+def apply_ai_suggestion(review_id):
+    """
+    Applica un suggerimento AI creando una nuova policy.
+    """
+    try:
+        from models import PolicyReview
+        from tasks.ai_policy_review import apply_ai_suggestion
+        
+        review = PolicyReview.query.get_or_404(review_id)
+        suggestion_index = request.form.get('suggestion_index', type=int)
+        
+        if suggestion_index is None or suggestion_index >= len(review.suggestions):
+            flash('Suggerimento non valido.', 'error')
+            return redirect(url_for('admin.view_policy_review', review_id=review_id))
+        
+        suggestion_data = review.suggestions[suggestion_index]
+        
+        # Applica suggerimento
+        new_policy = apply_ai_suggestion(suggestion_data)
+        
+        if new_policy:
+            flash(f'Policy creata con successo: {new_policy.name}', 'success')
+        else:
+            flash('Errore durante la creazione della policy.', 'error')
+        
+        return redirect(url_for('admin.view_policy_review', review_id=review_id))
+        
+    except Exception as e:
+        flash(f'Errore: {str(e)}', 'error')
+        return redirect(url_for('admin.view_policy_review', review_id=review_id))
+
+@admin_bp.route('/admin/policy_reviews/<int:review_id>/mark_reviewed', methods=['POST'])
+@login_required
+@admin_required
+def mark_review_reviewed(review_id):
+    """
+    Marca un report come revisionato.
+    """
+    try:
+        from models import PolicyReview
+        
+        review = PolicyReview.query.get_or_404(review_id)
+        admin_notes = request.form.get('admin_notes', '')
+        
+        review.mark_as_reviewed(admin_notes)
+        
+        flash('Report marcato come revisionato.', 'success')
+        return redirect(url_for('admin.view_policy_review', review_id=review_id))
+        
+    except Exception as e:
+        flash(f'Errore: {str(e)}', 'error')
+        return redirect(url_for('admin.view_policy_review', review_id=review_id))
+
+@admin_bp.route('/admin/policy_reviews/<int:review_id>/activate_suggestion', methods=['POST'])
+@login_required
+@admin_required
+def activate_ai_suggestion(review_id):
+    """
+    Attiva un suggerimento AI come nuova policy.
+    """
+    try:
+        from models import AutoPolicy, PolicyReview
+        
+        review = PolicyReview.query.get_or_404(review_id)
+        
+        # Recupera dati dal form
+        condition = request.form.get("condition")
+        action = request.form.get("action")
+        explanation = request.form.get("explanation")
+        priority = int(request.form.get("priority", 3))
+        confidence = int(request.form.get("confidence", 70))
+        active = bool(request.form.get("active", False))
+        
+        # Validazione
+        if not condition or not action:
+            flash("Dati suggerimento incompleti.", "error")
+            return redirect(url_for('admin.view_policy_review', review_id=review_id))
+        
+        if action not in ['approve', 'deny']:
+            flash("Azione non valida.", "error")
+            return redirect(url_for('admin.view_policy_review', review_id=review_id))
+        
+        # Crea nuova policy
+        policy = AutoPolicy(
+            name=f"Policy AI - {datetime.utcnow().strftime('%Y%m%d_%H%M')}",
+            description=explanation or "Policy generata da suggerimento AI",
+            condition=condition,
+            action=action,
+            priority=priority,
+            confidence=confidence,
+            active=active,
+            created_by=current_user.id
+        )
+        
+        db.session.add(policy)
+        db.session.commit()
+        
+        # Log audit
+        from utils.logging import log_audit_event
+        log_audit_event(
+            action="policy_created_from_ai_suggestion",
+            details=f"Policy {policy.id} creata dal report {review.id} - attiva={active}",
+            user_id=current_user.id,
+            extra_info={
+                'policy_id': policy.id,
+                'review_id': review.id,
+                'condition': condition,
+                'action': action,
+                'active': active,
+                'priority': priority,
+                'confidence': confidence
+            }
+        )
+        
+        # Aggiorna review con suggerimento applicato
+        if not review.applied_suggestions:
+            review.applied_suggestions = []
+        
+        applied_suggestion = {
+            'condition': condition,
+            'action': action,
+            'explanation': explanation,
+            'applied_at': datetime.utcnow().isoformat(),
+            'policy_id': policy.id
+        }
+        review.applied_suggestions.append(applied_suggestion)
+        db.session.commit()
+        
+        # Messaggio di successo
+        status_text = "attivata" if active else "salvata come bozza"
+        flash(f"Policy creata con successo e {status_text}.", "success")
+        
+        return redirect(url_for('admin.view_policy_review', review_id=review_id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Errore durante la creazione della policy: {str(e)}", "error")
+        return redirect(url_for('admin.view_policy_review', review_id=review_id))
+
+@admin_bp.route('/admin/policy_reviews/<int:review_id>/activate_multiple', methods=['POST'])
+@login_required
+@admin_required
+def activate_multiple_suggestions(review_id):
+    """
+    Attiva multiple suggerimenti AI contemporaneamente.
+    """
+    try:
+        from models import AutoPolicy, PolicyReview
+        
+        review = PolicyReview.query.get_or_404(review_id)
+        suggestion_indices = request.form.getlist('suggestion_indices')
+        
+        if not suggestion_indices:
+            flash("Nessun suggerimento selezionato.", "warning")
+            return redirect(url_for('admin.view_policy_review', review_id=review_id))
+        
+        created_policies = []
+        
+        for index in suggestion_indices:
+            try:
+                suggestion_index = int(index)
+                if 0 <= suggestion_index < len(review.suggestions):
+                    suggestion = review.suggestions[suggestion_index]
+                    
+                    # Crea policy dal suggerimento
+                    policy = AutoPolicy(
+                        name=f"Policy AI - {datetime.utcnow().strftime('%Y%m%d_%H%M')}",
+                        description=suggestion.get('explanation', 'Policy generata da suggerimento AI'),
+                        condition=suggestion.get('condition', ''),
+                        action=suggestion.get('action', 'approve'),
+                        priority=suggestion.get('priority', 3),
+                        confidence=suggestion.get('confidence', 70),
+                        active=False,  # Sempre come bozza per multiple
+                        created_by=current_user.id
+                    )
+                    
+                    db.session.add(policy)
+                    created_policies.append(policy)
+                    
+            except (ValueError, IndexError):
+                continue
+        
+        if created_policies:
+            db.session.commit()
+            
+            # Log audit
+            from utils.logging import log_audit_event
+            log_audit_event(
+                action="multiple_policies_created_from_ai",
+                details=f"Create {len(created_policies)} policy dal report {review.id}",
+                user_id=current_user.id,
+                extra_info={
+                    'review_id': review.id,
+                    'policies_created': len(created_policies),
+                    'suggestion_indices': suggestion_indices
+                }
+            )
+            
+            flash(f"Create {len(created_policies)} policy con successo.", "success")
+        else:
+            flash("Nessuna policy creata.", "warning")
+        
+        return redirect(url_for('admin.view_policy_review', review_id=review_id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Errore durante la creazione delle policy: {str(e)}", "error")
+        return redirect(url_for('admin.view_policy_review', review_id=review_id))
+
+@admin_bp.route('/admin/policy_impact_reports', methods=['GET'])
+@login_required
+@admin_required
+def policy_impact_reports_list():
+    """
+    Lista dei report di impatto delle policy.
+    """
+    try:
+        from models import PolicyImpactReport
+        
+        # Paginazione
+        page = request.args.get('page', 1, type=int)
+        per_page = 10
+        
+        # Filtri
+        status_filter = request.args.get('status', '')
+        date_from = request.args.get('date_from', '')
+        date_to = request.args.get('date_to', '')
+        
+        # Query base
+        query = PolicyImpactReport.query
+        
+        # Applica filtri
+        if status_filter == 'reviewed':
+            query = query.filter_by(reviewed=True)
+        elif status_filter == 'pending':
+            query = query.filter_by(reviewed=False)
+        
+        if date_from:
+            try:
+                from_date = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(PolicyImpactReport.created_at >= from_date)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                to_date = datetime.strptime(date_to, '%Y-%m-%d')
+                query = query.filter(PolicyImpactReport.created_at <= to_date)
+            except ValueError:
+                pass
+        
+        # Ordina per data creazione (più recenti prima)
+        query = query.order_by(PolicyImpactReport.created_at.desc())
+        
+        # Paginazione
+        pagination = query.paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        reports = pagination.items
+        
+        # Statistiche generali
+        stats = PolicyImpactReport.get_reports_statistics()
+        
+        return render_template(
+            'admin/policy_impact_reports_list.html',
+            reports=reports,
+            pagination=pagination,
+            stats=stats,
+            filters={
+                'status': status_filter,
+                'date_from': date_from,
+                'date_to': date_to
+            }
+        )
+        
+    except Exception as e:
+        flash(f"Errore nel caricamento dei report: {str(e)}", "error")
+        return redirect(url_for('admin.dashboard'))
+
+@admin_bp.route('/admin/policy_impact_reports/<int:report_id>', methods=['GET'])
+@login_required
+@admin_required
+def view_policy_impact_report(report_id):
+    """
+    Visualizza un singolo report di impatto.
+    """
+    try:
+        from models import PolicyImpactReport
+        
+        report = PolicyImpactReport.query.get_or_404(report_id)
+        
+        return render_template(
+            'admin/policy_impact_report.html',
+            report=report
+        )
+        
+    except Exception as e:
+        flash(f"Errore nel caricamento del report: {str(e)}", "error")
+        return redirect(url_for('admin.policy_impact_reports_list'))
+
+@admin_bp.route('/admin/policy_impact_reports/<int:report_id>/mark_reviewed', methods=['POST'])
+@login_required
+@admin_required
+def mark_impact_report_reviewed(report_id):
+    """
+    Marca un report di impatto come revisionato.
+    """
+    try:
+        from models import PolicyImpactReport
+        
+        report = PolicyImpactReport.query.get_or_404(report_id)
+        admin_notes = request.form.get('admin_notes', '')
+        
+        report.mark_as_reviewed(admin_notes, current_user.id)
+        db.session.commit()
+        
+        # Log audit
+        log_audit_event(
+            action="policy_impact_report_marked_reviewed",
+            details=f"Report impatto {report_id} marcato come revisionato",
+            user_id=current_user.id,
+            extra_info={
+                'report_id': report_id,
+                'admin_notes': admin_notes
+            }
+        )
+        
+        flash("Report marcato come revisionato con successo.", "success")
+        return redirect(url_for('admin.view_policy_impact_report', report_id=report_id))
+        
+    except Exception as e:
+        flash(f"Errore nell'aggiornamento del report: {str(e)}", "error")
+        return redirect(url_for('admin.view_policy_impact_report', report_id=report_id))
+
+@admin_bp.route('/admin/policy_change_logs', methods=['GET'])
+@login_required
+@admin_required
+def policy_change_logs_list():
+    """
+    Lista delle modifiche alle policy (AI e manuali).
+    """
+    try:
+        from models import PolicyChangeLog
+        
+        # Paginazione
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        # Filtri
+        policy_id = request.args.get('policy_id', type=int)
+        change_type = request.args.get('change_type', '')
+        changed_by = request.args.get('changed_by', '')
+        date_from = request.args.get('date_from', '')
+        date_to = request.args.get('date_to', '')
+        
+        # Query base
+        query = PolicyChangeLog.query
+        
+        # Applica filtri
+        if policy_id:
+            query = query.filter_by(policy_id=policy_id)
+        
+        if change_type:
+            if change_type == 'action':
+                query = query.filter(PolicyChangeLog.old_action != PolicyChangeLog.new_action)
+            elif change_type == 'condition':
+                query = query.filter(PolicyChangeLog.old_condition != PolicyChangeLog.new_condition)
+            elif change_type == 'explanation':
+                query = query.filter(PolicyChangeLog.old_explanation != PolicyChangeLog.new_explanation)
+        
+        if changed_by == 'ai':
+            query = query.filter_by(changed_by_ai=True)
+        elif changed_by == 'admin':
+            query = query.filter_by(changed_by_ai=False)
+        
+        if date_from:
+            try:
+                from_date = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(PolicyChangeLog.changed_at >= from_date)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                to_date = datetime.strptime(date_to, '%Y-%m-%d')
+                query = query.filter(PolicyChangeLog.changed_at <= to_date)
+            except ValueError:
+                pass
+        
+        # Ordina per data (più recenti prima)
+        query = query.order_by(PolicyChangeLog.changed_at.desc())
+        
+        # Paginazione
+        pagination = query.paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        logs = pagination.items
+        
+        # Statistiche
+        stats = PolicyChangeLog.get_changes_statistics()
+        impact_stats = PolicyChangeLog.get_impact_statistics()
+        
+        # Lista policy per filtro
+        from models import AutoPolicy
+        policies = AutoPolicy.query.all()
+        
+        return render_template(
+            'admin/policy_change_logs.html',
+            logs=logs,
+            pagination=pagination,
+            stats=stats,
+            impact_stats=impact_stats,
+            policies=policies,
+            filters={
+                'policy_id': policy_id,
+                'change_type': change_type,
+                'changed_by': changed_by,
+                'date_from': date_from,
+                'date_to': date_to
+            }
+        )
+        
+    except Exception as e:
+        flash(f"Errore nel caricamento del log modifiche: {str(e)}", "error")
+        return redirect(url_for('admin.dashboard'))
+
+@admin_bp.route('/admin/policy_change_logs/<int:log_id>', methods=['GET'])
+@login_required
+@admin_required
+def view_policy_change_log(log_id):
+    """
+    Visualizza dettagli di una singola modifica.
+    """
+    try:
+        from models import PolicyChangeLog
+        
+        log = PolicyChangeLog.query.get_or_404(log_id)
+        
+        return render_template(
+            'admin/policy_change_log_detail.html',
+            log=log
+        )
+        
+    except Exception as e:
+        flash(f"Errore nel caricamento della modifica: {str(e)}", "error")
+        return redirect(url_for('admin.policy_change_logs_list'))
+
+@admin_bp.route('/admin/policy_change_logs/policy/<int:policy_id>', methods=['GET'])
+@login_required
+@admin_required
+def policy_change_history(policy_id):
+    """
+    Visualizza storico modifiche per una policy specifica.
+    """
+    try:
+        from models import PolicyChangeLog, AutoPolicy
+        
+        policy = AutoPolicy.query.get_or_404(policy_id)
+        logs = PolicyChangeLog.get_changes_for_policy(policy_id)
+        
+        return render_template(
+            'admin/policy_change_history.html',
+            policy=policy,
+            logs=logs
+        )
+        
+    except Exception as e:
+        flash(f"Errore nel caricamento dello storico: {str(e)}", "error")
+        return redirect(url_for('admin.policy_change_logs_list'))
+
+@admin_bp.route('/admin/policy_change_logs/manual_tuning', methods=['POST'])
+@login_required
+@admin_required
+def trigger_manual_self_tuning():
+    """
+    Trigger manuale per l'auto-tuning delle policy.
+    """
+    try:
+        from tasks.ai_self_tuning import trigger_manual_self_tuning
+        
+        changes = trigger_manual_self_tuning()
+        
+        flash(f"Auto-tuning completato. {len(changes)} policy ottimizzate.", "success")
+        return redirect(url_for('admin.policy_change_logs_list'))
+        
+    except Exception as e:
+        flash(f"Errore nell'auto-tuning: {str(e)}", "error")
+        return redirect(url_for('admin.policy_change_logs_list'))
+
+@admin_bp.route('/admin/policy_impact_reports/manual_generation', methods=['POST'])
+@login_required
+@admin_required
+def trigger_manual_impact_report():
+    """
+    Trigger manuale per generare report di impatto.
+    """
+    try:
+        from tasks.ai_policy_impact import trigger_manual_impact_report
+        
+        report = trigger_manual_impact_report()
+        
+        flash(f"Report di impatto generato con successo. ID: {report.id}", "success")
+        return redirect(url_for('admin.view_policy_impact_report', report_id=report.id))
+        
+    except Exception as e:
+        flash(f"Errore nella generazione del report: {str(e)}", "error")
+        return redirect(url_for('admin.policy_impact_reports_list'))
+
+@admin_bp.route('/admin/policy_reviews/manual_review', methods=['POST'])
+@login_required
+@admin_required
+def trigger_manual_review():
+    """
+    Attiva una revisione AI manuale.
+    """
+    try:
+        from tasks.ai_policy_review import ai_review_policies_job
+        
+        # Esegui job manualmente
+        review = ai_review_policies_job()
+        
+        if review:
+            flash(f'Revisione AI completata. ID Review: {review.id}', 'success')
+        else:
+            flash('Errore durante la revisione AI.', 'error')
+        
+        return redirect(url_for('admin.policy_reviews_list'))
+        
+    except Exception as e:
+        flash(f'Errore: {str(e)}', 'error')
+        return redirect(url_for('admin.policy_reviews_list'))
+
+@admin_bp.route('/admin/access_requests/ai_policies/audit', methods=['GET'])
+@login_required
+@admin_required
+def policy_audit_log():
+    """
+    Visualizza audit log delle modifiche alle regole AI.
+    """
+    from utils.audit_logger import get_audit_logs
+    
+    # Recupera log audit per policies
+    audit_logs = get_audit_logs(
+        action_filter=['policy_created', 'policy_activated', 'policy_deactivated', 
+                     'policy_deleted', 'policy_edited', 'policy_toggled'],
+        limit=100
+    )
+    
+    return render_template('admin/policy_audit_log.html', audit_logs=audit_logs)
+
+@admin_bp.route('/admin/access_requests/ai_policies/stats', methods=['GET'])
+@login_required
+@admin_required
+def policy_statistics():
+    """
+    Visualizza statistiche delle policy automatiche.
+    """
+    from utils.policies import get_policy_statistics
+    
+    stats = get_policy_statistics()
+    
+    return render_template(
+        'admin/policy_statistics.html',
+        stats=stats
+    )
+
+@admin_bp.route('/admin/access_requests/ai_policies/export', methods=['GET'])
+@login_required
+@admin_required
+def export_policies():
+    """
+    Esporta le regole AI in formato CSV.
+    """
+    try:
+        policies = AutoPolicy.query.order_by(AutoPolicy.created_at.desc()).all()
+        
+        # Crea CSV
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Header
+        writer.writerow([
+            'ID', 'Nome', 'Descrizione', 'Condizione', 'Azione', 'Priorità', 
+            'Confidenza', 'Attiva', 'Creato da', 'Data Creazione', 'Approvato da', 'Data Approvazione'
+        ])
+        
+        # Dati
+        for policy in policies:
+            writer.writerow([
+                policy.id,
+                policy.name,
+                policy.description,
+                policy.condition,
+                policy.action,
+                policy.priority,
+                policy.confidence,
+                'Sì' if policy.active else 'No',
+                policy.creator.username if policy.creator else 'N/A',
+                policy.created_at.strftime('%Y-%m-%d %H:%M') if policy.created_at else 'N/A',
+                policy.approver.username if policy.approver else 'N/A',
+                policy.approved_at.strftime('%Y-%m-%d %H:%M') if policy.approved_at else 'N/A'
+            ])
+        
+        # Crea response
+        output.seek(0)
+        response = Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=ai_policies_export.csv'}
+        )
+        
+        return response
+        
+    except Exception as e:
+        flash(f'Errore esportazione: {str(e)}', 'error')
+        return redirect(url_for('admin.manage_ai_policies'))
+
+@admin_bp.route('/admin/access_requests/ai_policies/generated', methods=['GET'])
+@login_required
+@admin_required
+def view_generated_policies():
+    """
+    Visualizza le regole AI generate con analisi dettagliata.
+    """
+    try:
+        # Recupera storico richieste per analisi
+        historical_requests = AccessRequest.query.join(User).join(Document).outerjoin(Company, Document.company_id == Company.id).outerjoin(Department, Document.department_id == Department.id) \
+            .order_by(AccessRequest.created_at.desc()).limit(1000).all()
+        
+        # Trasforma in formato analizzabile
+        analysis_data = []
+        for req in historical_requests:
+            user_name = f"{req.user.first_name or ''} {req.user.last_name or ''}".strip() or req.user.username
+            document_name = req.document.title or req.document.original_filename or 'Documento non trovato'
+            company_name = req.document.company.name if req.document.company else ""
+            department_name = req.document.department.name if req.document.department else ""
+            
+            # Estrai tag del documento se disponibili
+            document_tags = []
+            if hasattr(req.document, 'tags') and req.document.tags:
+                document_tags = [tag.name for tag in req.document.tags]
+            
+            analysis_data.append({
+                "utente": user_name,
+                "ruolo": req.user.role,
+                "azienda": company_name,
+                "reparto": department_name,
+                "file": document_name,
+                "tags": document_tags,
+                "stato": req.status,
+                "motivazione": req.note or "",
+                "data_richiesta": req.created_at.strftime('%Y-%m-%d %H:%M')
+            })
+        
+        # Genera regole AI avanzate
+        generated_policies = generate_advanced_ai_policies(analysis_data)
+        
+        return render_template(
+            'admin/ai_generated_policies.html',
+            policies=generated_policies['rules'],
+            analysis=generated_policies['analysis']
+        )
+        
+    except Exception as e:
+        return render_template(
+            'admin/ai_generated_policies.html',
+            policies=[],
+            analysis=f"Errore durante la generazione: {str(e)}"
+        )
+
+@admin_bp.route('/admin/access_requests/ai_policies/simulate', methods=['POST'])
+@login_required
+@admin_required
+def simulate_ai_policies():
+    """
+    Simula l'applicazione delle regole AI su dati storici.
+    """
+    try:
+        # Recupera dati storici per simulazione
+        historical_requests = AccessRequest.query.join(User).join(Document).outerjoin(Company, Document.company_id == Company.id).outerjoin(Department, Document.department_id == Department.id) \
+            .order_by(AccessRequest.created_at.desc()).limit(500).all()
+        
+        # Simula applicazione regole
+        simulation_results = {
+            'total_requests': len(historical_requests),
+            'auto_approved': 0,
+            'auto_denied': 0,
+            'manual_review': 0,
+            'policies_applied': []
+        }
+        
+        for req in historical_requests:
+            # Prepara dati per valutazione regole
+            request_data = {
+                'user_role': req.user.role,
+                'user_company': req.document.company.name if req.document.company else "",
+                'user_department': req.document.department.name if req.document.department else "",
+                'document_company': req.document.company.name if req.document.company else "",
+                'document_department': req.document.department.name if req.document.department else "",
+                'document_name': req.document.title or req.document.original_filename
+            }
+            
+            # Valuta regole attive
+            policy_result = AutoPolicy.evaluate_all_policies(request_data)
+            
+            if policy_result and policy_result['applied']:
+                if policy_result['action'] == 'approve':
+                    simulation_results['auto_approved'] += 1
+                else:
+                    simulation_results['auto_denied'] += 1
+                
+                # Traccia regola applicata
+                policy_name = policy_result['policy_name']
+                if policy_name not in [p['name'] for p in simulation_results['policies_applied']]:
+                    simulation_results['policies_applied'].append({
+                        'name': policy_name,
+                        'action': policy_result['action'],
+                        'count': 1
+                    })
+                else:
+                    for p in simulation_results['policies_applied']:
+                        if p['name'] == policy_name:
+                            p['count'] += 1
+                            break
+            else:
+                simulation_results['manual_review'] += 1
+        
+        return jsonify({
+            'success': True,
+            'simulation': simulation_results
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Errore simulazione: {str(e)}'
+        }), 500
+
+@admin_bp.route('/admin/access_requests', methods=['GET'])
+@login_required
+@admin_required
+def access_requests_main_dashboard():
+    """
+    Dashboard principale per visualizzare tutte le richieste di accesso con filtri e azioni.
+    """
+    # Filtri dalla query string
+    status_filter = request.args.get('status', 'all')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    user_filter = request.args.get('user', '')
+    file_filter = request.args.get('file', '')
+    company_filter = request.args.get('company', '')
+    
+    # Query base con join
+    query = db.session.query(
+        AccessRequest,
+        User.first_name.label('user_first_name'),
+        User.last_name.label('user_last_name'),
+        User.email.label('user_email'),
+        Document.title.label('document_title'),
+        Document.original_filename.label('document_filename'),
+        Company.name.label('company_name'),
+        Department.name.label('department_name')
+    ).join(
+        User, AccessRequest.user_id == User.id
+    ).join(
+        Document, AccessRequest.document_id == Document.id
+    ).outerjoin(
+        Company, User.company_id == Company.id
+    ).outerjoin(
+        Department, User.department_id == Department.id
+    )
+    
+    # Applica filtri
+    if status_filter != 'all':
+        query = query.filter(AccessRequest.status == status_filter)
+    
+    if date_from:
+        query = query.filter(AccessRequest.created_at >= date_from)
+    
+    if date_to:
+        query = query.filter(AccessRequest.created_at <= date_to + ' 23:59:59')
+    
+    if user_filter:
+        query = query.filter(
+            or_(
+                User.first_name.ilike(f'%{user_filter}%'),
+                User.last_name.ilike(f'%{user_filter}%'),
+                User.email.ilike(f'%{user_filter}%')
+            )
+        )
+    
+    if file_filter:
+        query = query.filter(
+            or_(
+                Document.title.ilike(f'%{file_filter}%'),
+                Document.original_filename.ilike(f'%{file_filter}%')
+            )
+        )
+    
+    if company_filter:
+        query = query.filter(Company.name.ilike(f'%{company_filter}%'))
+    
+    # Esegui query
+    results = query.order_by(AccessRequest.created_at.desc()).all()
+    
+    # Prepara dati per template
+    requests_data = []
+    for result in results:
+        access_request, user_fn, user_ln, user_email, doc_title, doc_filename, company_name, dept_name = result
+        
+        # Nome utente completo
+        user_name = f"{user_fn or ''} {user_ln or ''}".strip() or access_request.user.username
+        
+        # Nome documento
+        document_name = doc_title or doc_filename or 'Documento non trovato'
+        
+        # Link per azioni (solo per richieste pendenti)
+        approve_link = None
+        deny_link = None
+        if access_request.status == 'pending':
+            approve_link = url_for('admin.handle_access_request', req_id=access_request.id, action='approve')
+            deny_link = url_for('admin.deny_access_request')
+        
+        requests_data.append({
+            'id': access_request.id,
+            'created_at': access_request.created_at,
+            'user_name': user_name,
+            'user_email': user_email,
+            'document_name': document_name,
+            'company_name': company_name or 'N/A',
+            'department_name': dept_name or 'N/A',
+            'reason': access_request.reason or 'Nessuna motivazione',
+            'status': access_request.status,
+            'resolved_at': access_request.resolved_at,
+            'response_message': access_request.response_message,
+            'approve_link': approve_link,
+            'deny_link': deny_link
+        })
+    
+    # Statistiche
+    total_requests = len(requests_data)
+    pending_requests = len([r for r in requests_data if r['status'] == 'pending'])
+    approved_requests = len([r for r in requests_data if r['status'] == 'approved'])
+    denied_requests = len([r for r in requests_data if r['status'] == 'denied'])
+    
+    return render_template('admin/access_requests.html',
+                         requests=requests_data,
+                         total_requests=total_requests,
+                         pending_requests=pending_requests,
+                         approved_requests=approved_requests,
+                         denied_requests=denied_requests,
+                         filters={
+                             'status': status_filter,
+                             'date_from': date_from,
+                             'date_to': date_to,
+                             'user': user_filter,
+                             'file': file_filter,
+                             'company': company_filter
+                         })
+
+
+@admin_bp.route('/guests/create', methods=['POST'])
+@login_required
+@ceo_or_admin_required
+def create_mercury_guest():
+    """
+    Crea nuovo guest per modulo Mercury.
+    """
+    try:
+        # Validazione dati
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        company_id = request.form.get('company_id')
+        expiry_days = int(request.form.get('expiry_days', 30))
+        document_ids = request.form.getlist('document_ids')
+        
+        if not all([first_name, last_name, email]):
+            flash('Nome, cognome ed email sono obbligatori.', 'danger')
+            return redirect(url_for('admin.mercury_guests'))
+        
+        # Verifica email unica
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            flash('Email già registrata nel sistema.', 'danger')
+            return redirect(url_for('admin.mercury_guests'))
+        
+        # Genera password temporanea
+        import secrets
+        import string
+        password_chars = string.ascii_letters + string.digits
+        temp_password = ''.join(secrets.choice(password_chars) for _ in range(12))
+        
+        # Calcola scadenza
+        expiry_date = datetime.utcnow() + timedelta(days=expiry_days)
+        
+        # Crea guest
+        new_guest = User(
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            username=email.split('@')[0],
+            password=bcrypt.generate_password_hash(temp_password).decode('utf-8'),
+            role='guest',
+            modulo='Mercury',
+            access_expiration=expiry_date
+        )
+        
+        # Associa azienda
+        if company_id:
+            company = Company.query.get(company_id)
+            if company:
+                new_guest.companies.append(company)
+        
+        db.session.add(new_guest)
+        db.session.commit()
+        
+        # Associa documenti autorizzati
+        for doc_id in document_ids:
+            doc = Document.query.get(doc_id)
+            if doc:
+                authorized_access = AuthorizedAccess(
+                    user_id=new_guest.id,
+                    document_id=doc_id
+                )
+                db.session.add(authorized_access)
+        
+        db.session.commit()
+        
+        # Invia email di benvenuto
+        try:
+            send_guest_welcome_email(new_guest, temp_password, expiry_date)
+            flash(f'✅ Guest {email} creato con successo. Accesso valido fino al {expiry_date.strftime("%d/%m/%Y")}.', 'success')
+        except Exception as e:
+            flash(f'⚠️ Guest creato ma errore invio email: {str(e)}', 'warning')
+        
+        # Sincronizza con CEO
+        sync_guest_with_ceo(new_guest, 'create')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nella creazione guest: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin.mercury_guests'))
+
+
+@admin_bp.route('/guests/proroga/<int:guest_id>', methods=['POST'])
+@login_required
+@ceo_or_admin_required
+def proroga_guest(guest_id):
+    """
+    Proroga scadenza guest.
+    """
+    try:
+        guest = User.query.get_or_404(guest_id)
+        
+        # Verifica permessi
+        if current_user.role == 'admin' and guest.modulo != 'Mercury':
+            flash('❌ Non hai i permessi per modificare questo guest.', 'danger')
+            return redirect(url_for('admin.mercury_guests'))
+        
+        # Verifica che sia un guest
+        if guest.role != 'guest':
+            flash('❌ Questo utente non è un guest.', 'danger')
+            return redirect(url_for('admin.mercury_guests'))
+        
+        # Calcola nuova scadenza
+        proroga_days = int(request.form.get('proroga_days', 30))
+        new_expiry = datetime.utcnow() + timedelta(days=proroga_days)
+        
+        # Aggiorna scadenza
+        old_expiry = guest.access_expiration
+        guest.access_expiration = new_expiry
+        
+        db.session.commit()
+        
+        flash(f'✅ Scadenza guest {guest.email} prorogata fino al {new_expiry.strftime("%d/%m/%Y")}.', 'success')
+        
+        # Sincronizza con CEO
+        sync_guest_with_ceo(guest, 'update')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nella proroga: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin.mercury_guests'))
+
+
+@admin_bp.route('/guests/revoke/<int:guest_id>', methods=['POST'])
+@login_required
+@ceo_or_admin_required
+def revoke_guest(guest_id):
+    """
+    Revoca immediata accesso guest.
+    """
+    try:
+        guest = User.query.get_or_404(guest_id)
+        
+        # Verifica permessi
+        if current_user.role == 'admin' and guest.modulo != 'Mercury':
+            flash('❌ Non hai i permessi per modificare questo guest.', 'danger')
+            return redirect(url_for('admin.mercury_guests'))
+        
+        # Verifica che sia un guest
+        if guest.role != 'guest':
+            flash('❌ Questo utente non è un guest.', 'danger')
+            return redirect(url_for('admin.mercury_guests'))
+        
+        # Revoca accesso
+        guest.access_expiration = datetime.utcnow() - timedelta(days=1)
+        
+        db.session.commit()
+        
+        flash(f'✅ Accesso guest {guest.email} revocato immediatamente.', 'success')
+        
+        # Sincronizza con CEO
+        sync_guest_with_ceo(guest, 'update')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nella revoca: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin.mercury_guests'))
+
+
+@admin_bp.route('/guests/delete/<int:guest_id>', methods=['POST'])
+@login_required
+@ceo_or_admin_required
+def delete_mercury_guest(guest_id):
+    """
+    Elimina guest.
+    """
+    try:
+        guest = User.query.get_or_404(guest_id)
+        
+        # Verifica permessi
+        if current_user.role == 'admin' and guest.modulo != 'Mercury':
+            flash('❌ Non hai i permessi per eliminare questo guest.', 'danger')
+            return redirect(url_for('admin.mercury_guests'))
+        
+        # Verifica che sia un guest
+        if guest.role != 'guest':
+            flash('❌ Questo utente non è un guest.', 'danger')
+            return redirect(url_for('admin.mercury_guests'))
+        
+        email = guest.email
+        db.session.delete(guest)
+        db.session.commit()
+        
+        flash(f'✅ Guest {email} eliminato con successo.', 'success')
+        
+        # Sincronizza con CEO
+        sync_guest_with_ceo(guest, 'delete')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nell\'eliminazione guest: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin.mercury_guests'))
+
+
+# === API PER ATTIVITÀ UTENTI/GUEST ===
+
+@admin_bp.route('/users/activity', methods=['GET'])
+@login_required
+@ceo_or_admin_required
+def users_activity():
+    """
+    API per dati attività utenti (per integrazione AI futura).
+    Output JSON con campi per analisi comportamentale.
+    """
+    try:
+        # Query base
+        query = User.query
+        
+        # Filtro per modulo (CEO vede tutto, Admin solo Mercury)
+        if current_user.role == 'admin':
+            query = query.filter(User.modulo == 'Mercury')
+        
+        users = query.all()
+        
+        activity_data = []
+        for user in users:
+            # Calcola ultimo accesso
+            last_login = None
+            if hasattr(user, 'last_login') and user.last_login:
+                last_login = user.last_login.isoformat()
+            
+            # Conta documenti aperti
+            docs_opened = DocumentActivityLog.query.filter_by(user_id=user.id).count()
+            
+            # Conta download totali
+            downloads_total = DownloadDeniedLog.query.filter_by(user_id=user.id).count()
+            
+            # Conta upload totali (se disponibile)
+            uploads_total = 0  # Placeholder per futura implementazione
+            
+            # Conta tentativi login falliti
+            failed_logins = 0  # Placeholder per futura implementazione
+            
+            # Analizza orari accesso
+            access_hours = {
+                'morning': 0,    # 6-12
+                'afternoon': 0,  # 12-18
+                'evening': 0,    # 18-24
+                'night': 0       # 0-6
+            }
+            
+            # Simula analisi orari (in futuro verrà dal DB)
+            if user.last_login:
+                hour = user.last_login.hour
+                if 6 <= hour < 12:
+                    access_hours['morning'] = 1
+                elif 12 <= hour < 18:
+                    access_hours['afternoon'] = 1
+                elif 18 <= hour < 24:
+                    access_hours['evening'] = 1
+                else:
+                    access_hours['night'] = 1
+            
+            # Determina comportamento anomalo
+            anomalous_behavior = False
+            if failed_logins > 5 or docs_opened > 100 or access_hours['night'] > 0:
+                anomalous_behavior = True
+            
+            activity_data.append({
+                'id': user.id,
+                'nome': f"{user.first_name} {user.last_name}",
+                'email': user.email,
+                'ultimo_accesso': last_login,
+                'documenti_aperti': docs_opened,
+                'download_totali': downloads_total,
+                'upload_totali': uploads_total,
+                'tentativi_login_falliti': failed_logins,
+                'orari_accesso': access_hours,
+                'comportamento_anomalo': anomalous_behavior,
+                'ruolo': user.role,
+                'azienda': user.company.name if user.company else None,
+                'reparto': user.department.name if user.department else None,
+                'stato': 'active' if not user.access_expiration or user.access_expiration > datetime.utcnow() else 'expired'
+            })
+        
+        # Analizza dati per AI
+        analizza_attivita_ai(activity_data, 'users')
+        
+        return jsonify({
+            'success': True,
+            'data': activity_data,
+            'total_users': len(activity_data),
+            'anomalous_count': sum(1 for user in activity_data if user['comportamento_anomalo'])
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'Errore API attività utenti: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/guests/activity', methods=['GET'])
+@login_required
+@ceo_or_admin_required
+def guests_activity():
+    """
+    API per dati attività guest (per integrazione AI futura).
+    Output JSON con campi per analisi comportamentale.
+    """
+    try:
+        # Query base
+        query = User.query.filter(User.role == 'guest')
+        
+        # Filtro per modulo (CEO vede tutto, Admin solo Mercury)
+        if current_user.role == 'admin':
+            query = query.filter(User.modulo == 'Mercury')
+        
+        guests = query.all()
+        
+        activity_data = []
+        for guest in guests:
+            # Conta documenti aperti
+            docs_opened = DocumentActivityLog.query.filter_by(user_id=guest.id).count()
+            
+            # Conta download totali
+            downloads_total = DownloadDeniedLog.query.filter_by(user_id=guest.id).count()
+            
+            # Conta upload totali (se disponibile)
+            uploads_total = 0  # Placeholder per futura implementazione
+            
+            # Conta tentativi login falliti
+            failed_logins = 0  # Placeholder per futura implementazione
+            
+            # Documenti autorizzati
+            authorized_docs = AuthorizedAccess.query.filter_by(user_id=guest.id).count()
+            
+            # Calcola giorni alla scadenza
+            days_to_expiry = None
+            if guest.access_expiration:
+                days_to_expiry = (guest.access_expiration - datetime.utcnow()).days
+            
+            # Analizza orari accesso
+            access_hours = {
+                'morning': 0,    # 6-12
+                'afternoon': 0,  # 12-18
+                'evening': 0,    # 18-24
+                'night': 0       # 0-6
+            }
+            
+            # Simula analisi orari (in futuro verrà dal DB)
+            if guest.last_login:
+                hour = guest.last_login.hour
+                if 6 <= hour < 12:
+                    access_hours['morning'] = 1
+                elif 12 <= hour < 18:
+                    access_hours['afternoon'] = 1
+                elif 18 <= hour < 24:
+                    access_hours['evening'] = 1
+                else:
+                    access_hours['night'] = 1
+            
+            # Determina comportamento anomalo
+            anomalous_behavior = False
+            if failed_logins > 3 or docs_opened > 50 or access_hours['night'] > 0 or (days_to_expiry and days_to_expiry < 0):
+                anomalous_behavior = True
+            
+            activity_data.append({
+                'id': guest.id,
+                'nome': f"{guest.first_name} {guest.last_name}",
+                'email': guest.email,
+                'ultimo_accesso': guest.last_login.isoformat() if guest.last_login else None,
+                'documenti_aperti': docs_opened,
+                'download_totali': downloads_total,
+                'upload_totali': uploads_total,
+                'tentativi_login_falliti': failed_logins,
+                'orari_accesso': access_hours,
+                'comportamento_anomalo': anomalous_behavior,
+                'azienda': guest.company.name if guest.company else None,
+                'documenti_assegnati': authorized_docs,
+                'scadenza_accesso': guest.access_expiration.isoformat() if guest.access_expiration else None,
+                'giorni_alla_scadenza': days_to_expiry,
+                'stato': 'active' if not guest.access_expiration or guest.access_expiration > datetime.utcnow() else 'expired'
+            })
+        
+        # Analizza dati per AI
+        analizza_attivita_ai(activity_data, 'guests')
+        
+        return jsonify({
+            'success': True,
+            'data': activity_data,
+            'total_guests': len(activity_data),
+            'anomalous_count': sum(1 for guest in activity_data if guest['comportamento_anomalo']),
+            'expired_count': sum(1 for guest in activity_data if guest['stato'] == 'expired')
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'Errore API attività guest: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+# === FUNZIONI DI SINCRONIZZAZIONE CEO ===
+
+def sync_user_with_ceo(user, action):
+    """
+    Sincronizza dati utente con CEO.
+    """
+    try:
+        ceo_api_url = 'https://64.226.70.28/api/sync/users'
+        
+        # Prepara dati utente
+        user_data = {
+            'id': user.id,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'role': user.role,
+            'modulo': user.modulo,
+            'action': action,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # Chiamata API (placeholder - implementare JWT)
+        response = requests.post(ceo_api_url, json=user_data, timeout=10)
+        
+        if response.status_code != 200:
+            current_app.logger.error(f'Errore sincronizzazione CEO per utente {user.email}: {response.status_code}')
+            
+    except Exception as e:
+        current_app.logger.error(f'Errore sincronizzazione CEO: {str(e)}')
+
+
+def sync_guest_with_ceo(guest, action):
+    """
+    Sincronizza dati guest con CEO.
+    """
+    try:
+        ceo_api_url = 'https://64.226.70.28/api/sync/guests'
+        
+        # Prepara dati guest
+        guest_data = {
+            'id': guest.id,
+            'email': guest.email,
+            'first_name': guest.first_name,
+            'last_name': guest.last_name,
+            'modulo': guest.modulo,
+            'expiry_date': guest.access_expiration.isoformat() if guest.access_expiration else None,
+            'action': action,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # Chiamata API (placeholder - implementare JWT)
+        response = requests.post(ceo_api_url, json=guest_data, timeout=10)
+        
+        if response.status_code != 200:
+            current_app.logger.error(f'Errore sincronizzazione CEO per guest {guest.email}: {response.status_code}')
+            
+    except Exception as e:
+        current_app.logger.error(f'Errore sincronizzazione CEO: {str(e)}')
+
+
+def send_guest_welcome_email(guest, password, expiry_date):
+    """
+    Invia email di benvenuto al guest.
+    """
+    try:
+        subject = "Accesso Guest - Mercury DOCS"
+        body = f"""
+        Ciao {guest.first_name} {guest.last_name},
+        
+        Ti è stato creato un account guest per accedere ai documenti Mercury.
+        
+        Credenziali di accesso:
+        - Email: {guest.email}
+        - Password: {password}
+        - Scadenza: {expiry_date.strftime('%d/%m/%Y')}
+        
+        Accedi al portale: https://138.68.80.169
+        
+        Cordiali saluti,
+        Team Mercury DOCS
+        """
+        
+        msg = Message(subject, recipients=[guest.email], body=body)
+        mail.send(msg)
+        
+    except Exception as e:
+        current_app.logger.error(f'Errore invio email guest: {str(e)}')
+        raise e
+
+
+# === AI Dashboard Analytics ===
+@admin_bp.route("/ai_dashboard")
+@login_required
+@ceo_or_admin_required
+def ai_dashboard():
+    """
+    Dashboard AI avanzata per analisi utenti e guest.
+    Accessibile da Admin (solo Mercury) e CEO (tutti).
+    """
+    try:
+        # Filtro per modulo Mercury se admin
+        if current_user.is_admin and not current_user.is_ceo:
+            # Admin vede solo utenti/guest Mercury
+            users_query = User.query.filter(User.role.in_(['user', 'admin']))
+            guests_query = User.query.filter(User.role == 'guest')
+        else:
+            # CEO vede tutti
+            users_query = User.query.filter(User.role.in_(['user', 'admin']))
+            guests_query = User.query.filter(User.role == 'guest')
+
+        # === SEZIONE 1 - Statistiche Utenti ===
+        total_users = users_query.count()
+        active_users = users_query.filter(User.access_expiration.is_(None)).count()
+        inactive_users = users_query.filter(User.access_expiration.isnot(None)).count()
+        
+        # Utenti inattivi da >30 giorni
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        inactive_30_days = users_query.filter(
+            User.access_expiration < thirty_days_ago
+        ).count()
+        
+        # Ultimo accesso medio (semplificato)
+        last_access_avg = db.session.query(
+            func.avg(User.created_at)
+        ).scalar()
+        
+        # Grafico accessi ultimi 7 giorni
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        daily_access = db.session.query(
+            func.date(GuestActivity.timestamp).label('date'),
+            func.count().label('count')
+        ).filter(
+            GuestActivity.timestamp >= seven_days_ago
+        ).group_by(
+            func.date(GuestActivity.timestamp)
+        ).all()
+        
+        access_dates = [str(row.date) for row in daily_access]
+        access_counts = [row.count for row in daily_access]
+        
+        # Grafico torta utenti per ruolo
+        role_stats = db.session.query(
+            User.role,
+            func.count().label('count')
+        ).group_by(User.role).all()
+        
+        role_labels = [row.role for row in role_stats]
+        role_values = [row.count for row in role_stats]
+        
+        # === SEZIONE 2 - Statistiche Guest ===
+        total_guests = guests_query.count()
+        expired_guests = guests_query.filter(
+            User.access_expiration < datetime.utcnow()
+        ).count()
+        
+        # Scadenze guest nei prossimi 30 giorni
+        next_30_days = datetime.utcnow() + timedelta(days=30)
+        upcoming_expirations = db.session.query(
+            func.date(User.access_expiration).label('date'),
+            func.count().label('count')
+        ).filter(
+            User.role == 'guest',
+            User.access_expiration >= datetime.utcnow(),
+            User.access_expiration <= next_30_days
+        ).group_by(
+            func.date(User.access_expiration)
+        ).all()
+        
+        expiration_dates = [str(row.date) for row in upcoming_expirations]
+        expiration_counts = [row.count for row in upcoming_expirations]
+        
+        # Top 5 guest per download
+        top_guests_downloads = db.session.query(
+            User.email,
+            func.count(GuestActivity.id).label('download_count')
+        ).join(GuestActivity, User.id == GuestActivity.user_id).filter(
+            User.role == 'guest',
+            GuestActivity.action == 'download'
+        ).group_by(User.id, User.email).order_by(
+            func.count(GuestActivity.id).desc()
+        ).limit(5).all()
+        
+        # === SEZIONE 3 - Insight AI ===
+        # Comportamenti sospetti recenti
+        recent_alerts = AlertAI.query.filter(
+            AlertAI.created_at >= datetime.utcnow() - timedelta(days=7)
+        ).order_by(AlertAI.created_at.desc()).limit(10).all()
+        
+        # Genera suggerimenti AI
+        ai_suggestions = genera_insight_ai(current_user.role)
+        
+        # Grafico radar anomalie per tipo
+        anomaly_types = ['accesso', 'download', 'login', 'ip']
+        anomaly_intensities = []
+        
+        for anomaly_type in anomaly_types:
+            count = AlertAI.query.filter(
+                AlertAI.tipo_alert.contains(anomaly_type),
+                AlertAI.created_at >= datetime.utcnow() - timedelta(days=30)
+            ).count()
+            anomaly_intensities.append(count)
+        
+        # === SEZIONE 4 - Ultimi Invii PDF ===
+        ultimi_invii_pdf = LogInvioPDF.query.order_by(LogInvioPDF.timestamp.desc()).limit(10).all()
+        
+        return render_template(
+            'admin/ai_dashboard.html',
+            # Sezione 1 - Utenti
+            total_users=total_users,
+            active_users=active_users,
+            inactive_users=inactive_users,
+            inactive_30_days=inactive_30_days,
+            last_access_avg=last_access_avg,
+            access_dates=access_dates,
+            access_counts=access_counts,
+            role_labels=role_labels,
+            role_values=role_values,
+            
+            # Sezione 2 - Guest
+            total_guests=total_guests,
+            expired_guests=expired_guests,
+            expiration_dates=expiration_dates,
+            expiration_counts=expiration_counts,
+            top_guests_downloads=top_guests_downloads,
+            
+            # Sezione 3 - AI
+            recent_alerts=recent_alerts,
+            ai_suggestions=ai_suggestions,
+            anomaly_types=anomaly_types,
+            anomaly_intensities=anomaly_intensities,
+            
+            # Sezione 4 - Ultimi Invii PDF
+            ultimi_invii_pdf=ultimi_invii_pdf
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore dashboard AI: {str(e)}")
+        flash("Errore nel caricamento della dashboard AI", "error")
+        return redirect(url_for('admin.admin_dashboard'))
+
+
+def genera_insight_ai(user_role):
+    """
+    Genera suggerimenti AI basati sui dati del sistema.
+    
+    Args:
+        user_role (str): Ruolo dell'utente (admin/ceo)
+        
+    Returns:
+        list: Lista di suggerimenti AI
+    """
+    suggestions = []
+    
+    try:
+        # Controlla utenti inattivi
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        inactive_users = User.query.filter(
+            User.access_expiration < thirty_days_ago
+        ).count()
+        
+        if inactive_users > 5:
+            suggestions.append({
+                'type': 'warning',
+                'icon': '👥',
+                'title': 'Utenti Inattivi',
+                'message': f'Hai {inactive_users} utenti inattivi da più di 30 giorni.',
+                'action': 'Disattiva utenti inattivi'
+            })
+        
+        # Controlla alert critici recenti
+        recent_critical_alerts = AlertAI.query.filter(
+            AlertAI.livello.in_(['alto', 'critico']),
+            AlertAI.created_at >= datetime.utcnow() - timedelta(days=7)
+        ).count()
+        
+        if recent_critical_alerts > 0:
+            suggestions.append({
+                'type': 'danger',
+                'icon': '🚨',
+                'title': 'Alert Critici',
+                'message': f'Sono presenti {recent_critical_alerts} alert critici non risolti.',
+                'action': 'Controlla questi download anomali'
+            })
+        
+        # Controlla IP insoliti
+        unique_ips = db.session.query(
+            AlertAI.ip_address
+        ).filter(
+            AlertAI.ip_address.isnot(None),
+            AlertAI.created_at >= datetime.utcnow() - timedelta(days=7)
+        ).distinct().count()
+        
+        if unique_ips > 10:
+            suggestions.append({
+                'type': 'info',
+                'icon': '🌐',
+                'title': 'IP Insoliti',
+                'message': f'Rilevati accessi da {unique_ips} IP diversi negli ultimi 7 giorni.',
+                'action': 'Verifica IP insoliti di accesso'
+            })
+        
+        # Controlla guest in scadenza
+        expiring_guests = User.query.filter(
+            User.role == 'guest',
+            User.access_expiration >= datetime.utcnow(),
+            User.access_expiration <= datetime.utcnow() + timedelta(days=7)
+        ).count()
+        
+        if expiring_guests > 0:
+            suggestions.append({
+                'type': 'warning',
+                'icon': '⏰',
+                'title': 'Guest in Scadenza',
+                'message': f'{expiring_guests} guest hanno accesso in scadenza nei prossimi 7 giorni.',
+                'action': 'Prolunga accessi guest'
+            })
+        
+        # Se non ci sono suggerimenti specifici
+        if not suggestions:
+            suggestions.append({
+                'type': 'success',
+                'icon': '✅',
+                'title': 'Sistema Stabile',
+                'message': 'Il sistema funziona correttamente, nessuna anomalia rilevata.',
+                'action': 'Continua il monitoraggio'
+            })
+            
+    except Exception as e:
+        current_app.logger.error(f"Errore generazione insight AI: {str(e)}")
+        suggestions.append({
+            'type': 'error',
+            'icon': '❌',
+            'title': 'Errore Analisi',
+            'message': 'Errore durante l\'analisi dei dati.',
+            'action': 'Riprova più tardi'
+        })
+    
+    return suggestions
+
+
+# === Scheda Dettaglio Utente ===
+@admin_bp.route("/user/<int:user_id>")
+@login_required
+@ceo_or_admin_required
+def user_detail(user_id):
+    """
+    Scheda dettaglio utente con cronologia attività e insight AI.
+    """
+    try:
+        user = User.query.get_or_404(user_id)
+        
+        # Verifica permessi (admin può vedere solo utenti Mercury)
+        if current_user.is_admin and not current_user.is_ceo:
+            if not hasattr(user, 'modulo') or user.modulo != 'Mercury':
+                flash("❌ Non hai i permessi per visualizzare questo utente.", "danger")
+                return redirect(url_for('admin.mercury_users'))
+        
+        # === SEZIONE 2 - Cronologia Attività ===
+        # Attività di login
+        login_activities = db.session.query(
+            func.date(User.created_at).label('date'),
+            func.count().label('count')
+        ).filter(
+            User.id == user_id
+        ).group_by(
+            func.date(User.created_at)
+        ).all()
+        
+        # Attività guest (se l'utente ha attività guest)
+        guest_activities = GuestActivity.query.filter_by(
+            user_id=user_id
+        ).order_by(GuestActivity.timestamp.desc()).limit(50).all()
+        
+        # Attività documenti
+        document_activities = DocumentActivityLog.query.filter_by(
+            user_id=user_id
+        ).order_by(DocumentActivityLog.timestamp.desc()).limit(50).all()
+        
+        # Download negati
+        denied_downloads = DownloadDeniedLog.query.filter_by(
+            user_id=user_id
+        ).order_by(DownloadDeniedLog.timestamp.desc()).limit(20).all()
+        
+        # === SEZIONE 3 - Alert AI ===
+        user_alerts = AlertAI.query.filter_by(
+            user_id=user_id
+        ).order_by(AlertAI.created_at.desc()).all()
+        
+        # === SEZIONE 4 - Insight AI Personalizzati ===
+        user_insights = genera_insight_per_utente(user_id)
+        
+        # Statistiche attività
+        activity_stats = {
+            'total_logins': len(login_activities),
+            'total_guest_activities': len(guest_activities),
+            'total_document_activities': len(document_activities),
+            'total_denied_downloads': len(denied_downloads),
+            'total_alerts': len(user_alerts),
+            'last_activity': max([
+                user.created_at,
+                *[ga.timestamp for ga in guest_activities],
+                *[da.timestamp for da in document_activities],
+                *[dd.timestamp for dd in denied_downloads]
+            ]) if any([guest_activities, document_activities, denied_downloads]) else user.created_at
+        }
+        
+        return render_template(
+            'admin/user_detail.html',
+            user=user,
+            login_activities=login_activities,
+            guest_activities=guest_activities,
+            document_activities=document_activities,
+            denied_downloads=denied_downloads,
+            user_alerts=user_alerts,
+            user_insights=user_insights,
+            activity_stats=activity_stats
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore scheda utente {user_id}: {str(e)}")
+        flash("Errore nel caricamento della scheda utente", "error")
+        return redirect(url_for('admin.mercury_users'))
+
+
+# === Scheda Dettaglio Guest ===
+@admin_bp.route("/guest/<int:guest_id>")
+@login_required
+@ceo_or_admin_required
+def guest_detail(guest_id):
+    """
+    Scheda dettaglio guest con cronologia attività e insight AI.
+    """
+    try:
+        guest = User.query.filter_by(id=guest_id, role='guest').first_or_404()
+        
+        # Verifica permessi (admin può vedere solo guest Mercury)
+        if current_user.is_admin and not current_user.is_ceo:
+            if not hasattr(guest, 'modulo') or guest.modulo != 'Mercury':
+                flash("❌ Non hai i permessi per visualizzare questo guest.", "danger")
+                return redirect(url_for('admin.mercury_guests'))
+        
+        # === SEZIONE 2 - Cronologia Attività Guest ===
+        guest_activities = GuestActivity.query.filter_by(
+            user_id=guest_id
+        ).order_by(GuestActivity.timestamp.desc()).limit(100).all()
+        
+        # Commenti guest
+        guest_comments = GuestComment.query.filter_by(
+            guest_email=guest.email
+        ).order_by(GuestComment.timestamp.desc()).limit(20).all()
+        
+        # === SEZIONE 3 - Alert AI Guest ===
+        guest_alerts = AlertAI.query.filter_by(
+            user_id=guest_id
+        ).order_by(AlertAI.created_at.desc()).all()
+        
+        # === SEZIONE 4 - Insight AI Personalizzati ===
+        guest_insights = genera_insight_per_guest(guest_id)
+        
+        # Statistiche guest
+        guest_stats = {
+            'total_activities': len(guest_activities),
+            'total_downloads': len([ga for ga in guest_activities if ga.action == 'download']),
+            'total_views': len([ga for ga in guest_activities if ga.action == 'view']),
+            'total_comments': len(guest_comments),
+            'total_alerts': len(guest_alerts),
+            'last_activity': max([ga.timestamp for ga in guest_activities]) if guest_activities else guest.created_at,
+            'is_expired': guest.access_expiration and guest.access_expiration < datetime.utcnow(),
+            'days_until_expiry': (guest.access_expiration - datetime.utcnow()).days if guest.access_expiration and guest.access_expiration > datetime.utcnow() else None
+        }
+        
+        return render_template(
+            'admin/guest_detail.html',
+            guest=guest,
+            guest_activities=guest_activities,
+            guest_comments=guest_comments,
+            guest_alerts=guest_alerts,
+            guest_insights=guest_insights,
+            guest_stats=guest_stats
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore scheda guest {guest_id}: {str(e)}")
+        flash("Errore nel caricamento della scheda guest", "error")
+        return redirect(url_for('admin.mercury_guests'))
+
+
+def genera_insight_per_utente(user_id):
+    """
+    Genera insight AI personalizzati per un utente specifico.
+    
+    Args:
+        user_id (int): ID dell'utente
+        
+    Returns:
+        list: Lista di insight personalizzati
+    """
+    insights = []
+    
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return insights
+        
+        # Analizza attività dell'utente
+        guest_activities = GuestActivity.query.filter_by(user_id=user_id).all()
+        document_activities = DocumentActivityLog.query.filter_by(user_id=user_id).all()
+        denied_downloads = DownloadDeniedLog.query.filter_by(user_id=user_id).all()
+        user_alerts = AlertAI.query.filter_by(user_id=user_id).all()
+        
+        # Calcola statistiche
+        total_downloads = len([ga for ga in guest_activities if ga.action == 'download'])
+        total_views = len([ga for ga in guest_activities if ga.action == 'view'])
+        total_errors = len(denied_downloads)
+        total_alerts = len(user_alerts)
+        
+        # Insight 1: Download notturni
+        night_downloads = len([
+            ga for ga in guest_activities 
+            if ga.action == 'download' and ga.timestamp.hour in [22, 23, 0, 1, 2, 3, 4, 5]
+        ])
+        
+        if night_downloads > 5:
+            insights.append({
+                'type': 'warning',
+                'icon': '🌙',
+                'title': 'Attività Notturna',
+                'message': f'L\'utente ha scaricato {night_downloads} documenti in orari notturni.',
+                'action': 'Verifica necessità accesso notturno'
+            })
+        
+        # Insight 2: Errori di accesso
+        if total_errors > 10:
+            insights.append({
+                'type': 'danger',
+                'icon': '🚫',
+                'title': 'Errori di Accesso',
+                'message': f'L\'utente ha {total_errors} tentativi di accesso negati.',
+                'action': 'Verifica permessi e documenti'
+            })
+        
+        # Insight 3: Inattività
+        if user.access_expiration and user.access_expiration < datetime.utcnow():
+            days_inactive = (datetime.utcnow() - user.access_expiration).days
+            insights.append({
+                'type': 'info',
+                'icon': '⏰',
+                'title': 'Account Inattivo',
+                'message': f'L\'account è inattivo da {days_inactive} giorni.',
+                'action': 'Valuta riattivazione o disattivazione'
+            })
+        
+        # Insight 4: Alert critici
+        critical_alerts = [a for a in user_alerts if a.livello in ['alto', 'critico']]
+        if critical_alerts:
+            insights.append({
+                'type': 'danger',
+                'icon': '🚨',
+                'title': 'Alert Critici',
+                'message': f'L\'utente ha {len(critical_alerts)} alert critici non risolti.',
+                'action': 'Rivedi immediatamente'
+            })
+        
+        # Insight 5: Attività normale
+        if total_downloads > 0 and total_errors == 0 and not critical_alerts:
+            insights.append({
+                'type': 'success',
+                'icon': '✅',
+                'title': 'Attività Normale',
+                'message': f'L\'utente ha {total_downloads} download e {total_views} visualizzazioni.',
+                'action': 'Continua monitoraggio'
+            })
+        
+        # Se non ci sono insight specifici
+        if not insights:
+            insights.append({
+                'type': 'info',
+                'icon': 'ℹ️',
+                'title': 'Dati Insufficienti',
+                'message': 'Non ci sono abbastanza dati per generare insight specifici.',
+                'action': 'Monitora ulteriori attività'
+            })
+            
+    except Exception as e:
+        current_app.logger.error(f"Errore generazione insight utente {user_id}: {str(e)}")
+        insights.append({
+            'type': 'error',
+            'icon': '❌',
+            'title': 'Errore Analisi',
+            'message': 'Errore durante l\'analisi dei dati utente.',
+            'action': 'Riprova più tardi'
+        })
+    
+    return insights
+
+
+def genera_insight_per_guest(guest_id):
+    """
+    Genera insight AI personalizzati per un guest specifico.
+    
+    Args:
+        guest_id (int): ID del guest
+        
+    Returns:
+        list: Lista di insight personalizzati
+    """
+    insights = []
+    
+    try:
+        guest = User.query.get(guest_id)
+        if not guest or guest.role != 'guest':
+            return insights
+        
+        # Analizza attività del guest
+        guest_activities = GuestActivity.query.filter_by(user_id=guest_id).all()
+        guest_alerts = AlertAI.query.filter_by(user_id=guest_id).all()
+        
+        # Calcola statistiche
+        total_downloads = len([ga for ga in guest_activities if ga.action == 'download'])
+        total_views = len([ga for ga in guest_activities if ga.action == 'view'])
+        total_alerts = len(guest_alerts)
+        
+        # Insight 1: Scadenza accesso
+        if guest.access_expiration:
+            if guest.access_expiration < datetime.utcnow():
+                days_expired = (datetime.utcnow() - guest.access_expiration).days
+                insights.append({
+                    'type': 'danger',
+                    'icon': '⏰',
+                    'title': 'Accesso Scaduto',
+                    'message': f'L\'accesso guest è scaduto da {days_expired} giorni.',
+                    'action': 'Prolunga accesso o revoca'
+                })
+            elif (guest.access_expiration - datetime.utcnow()).days <= 7:
+                days_left = (guest.access_expiration - datetime.utcnow()).days
+                insights.append({
+                    'type': 'warning',
+                    'icon': '⚠️',
+                    'title': 'Scadenza Imminente',
+                    'message': f'L\'accesso scade tra {days_left} giorni.',
+                    'action': 'Valuta prolungamento'
+                })
+        
+        # Insight 2: Download massivi
+        if total_downloads > 20:
+            insights.append({
+                'type': 'warning',
+                'icon': '📥',
+                'title': 'Download Massivi',
+                'message': f'Il guest ha scaricato {total_downloads} documenti.',
+                'action': 'Verifica necessità e autorizzazioni'
+            })
+        
+        # Insight 3: Alert critici
+        critical_alerts = [a for a in guest_alerts if a.livello in ['alto', 'critico']]
+        if critical_alerts:
+            insights.append({
+                'type': 'danger',
+                'icon': '🚨',
+                'title': 'Alert Critici',
+                'message': f'Il guest ha {len(critical_alerts)} alert critici.',
+                'action': 'Rivedi immediatamente'
+            })
+        
+        # Insight 4: Attività normale
+        if total_downloads > 0 and total_alerts == 0:
+            insights.append({
+                'type': 'success',
+                'icon': '✅',
+                'title': 'Attività Normale',
+                'message': f'Il guest ha {total_downloads} download e {total_views} visualizzazioni.',
+                'action': 'Continua monitoraggio'
+            })
+        
+        # Insight 5: Nessuna attività
+        if not guest_activities:
+            insights.append({
+                'type': 'info',
+                'icon': '📭',
+                'title': 'Nessuna Attività',
+                'message': 'Il guest non ha ancora effettuato attività.',
+                'action': 'Verifica invio credenziali'
+            })
+        
+        # Se non ci sono insight specifici
+        if not insights:
+            insights.append({
+                'type': 'info',
+                'icon': 'ℹ️',
+                'title': 'Dati Insufficienti',
+                'message': 'Non ci sono abbastanza dati per generare insight specifici.',
+                'action': 'Monitora ulteriori attività'
+            })
+            
+    except Exception as e:
+        current_app.logger.error(f"Errore generazione insight guest {guest_id}: {str(e)}")
+        insights.append({
+            'type': 'error',
+            'icon': '❌',
+            'title': 'Errore Analisi',
+            'message': 'Errore durante l\'analisi dei dati guest.',
+            'action': 'Riprova più tardi'
+        })
+    
+    return insights
+
+# === Download PDF Cronologia Attività ===
+@admin_bp.route("/user/<int:user_id>/pdf")
+@login_required
+@ceo_or_admin_required
+def user_pdf(user_id):
+    """
+    Genera PDF con cronologia attività e alert per un utente.
+    """
+    try:
+        import weasyprint
+        from io import BytesIO
+        
+        user = User.query.get_or_404(user_id)
+        
+        # Verifica permessi (admin può vedere solo utenti Mercury)
+        if current_user.is_admin and not current_user.is_ceo:
+            if not hasattr(user, 'modulo') or user.modulo != 'Mercury':
+                flash("❌ Non hai i permessi per visualizzare questo utente.", "danger")
+                return redirect(url_for('admin.mercury_users'))
+        
+        # Raccogli dati per il PDF
+        guest_activities = GuestActivity.query.filter_by(
+            user_id=user_id
+        ).order_by(GuestActivity.timestamp.desc()).limit(100).all()
+        
+        document_activities = DocumentActivityLog.query.filter_by(
+            user_id=user_id
+        ).order_by(DocumentActivityLog.timestamp.desc()).limit(100).all()
+        
+        denied_downloads = DownloadDeniedLog.query.filter_by(
+            user_id=user_id
+        ).order_by(DownloadDeniedLog.timestamp.desc()).limit(50).all()
+        
+        user_alerts = AlertAI.query.filter_by(
+            user_id=user_id
+        ).order_by(AlertAI.created_at.desc()).all()
+        
+        user_insights = genera_insight_per_utente(user_id)
+        
+        # Statistiche per il PDF
+        activity_stats = {
+            'total_guest_activities': len(guest_activities),
+            'total_document_activities': len(document_activities),
+            'total_denied_downloads': len(denied_downloads),
+            'total_alerts': len(user_alerts),
+            'total_downloads': len([ga for ga in guest_activities if ga.action == 'download']),
+            'total_views': len([ga for ga in guest_activities if ga.action == 'view']),
+            'last_activity': max([
+                user.created_at,
+                *[ga.timestamp for ga in guest_activities],
+                *[da.timestamp for da in document_activities],
+                *[dd.timestamp for dd in denied_downloads]
+            ]) if any([guest_activities, document_activities, denied_downloads]) else user.created_at
+        }
+        
+        # Genera HTML per il PDF
+        html = render_template(
+            'pdf/attivita_utente.html',
+            user=user,
+            guest_activities=guest_activities,
+            document_activities=document_activities,
+            denied_downloads=denied_downloads,
+            user_alerts=user_alerts,
+            user_insights=user_insights,
+            activity_stats=activity_stats,
+            generated_at=datetime.utcnow()
+        )
+        
+        # Converti HTML in PDF
+        pdf = weasyprint.HTML(string=html).write_pdf()
+        
+        # Crea response con PDF
+        buffer = BytesIO()
+        buffer.write(pdf)
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"cronologia_utente_{user.email}_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore generazione PDF utente {user_id}: {str(e)}")
+        flash("Errore nella generazione del PDF", "error")
+        return redirect(url_for('admin.user_detail', user_id=user_id))
+
+
+@admin_bp.route("/guest/<int:guest_id>/pdf")
+@login_required
+@ceo_or_admin_required
+def guest_pdf(guest_id):
+    """
+    Genera PDF con cronologia attività e alert per un guest.
+    """
+    try:
+        import weasyprint
+        from io import BytesIO
+        
+        guest = User.query.filter_by(id=guest_id, role='guest').first_or_404()
+        
+        # Verifica permessi (admin può vedere solo guest Mercury)
+        if current_user.is_admin and not current_user.is_ceo:
+            if not hasattr(guest, 'modulo') or guest.modulo != 'Mercury':
+                flash("❌ Non hai i permessi per visualizzare questo guest.", "danger")
+                return redirect(url_for('admin.mercury_guests'))
+        
+        # Raccogli dati per il PDF
+        guest_activities = GuestActivity.query.filter_by(
+            user_id=guest_id
+        ).order_by(GuestActivity.timestamp.desc()).limit(100).all()
+        
+        guest_comments = GuestComment.query.filter_by(
+            guest_email=guest.email
+        ).order_by(GuestComment.timestamp.desc()).limit(50).all()
+        
+        guest_alerts = AlertAI.query.filter_by(
+            user_id=guest_id
+        ).order_by(AlertAI.created_at.desc()).all()
+        
+        guest_insights = genera_insight_per_guest(guest_id)
+        
+        # Statistiche per il PDF
+        guest_stats = {
+            'total_activities': len(guest_activities),
+            'total_downloads': len([ga for ga in guest_activities if ga.action == 'download']),
+            'total_views': len([ga for ga in guest_activities if ga.action == 'view']),
+            'total_comments': len(guest_comments),
+            'total_alerts': len(guest_alerts),
+            'last_activity': max([ga.timestamp for ga in guest_activities]) if guest_activities else guest.created_at,
+            'is_expired': guest.access_expiration and guest.access_expiration < datetime.utcnow(),
+            'days_until_expiry': (guest.access_expiration - datetime.utcnow()).days if guest.access_expiration and guest.access_expiration > datetime.utcnow() else None
+        }
+        
+        # Genera HTML per il PDF
+        html = render_template(
+            'pdf/attivita_guest.html',
+            guest=guest,
+            guest_activities=guest_activities,
+            guest_comments=guest_comments,
+            guest_alerts=guest_alerts,
+            guest_insights=guest_insights,
+            guest_stats=guest_stats,
+            generated_at=datetime.utcnow()
+        )
+        
+        # Converti HTML in PDF
+        pdf = weasyprint.HTML(string=html).write_pdf()
+        
+        # Crea response con PDF
+        buffer = BytesIO()
+        buffer.write(pdf)
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"cronologia_guest_{guest.email}_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore generazione PDF guest {guest_id}: {str(e)}")
+        flash("Errore nella generazione del PDF", "error")
+        return redirect(url_for('admin.guest_detail', guest_id=guest_id))
+
+
+# === Invio PDF via Email per Audit/Segnalazioni ===
+
+def invia_report_pdf_via_email(user_id, tipo, destinatario, messaggio_opzionale=""):
+    """
+    Funzione per inviare PDF report via email.
+    
+    Args:
+        user_id: ID dell'utente/guest
+        tipo: 'user' o 'guest'
+        destinatario: email del destinatario
+        messaggio_opzionale: messaggio aggiuntivo opzionale
+    """
+    try:
+        import weasyprint
+        from io import BytesIO
+        from flask_mail import Message
+        
+        # Recupera dati utente/guest
+        if tipo == 'user':
+            user = User.query.get_or_404(user_id)
+            nome = f"{user.first_name or user.nome or ''} {user.last_name or user.cognome or ''}".strip() or user.email
+        else:
+            user = User.query.filter_by(id=user_id, role='guest').first_or_404()
+            nome = f"{user.first_name or user.nome or ''} {user.last_name or user.cognome or ''}".strip() or user.email
+        
+        # Raccogli dati per il PDF (stesso codice delle rotte PDF)
+        if tipo == 'user':
+            guest_activities = GuestActivity.query.filter_by(
+                user_id=user_id
+            ).order_by(GuestActivity.timestamp.desc()).limit(100).all()
+            
+            document_activities = DocumentActivityLog.query.filter_by(
+                user_id=user_id
+            ).order_by(DocumentActivityLog.timestamp.desc()).limit(100).all()
+            
+            denied_downloads = DownloadDeniedLog.query.filter_by(
+                user_id=user_id
+            ).order_by(DownloadDeniedLog.timestamp.desc()).limit(50).all()
+            
+            user_alerts = AlertAI.query.filter_by(
+                user_id=user_id
+            ).order_by(AlertAI.created_at.desc()).all()
+            
+            user_insights = genera_insight_per_utente(user_id)
+            
+            activity_stats = {
+                'total_guest_activities': len(guest_activities),
+                'total_document_activities': len(document_activities),
+                'total_denied_downloads': len(denied_downloads),
+                'total_alerts': len(user_alerts),
+                'total_downloads': len([ga for ga in guest_activities if ga.action == 'download']),
+                'total_views': len([ga for ga in guest_activities if ga.action == 'view']),
+                'last_activity': max([
+                    user.created_at,
+                    *[ga.timestamp for ga in guest_activities],
+                    *[da.timestamp for da in document_activities],
+                    *[dd.timestamp for dd in denied_downloads]
+                ]) if any([guest_activities, document_activities, denied_downloads]) else user.created_at
+            }
+            
+            # Genera HTML per il PDF
+            html = render_template(
+                'pdf/attivita_utente.html',
+                user=user,
+                guest_activities=guest_activities,
+                document_activities=document_activities,
+                denied_downloads=denied_downloads,
+                user_alerts=user_alerts,
+                user_insights=user_insights,
+                activity_stats=activity_stats,
+                generated_at=datetime.utcnow()
+            )
+            
+        else:  # guest
+            guest_activities = GuestActivity.query.filter_by(
+                user_id=user_id
+            ).order_by(GuestActivity.timestamp.desc()).limit(100).all()
+            
+            guest_comments = GuestComment.query.filter_by(
+                guest_email=user.email
+            ).order_by(GuestComment.timestamp.desc()).limit(50).all()
+            
+            guest_alerts = AlertAI.query.filter_by(
+                user_id=user_id
+            ).order_by(AlertAI.created_at.desc()).all()
+            
+            guest_insights = genera_insight_per_guest(user_id)
+            
+            guest_stats = {
+                'total_activities': len(guest_activities),
+                'total_downloads': len([ga for ga in guest_activities if ga.action == 'download']),
+                'total_views': len([ga for ga in guest_activities if ga.action == 'view']),
+                'total_comments': len(guest_comments),
+                'total_alerts': len(guest_alerts),
+                'last_activity': max([ga.timestamp for ga in guest_activities]) if guest_activities else user.created_at,
+                'is_expired': user.access_expiration and user.access_expiration < datetime.utcnow(),
+                'days_until_expiry': (user.access_expiration - datetime.utcnow()).days if user.access_expiration and user.access_expiration > datetime.utcnow() else None
+            }
+            
+            # Genera HTML per il PDF
+            html = render_template(
+                'pdf/attivita_guest.html',
+                guest=user,
+                guest_activities=guest_activities,
+                guest_comments=guest_comments,
+                guest_alerts=guest_alerts,
+                guest_insights=guest_insights,
+                guest_stats=guest_stats,
+                generated_at=datetime.utcnow()
+            )
+        
+        # Converti HTML in PDF
+        pdf = weasyprint.HTML(string=html).write_pdf()
+        
+        # Crea buffer per il PDF
+        buffer = BytesIO()
+        buffer.write(pdf)
+        buffer.seek(0)
+        
+        # Prepara email
+        oggetto = f"Report attività {tipo} - {nome}"
+        
+        corpo_email = f"""
+In allegato trovi il PDF con la cronologia delle attività e gli alert AI rilevati per l'{tipo} {nome}.
+
+{messaggio_opzionale}
+
+--
+DOCS Mercury – Sistema Documentale Integrato
+        """.strip()
+        
+        # Crea messaggio email
+        msg = Message(
+            subject=oggetto,
+            recipients=[destinatario],
+            body=corpo_email,
+            sender=current_app.config.get('MAIL_DEFAULT_SENDER', 'noreply@mercury-docs.com')
+        )
+        
+        # Allega PDF
+        msg.attach(
+            f"report_{tipo}_{nome.replace(' ', '_')}_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.pdf",
+            "application/pdf",
+            buffer.read()
+        )
+        
+        # Invia email
+        from flask_mail import Mail
+        mail = Mail(current_app)
+        mail.send(msg)
+        
+        # Log dell'invio nel database
+        from models import LogInvioPDF
+        log_entry = LogInvioPDF(
+            id_utente_o_guest=user_id,
+            tipo=tipo,
+            inviato_da=current_user.email,
+            inviato_a=destinatario,
+            oggetto_email=oggetto,
+            messaggio_email=messaggio_opzionale,
+            timestamp=datetime.utcnow(),
+            esito='successo'
+        )
+        db.session.add(log_entry)
+        db.session.commit()
+        
+        # Processa notifica CEO se necessario
+        try:
+            from services.ceo_notifications import processa_invio_pdf_per_notifiche
+            processa_invio_pdf_per_notifiche(log_entry.id)
+        except Exception as e:
+            current_app.logger.error(f"❌ Errore processamento notifica CEO: {e}")
+        
+        # Log dell'invio
+        log_message = f"PDF {tipo} inviato via email - Mittente: {current_user.email}, Destinatario: {destinatario}, ID: {user_id}, Data: {datetime.utcnow()}"
+        current_app.logger.info(log_message)
+        
+        # Salva log in file specifico
+        with open('logs/invio_pdf.log', 'a', encoding='utf-8') as f:
+            f.write(f"{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} - {log_message}\n")
+        
+        return True, "Email inviata con successo"
+        
+    except Exception as e:
+        error_msg = f"Errore invio PDF {tipo} via email: {str(e)}"
+        current_app.logger.error(error_msg)
+        
+        # Log errore
+        with open('logs/invio_pdf.log', 'a', encoding='utf-8') as f:
+            f.write(f"{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} - ERRORE: {error_msg}\n")
+        
+        # Log dell'errore nel database
+        from models import LogInvioPDF
+        log_entry = LogInvioPDF(
+            id_utente_o_guest=user_id,
+            tipo=tipo,
+            inviato_da=current_user.email,
+            inviato_a=destinatario,
+            oggetto_email=f"Report attività {tipo} - {nome}",
+            messaggio_email=messaggio_opzionale,
+            timestamp=datetime.utcnow(),
+            esito='errore',
+            errore=str(e)
+        )
+        db.session.add(log_entry)
+        db.session.commit()
+        
+        # Processa notifica CEO se necessario (anche per errori)
+        try:
+            from services.ceo_notifications import processa_invio_pdf_per_notifiche
+            processa_invio_pdf_per_notifiche(log_entry.id)
+        except Exception as e:
+            current_app.logger.error(f"❌ Errore processamento notifica CEO: {e}")
+        
+        return False, f"Errore nell'invio dell'email: {str(e)}"
+
+
+@admin_bp.route("/user/<int:user_id>/send_pdf", methods=['POST'])
+@login_required
+@ceo_or_admin_required
+def user_send_pdf(user_id):
+    """
+    Invia PDF report utente via email.
+    """
+    try:
+        # Verifica permessi (admin può vedere solo utenti Mercury)
+        user = User.query.get_or_404(user_id)
+        if current_user.is_admin and not current_user.is_ceo:
+            if not hasattr(user, 'modulo') or user.modulo != 'Mercury':
+                flash("❌ Non hai i permessi per visualizzare questo utente.", "danger")
+                return redirect(url_for('admin.mercury_users'))
+        
+        # Recupera dati dal form
+        email_destinatario = request.form.get('email_destinatario', '').strip()
+        oggetto = request.form.get('oggetto', '').strip()
+        messaggio = request.form.get('messaggio', '').strip()
+        
+        # Validazioni
+        if not email_destinatario:
+            flash("❌ Email destinatario richiesta.", "danger")
+            return redirect(url_for('admin.user_detail', user_id=user_id))
+        
+        # Validazione email interna (dominio aziendale)
+        from email_validator import validate_email, EmailNotValidError
+        try:
+            valid = validate_email(email_destinatario)
+            email_destinatario = valid.email
+        except EmailNotValidError:
+            flash("❌ Indirizzo email non valido.", "danger")
+            return redirect(url_for('admin.user_detail', user_id=user_id))
+        
+        # Verifica dominio aziendale (esempio: solo email @azienda.com)
+        domain = email_destinatario.split('@')[1].lower()
+        allowed_domains = ['azienda.com', 'mercury-docs.com', 'company.com']  # Configurare secondo necessità
+        if domain not in allowed_domains:
+            flash("❌ Solo email aziendali sono consentite per l'invio di report.", "danger")
+            return redirect(url_for('admin.user_detail', user_id=user_id))
+        
+        # Invia PDF via email
+        success, message = invia_report_pdf_via_email(
+            user_id=user_id,
+            tipo='user',
+            destinatario=email_destinatario,
+            messaggio_opzionale=messaggio
+        )
+        
+        if success:
+            flash(f"✅ {message}", "success")
+        else:
+            flash(f"❌ {message}", "danger")
+        
+        return redirect(url_for('admin.user_detail', user_id=user_id))
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore invio PDF utente {user_id}: {str(e)}")
+        flash("Errore nell'invio del PDF via email", "danger")
+        return redirect(url_for('admin.user_detail', user_id=user_id))
+
+
+@admin_bp.route("/guest/<int:guest_id>/send_pdf", methods=['POST'])
+@login_required
+@ceo_or_admin_required
+def guest_send_pdf(guest_id):
+    """
+    Invia PDF report guest via email.
+    """
+    try:
+        # Verifica permessi (admin può vedere solo guest Mercury)
+        guest = User.query.filter_by(id=guest_id, role='guest').first_or_404()
+        if current_user.is_admin and not current_user.is_ceo:
+            if not hasattr(guest, 'modulo') or guest.modulo != 'Mercury':
+                flash("❌ Non hai i permessi per visualizzare questo guest.", "danger")
+                return redirect(url_for('admin.mercury_guests'))
+        
+        # Recupera dati dal form
+        email_destinatario = request.form.get('email_destinatario', '').strip()
+        oggetto = request.form.get('oggetto', '').strip()
+        messaggio = request.form.get('messaggio', '').strip()
+        
+        # Validazioni
+        if not email_destinatario:
+            flash("❌ Email destinatario richiesta.", "danger")
+            return redirect(url_for('admin.guest_detail', guest_id=guest_id))
+        
+        # Validazione email interna (dominio aziendale)
+        from email_validator import validate_email, EmailNotValidError
+        try:
+            valid = validate_email(email_destinatario)
+            email_destinatario = valid.email
+        except EmailNotValidError:
+            flash("❌ Indirizzo email non valido.", "danger")
+            return redirect(url_for('admin.guest_detail', guest_id=guest_id))
+        
+        # Verifica dominio aziendale
+        domain = email_destinatario.split('@')[1].lower()
+        allowed_domains = ['azienda.com', 'mercury-docs.com', 'company.com']  # Configurare secondo necessità
+        if domain not in allowed_domains:
+            flash("❌ Solo email aziendali sono consentite per l'invio di report.", "danger")
+            return redirect(url_for('admin.guest_detail', guest_id=guest_id))
+        
+        # Invia PDF via email
+        success, message = invia_report_pdf_via_email(
+            user_id=guest_id,
+            tipo='guest',
+            destinatario=email_destinatario,
+            messaggio_opzionale=messaggio
+        )
+        
+        if success:
+            flash(f"✅ {message}", "success")
+        else:
+            flash(f"❌ {message}", "danger")
+        
+        return redirect(url_for('admin.guest_detail', guest_id=guest_id))
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore invio PDF guest {guest_id}: {str(e)}")
+        flash("Errore nell'invio del PDF via email", "danger")
+        return redirect(url_for('admin.guest_detail', guest_id=guest_id))
+
+
+@admin_bp.route("/invii_pdf")
+@login_required
+@ceo_or_admin_required
+def invii_pdf():
+    """
+    Pagina con log completo degli invii PDF.
+    Accessibile solo a admin e CEO.
+    """
+    try:
+        # Recupera parametri di filtro
+        data_inizio = request.args.get('data_inizio')
+        data_fine = request.args.get('data_fine')
+        mittente = request.args.get('mittente')
+        destinatario = request.args.get('destinatario')
+        tipo = request.args.get('tipo')
+        stato = request.args.get('stato')
+        pagina = request.args.get('page', 1, type=int)
+        per_pagina = 50
+        
+        # Query base
+        query = LogInvioPDF.query
+        
+        # Applica filtri
+        if data_inizio:
+            try:
+                data_inizio = datetime.strptime(data_inizio, '%Y-%m-%d')
+                query = query.filter(LogInvioPDF.timestamp >= data_inizio)
+            except ValueError:
+                pass
+        
+        if data_fine:
+            try:
+                data_fine = datetime.strptime(data_fine, '%Y-%m-%d')
+                query = query.filter(LogInvioPDF.timestamp <= data_fine + timedelta(days=1))
+            except ValueError:
+                pass
+        
+        if mittente:
+            query = query.filter(LogInvioPDF.inviato_da.ilike(f'%{mittente}%'))
+        
+        if destinatario:
+            query = query.filter(LogInvioPDF.inviato_a.ilike(f'%{destinatario}%'))
+        
+        if tipo:
+            query = query.filter(LogInvioPDF.tipo == tipo)
+        
+        if stato:
+            query = query.filter(LogInvioPDF.esito == stato)
+        
+        # Ordina per timestamp decrescente
+        query = query.order_by(LogInvioPDF.timestamp.desc())
+        
+        # Paginazione
+        paginazione = query.paginate(
+            page=pagina,
+            per_page=per_pagina,
+            error_out=False
+        )
+        
+        # Statistiche
+        totale_invii = query.count()
+        invii_successo = query.filter(LogInvioPDF.esito == 'successo').count()
+        invii_errore = query.filter(LogInvioPDF.esito == 'errore').count()
+        
+        # Ultimi 7 giorni
+        sette_giorni_fa = datetime.utcnow() - timedelta(days=7)
+        invii_ultima_settimana = query.filter(LogInvioPDF.timestamp >= sette_giorni_fa).count()
+        
+        return render_template('admin/invii_pdf.html',
+                             invii=paginazione.items,
+                             paginazione=paginazione,
+                             totale_invii=totale_invii,
+                             invii_successo=invii_successo,
+                             invii_errore=invii_errore,
+                             invii_ultima_settimana=invii_ultima_settimana,
+                             filtri={
+                                 'data_inizio': data_inizio,
+                                 'data_fine': data_fine,
+                                 'mittente': mittente,
+                                 'destinatario': destinatario,
+                                 'tipo': tipo,
+                                 'stato': stato
+                             })
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore pagina invii PDF: {str(e)}")
+        flash("Errore nel caricamento del log invii PDF", "danger")
+        return redirect(url_for('admin.ai_dashboard'))
+
+# ===== GESTIONE ALERT DI SICUREZZA =====
+
+@admin_bp.route('/admin/alerts', methods=['GET'])
+@login_required
+@admin_required
+def security_alerts():
+    """
+    Dashboard principale per la gestione degli alert di sicurezza.
+    """
+    try:
+        from services.alert_service import alert_service
+        from models import SecurityAlert, SeverityLevel, AlertStatus, User
+        
+        # Parametri di filtro dalla query string
+        severity_filter = request.args.get('severity')
+        status_filter = request.args.get('status', 'open')
+        user_filter = request.args.get('user_id', type=int)
+        page = request.args.get('page', 1, type=int)
+        per_page = 25
+        
+        # Query base
+        query = SecurityAlert.query
+        
+        # Applica filtri
+        if severity_filter and severity_filter != 'all':
+            query = query.filter(SecurityAlert.severity == SeverityLevel(severity_filter))
+        
+        if status_filter and status_filter != 'all':
+            query = query.filter(SecurityAlert.status == AlertStatus(status_filter))
+        
+        if user_filter:
+            query = query.filter(SecurityAlert.user_id == user_filter)
+        
+        # Ordina per data (più recenti prima)
+        query = query.order_by(SecurityAlert.ts.desc())
+        
+        # Paginazione
+        alerts = query.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        # Statistiche
+        stats = alert_service.get_alert_statistics(days=30)
+        
+        # Lista utenti per filtro
+        users_with_alerts = db.session.query(User)\
+            .join(SecurityAlert)\
+            .distinct(User.id)\
+            .order_by(User.username)\
+            .all()
+        
+        return render_template(
+            'admin/security_alerts.html',
+                             alerts=alerts,
+                             stats=stats,
+            severity_levels=SeverityLevel,
+            alert_statuses=AlertStatus,
+            users_with_alerts=users_with_alerts,
+            current_filters={
+                'severity': severity_filter,
+                'status': status_filter,
+                'user_id': user_filter
+            }
+        )
+                             
+    except Exception as e:
+        current_app.logger.error(f"Errore dashboard alert: {str(e)}")
+        flash("Errore nel caricamento degli alert di sicurezza", "danger")
+        return redirect(url_for('admin.dashboard'))
+
+@admin_bp.route('/admin/alerts/<int:alert_id>', methods=['GET'])
+@login_required
+@admin_required
+def alert_detail(alert_id):
+    """
+    Visualizza i dettagli di un alert specifico.
+    """
+    try:
+        from models import SecurityAlert, SecurityAuditLog
+        
+        alert = SecurityAlert.query.get_or_404(alert_id)
+        
+        # Log correlati all'utente nell'ultimo periodo
+        related_logs = SecurityAuditLog.query.filter(
+            SecurityAuditLog.user_id == alert.user_id,
+            SecurityAuditLog.ts >= alert.ts - timedelta(hours=1),
+            SecurityAuditLog.ts <= alert.ts + timedelta(hours=1)
+        ).order_by(SecurityAuditLog.ts.desc()).limit(20).all()
+        
+        return render_template(
+            'admin/alert_detail.html',
+            alert=alert,
+            related_logs=related_logs
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore dettaglio alert {alert_id}: {str(e)}")
+        flash("Errore nel caricamento del dettaglio alert", "danger")
+        return redirect(url_for('admin.security_alerts'))
+
+@admin_bp.route('/admin/alerts/<int:alert_id>/close', methods=['PATCH', 'POST'])
+@login_required
+@admin_required
+def close_alert(alert_id):
+    """
+    Chiude un alert di sicurezza.
+    """
+    try:
+        from services.alert_service import alert_service
+        
+        note = request.form.get('note', '').strip()
+        
+        success = alert_service.close_alert(alert_id, current_user.id, note)
+        
+        if success:
+            flash("Alert chiuso con successo", "success")
+        else:
+            flash("Errore nella chiusura dell'alert", "danger")
+        
+        # Redirect appropriato
+        if request.method == 'PATCH':
+            return jsonify({'success': success})
+        else:
+            return redirect(url_for('admin.alert_detail', alert_id=alert_id))
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore chiusura alert {alert_id}: {str(e)}")
+        
+        if request.method == 'PATCH':
+            return jsonify({'success': False, 'error': str(e)}), 500
+        else:
+            flash("Errore nella chiusura dell'alert", "danger")
+            return redirect(url_for('admin.alert_detail', alert_id=alert_id))
+
+@admin_bp.route('/admin/alerts/export', methods=['GET'])
+@login_required
+@admin_required
+def export_alerts():
+    """
+    Esporta gli alert filtrati in formato CSV.
+    """
+    try:
+        from models import SecurityAlert, SeverityLevel, AlertStatus
+        import csv
+        from io import StringIO
+        from flask import make_response
+        
+        # Applica gli stessi filtri della vista principale
+        severity_filter = request.args.get('severity')
+        status_filter = request.args.get('status', 'open')
+        user_filter = request.args.get('user_id', type=int)
+        
+        # Query base
+        query = SecurityAlert.query
+        
+        # Applica filtri
+        if severity_filter and severity_filter != 'all':
+            query = query.filter(SecurityAlert.severity == SeverityLevel(severity_filter))
+        
+        if status_filter and status_filter != 'all':
+            query = query.filter(SecurityAlert.status == AlertStatus(status_filter))
+        
+        if user_filter:
+            query = query.filter(SecurityAlert.user_id == user_filter)
+        
+        alerts = query.order_by(SecurityAlert.ts.desc()).all()
+        
+        # Crea CSV
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Header
+        writer.writerow([
+            'ID', 'Timestamp', 'Utente', 'Email', 'Regola', 'Severità', 
+            'Stato', 'Dettagli'
+        ])
+        
+        # Dati
+        for alert in alerts:
+            writer.writerow([
+                alert.id,
+                alert.ts.strftime('%d/%m/%Y %H:%M:%S'),
+                alert.user.username if alert.user else 'N/A',
+                alert.user.email if alert.user else 'N/A',
+                alert.rule_id,
+                alert.severity.value,
+                alert.status.value,
+                alert.details
+            ])
+        
+        # Prepara response
+        output.seek(0)
+        
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=security_alerts_{datetime.now().strftime("%Y%m%d_%H%M")}.csv'
+        
+        return response
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore export alert: {str(e)}")
+        flash("Errore nell'esportazione degli alert", "danger")
+        return redirect(url_for('admin.security_alerts'))
+
+@admin_bp.route('/admin/alerts/stats', methods=['GET'])
+@login_required
+@admin_required
+def alert_statistics():
+    """
+    Visualizza statistiche dettagliate degli alert.
+    """
+    try:
+        from services.alert_service import alert_service
+        
+        # Parametri
+        days = request.args.get('days', 30, type=int)
+        
+        # Ottieni statistiche
+        stats = alert_service.get_alert_statistics(days)
+        
+        return render_template(
+            'admin/alert_statistics.html',
+            stats=stats,
+            days=days
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Errore statistiche alert: {str(e)}")
+        flash("Errore nel caricamento delle statistiche", "danger")
+        return redirect(url_for('admin.security_alerts'))
+
+
+@admin_bp.route('/admin/file-manager', methods=['GET'])
+@login_required
+@admin_required
+def file_manager():
+    """
+    File Manager moderno con tree e tabella.
+    """
+    return render_template('admin/file_manager.html')
+
+# === ROUTE ALERT DOWNLOAD SOSPETTI ===
+@admin_bp.route('/admin/alerts', methods=['GET'])
+@login_required
+@admin_required
+def download_alerts():
+    """
+    Dashboard per gli alert di download sospetti.
+    """
+    # Filtri
+    status_filter = request.args.get('status', '')
+    severity_filter = request.args.get('severity', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    
+    # Query base
+    query = DownloadAlert.query.join(User).join(Document)
+    
+    # Applica filtri
+    if status_filter:
+        query = query.filter(DownloadAlert.status == DownloadAlertStatus(status_filter))
+    if severity_filter:
+        query = query.filter(DownloadAlert.severity == severity_filter)
+    if date_from:
+        query = query.filter(DownloadAlert.timestamp >= datetime.strptime(date_from, '%Y-%m-%d'))
+    if date_to:
+        query = query.filter(DownloadAlert.timestamp <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+    
+    # Ordina per data più recente
+    alerts = query.order_by(DownloadAlert.timestamp.desc()).all()
+    
+    # Statistiche
+    summary = alert_detector.get_alerts_summary()
+    
+    return render_template('admin/download_alerts.html', 
+                         alerts=alerts, 
+                         summary=summary,
+                         status_filter=status_filter,
+                         severity_filter=severity_filter,
+                         date_from=date_from,
+                         date_to=date_to)
+
+@admin_bp.route('/admin/alerts/<int:alert_id>/mark_seen', methods=['POST'])
+@login_required
+@admin_required
+def mark_download_alert_seen(alert_id):
+    """
+    Segna un alert di download come visto.
+    """
+    alert = DownloadAlert.query.get_or_404(alert_id)
+    alert.status = DownloadAlertStatus.SEEN
+    db.session.commit()
+    
+    flash("Alert segnato come visto", "success")
+    return redirect(url_for('admin.download_alerts'))
+
+@admin_bp.route('/admin/alerts/<int:alert_id>/resolve', methods=['POST'])
+@login_required
+@admin_required
+def resolve_download_alert(alert_id):
+    """
+    Risolve un alert di download.
+    """
+    alert = DownloadAlert.query.get_or_404(alert_id)
+    alert.status = DownloadAlertStatus.RESOLVED
+    alert.resolved_at = datetime.utcnow()
+    alert.resolved_by = current_user.id
+    db.session.commit()
+    
+    flash("Alert risolto", "success")
+    return redirect(url_for('admin.download_alerts'))
+
+@admin_bp.route('/admin/alerts/export_csv')
+@login_required
+@admin_required
+def export_alerts_csv():
+    """
+    Esporta gli alert in CSV.
+    """
+    alerts = DownloadAlert.query.join(User).join(Document).order_by(DownloadAlert.timestamp.desc()).all()
+    
+    # Crea CSV
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Utente', 'File', 'Motivo', 'IP', 'Data/Ora', 'Stato', 'Gravità'])
+    
+    for alert in alerts:
+        writer.writerow([
+            alert.id,
+            alert.user.username if alert.user else 'N/A',
+            alert.filename,
+            alert.reason,
+            alert.ip_address,
+            alert.timestamp.strftime('%d/%m/%Y %H:%M:%S') if alert.timestamp else '',
+            alert.status.value if alert.status else '',
+            alert.severity
+        ])
+    
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=download_alerts.csv'}
+    )
+
+# === ROUTE EXPORT CSV LOG DOWNLOAD ===
+@admin_bp.route('/admin/downloads', methods=['GET'])
+@login_required
+@admin_required
+def downloads_dashboard():
+    """
+    Dashboard per i log download con filtri e tabella.
+    """
+    # Filtri dalla query string
+    filters = {
+        'from': request.args.get('from', ''),
+        'to': request.args.get('to', ''),
+        'user_id': request.args.get('user_id', ''),
+        'username': request.args.get('username', ''),
+        'filename': request.args.get('filename', ''),
+        'ip': request.args.get('ip', ''),
+        'status': request.args.get('status', ''),
+        'source': request.args.get('source', '')
+    }
+    
+    # Validazione filtri
+    validated_filters = download_export_service.validate_filters(filters)
+    
+    # Query con filtri
+    query = download_export_service.build_query(validated_filters)
+    
+    # Paginazione
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    pagination = query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    # Statistiche
+    stats = download_export_service.get_export_stats(filters)
+    
+    # Lista utenti per filtro
+    users = User.query.order_by(User.username).all()
+    
+    return render_template('admin/downloads.html',
+                         logs=pagination.items,
+                         pagination=pagination,
+                         filters=filters,
+                         validated_filters=validated_filters,
+                         stats=stats,
+                         users=users)
+
+@admin_bp.route('/admin/downloads/export', methods=['GET'])
+@login_required
+@admin_required
+@rate_limit_export
+def export_downloads_csv():
+    """
+    Export CSV dei log download con streaming.
+    """
+    # Filtri dalla query string
+    filters = {
+        'from': request.args.get('from', ''),
+        'to': request.args.get('to', ''),
+        'user_id': request.args.get('user_id', ''),
+        'username': request.args.get('username', ''),
+        'filename': request.args.get('filename', ''),
+        'ip': request.args.get('ip', ''),
+        'status': request.args.get('status', ''),
+        'source': request.args.get('source', '')
+    }
+    
+    # Validazione filtri
+    validated_filters = download_export_service.validate_filters(filters)
+    
+    # Query per conteggio
+    query = download_export_service.build_query(validated_filters)
+    record_count = query.count()
+    
+    # Log dell'export
+    download_export_service.log_export(
+        admin_id=current_user.id,
+        filters=validated_filters,
+        record_count=record_count
+    )
+    
+    # Genera nome file con timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"download_logs_{timestamp}.csv"
+    
+    # Genera stream CSV con BOM UTF-8
+    def generate_csv():
+        # BOM UTF-8
+        yield b'\xef\xbb\xbf'
+        
+        # Stream dei dati
+        for chunk in download_export_service.generate_csv_stream(filters):
+            yield chunk.encode('utf-8')
+    
+    return Response(
+        generate_csv(),
+        mimetype='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Cache-Control': 'no-cache'
+        }
+    )
+
+@admin_bp.route('/admin/downloads/export/all', methods=['GET'])
+@login_required
+@admin_required
+@rate_limit_export
+def export_all_downloads_csv():
+    """
+    Export CSV di tutti i log download (ignora filtri).
+    """
+    # Log dell'export
+    download_export_service.log_export(
+        admin_id=current_user.id,
+        filters={'all': True},
+        record_count=DownloadLog.query.count()
+    )
+    
+    # Genera nome file
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"all_download_logs_{timestamp}.csv"
+    
+    # Genera stream CSV
+    def generate_csv():
+        # BOM UTF-8
+        yield b'\xef\xbb\xbf'
+        
+        # Header
+        yield download_export_service.get_csv_header().encode('utf-8')
+        
+        # Streaming di tutti i record
+        offset = 0
+        chunk_size = 1000
+        while True:
+            chunk = DownloadLog.query.join(User).join(Document)\
+                .order_by(DownloadLog.timestamp.desc())\
+                .offset(offset).limit(chunk_size).all()
+            
+            if not chunk:
+                break
+            
+            chunk_data = ''.join(
+                download_export_service.format_csv_row(log) for log in chunk
+            )
+            yield chunk_data.encode('utf-8')
+            
+            offset += chunk_size
+    
+    return Response(
+        generate_csv(),
+        mimetype='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Cache-Control': 'no-cache'
+        }
+    )
+
+
+# === ROUTE RICHIESTE ACCESSO UTENTI ===
+
+# === ROUTE EXPORT CSV RICHIESTE ACCESSO ===
+
+# === ROUTE EXPORT CSV RICHIESTE ACCESSO ===
+
+@admin_bp.route('/admin/access-requests/export', methods=['GET'])
+@login_required
+@admin_required
+def export_access_requests_csv():
+    """
+    Export CSV delle richieste di accesso con filtri.
+    """
+    try:
+        # Filtri
+        status_filter = request.args.get('status', 'all')
+        file_id = request.args.get('file_id')
+        requested_by = request.args.get('requested_by')
+        owner_id = request.args.get('owner_id')
+        from_date = request.args.get('from_date')
+        to_date = request.args.get('to_date')
+        
+        # Query base con join
+        query = db.session.query(
+            AccessRequestNew,
+            Document.filename.label('filename'),
+            User.username.label('requested_by_username'),
+            User.email.label('requested_by_email'),
+            User.username.label('owner_username'),
+            User.username.label('approver_username')
+        ).join(
+            Document, AccessRequestNew.file_id == Document.id
+        ).join(
+            User, AccessRequestNew.requested_by == User.id
+        ).outerjoin(
+            User, AccessRequestNew.owner_id == User.id
+        ).outerjoin(
+            User, AccessRequestNew.approver_id == User.id
+        )
+        
+        # Applica filtri
+        if status_filter != 'all':
+            query = query.filter(AccessRequestNew.status == status_filter)
+        if file_id:
+            query = query.filter(AccessRequestNew.file_id == int(file_id))
+        if requested_by:
+            query = query.filter(AccessRequestNew.requested_by == int(requested_by))
+        if owner_id:
+            query = query.filter(AccessRequestNew.owner_id == int(owner_id))
+        if from_date:
+            query = query.filter(AccessRequestNew.created_at >= datetime.strptime(from_date, '%Y-%m-%d'))
+        if to_date:
+            query = query.filter(AccessRequestNew.created_at <= datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1))
+        
+        # Ordina per data creazione
+        query = query.order_by(AccessRequestNew.created_at.desc())
+        
+        # Conta record
+        record_count = query.count()
+        
+        # Log dell'export
+        logger.info(f"Export CSV richieste accesso: admin={current_user.id}, count={record_count}, filtri={request.args}")
+        
+        # Genera nome file con timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"access_requests_{timestamp}.csv"
+        
+        # Genera CSV in streaming
+        def generate_csv():
+            # BOM UTF-8
+            yield b'\xef\xbb\xbf'
+            
+            # Header
+            header = [
+                'id', 'file_id', 'filename', 'requested_by', 'requested_by_username',
+                'owner_id', 'owner_username', 'reason', 'status', 'decision_reason',
+                'created_at', 'decided_at', 'expires_at', 'approver_id', 'approver_username'
+            ]
+            yield ','.join(header) + '\n'
+            
+            # Streaming dei dati
+            offset = 0
+            chunk_size = 1000
+            
+            while True:
+                chunk = query.offset(offset).limit(chunk_size).all()
+                if not chunk:
+                    break
+                
+                for row in chunk:
+                    csv_row = [
+                        str(row.AccessRequestNew.id),
+                        str(row.AccessRequestNew.file_id),
+                        f'"{row.filename or ""}"',
+                        str(row.AccessRequestNew.requested_by),
+                        f'"{row.requested_by_username or ""}"',
+                        str(row.AccessRequestNew.owner_id or ''),
+                        f'"{row.owner_username or ""}"',
+                        f'"{row.AccessRequestNew.reason or ""}"',
+                        row.AccessRequestNew.status.value,
+                        f'"{row.AccessRequestNew.decision_reason or ""}"',
+                        row.AccessRequestNew.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.AccessRequestNew.created_at else '',
+                        row.AccessRequestNew.decided_at.strftime('%Y-%m-%d %H:%M:%S') if row.AccessRequestNew.decided_at else '',
+                        row.AccessRequestNew.expires_at.strftime('%Y-%m-%d %H:%M:%S') if row.AccessRequestNew.expires_at else '',
+                        str(row.AccessRequestNew.approver_id or ''),
+                        f'"{row.approver_username or ""}"'
+                    ]
+                    yield ','.join(csv_row) + '\n'
+                
+                offset += chunk_size
+        
+        return Response(
+            generate_csv(),
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Cache-Control': 'no-cache'
+            }
+        )
+        
+    except Exception as e:
+        flash(f'Errore durante l\'export: {str(e)}', 'error')
+        return redirect(url_for('admin.access_requests_dashboard'))
+
+
+# === ROUTE ALERT RICHIESTE ACCESSO ===
+
+
+@admin_bp.route('/admin/access-requests/alerts', methods=['GET'])
+@login_required
+@admin_required
+def access_request_alerts():
+    """Dashboard degli alert delle richieste di accesso."""
+    try:
+        # Filtri
+        severity_filter = request.args.get('severity', 'all')
+        status_filter = request.args.get('status', 'all')
+        rule_filter = request.args.get('rule', 'all')
+        user_id = request.args.get('user_id')
+        file_id = request.args.get('file_id')
+        from_date = request.args.get('from_date')
+        to_date = request.args.get('to_date')
+        
+        # Query base
+        query = AccessRequestAlert.query
+        
+        # Applica filtri
+        if severity_filter != 'all':
+            query = query.filter_by(severity=severity_filter)
+        if status_filter != 'all':
+            query = query.filter_by(status=status_filter)
+        if rule_filter != 'all':
+            query = query.filter_by(rule=rule_filter)
+        if user_id:
+            query = query.filter_by(user_id=int(user_id))
+        if file_id:
+            query = query.filter_by(file_id=int(file_id))
+        if from_date:
+            query = query.filter(AccessRequestAlert.created_at >= datetime.strptime(from_date, '%Y-%m-%d'))
+        if to_date:
+            query = query.filter(AccessRequestAlert.created_at <= datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1))
+        
+        # Ordina per data creazione (più recenti prima)
+        query = query.order_by(AccessRequestAlert.created_at.desc())
+        
+        # Paginazione
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        alerts = pagination.items
+        
+        # Statistiche
+        stats = {
+            'total': AccessRequestAlert.query.count(),
+            'new': AccessRequestAlert.query.filter_by(status=AccessRequestAlertStatus.NEW).count(),
+            'critical': AccessRequestAlert.query.filter_by(severity=AccessRequestAlertSeverity.CRITICAL).count(),
+            'last_24h': AccessRequestAlert.query.filter(
+                AccessRequestAlert.created_at >= datetime.utcnow() - timedelta(hours=24)
+            ).count()
+        }
+        
+        return render_template(
+            'admin/access_request_alerts.html',
+            alerts=alerts,
+            pagination=pagination,
+            stats=stats,
+            filters=request.args
+        )
+        
+    except Exception as e:
+        flash(f'Errore nel caricamento degli alert: {str(e)}', 'error')
+        return redirect(url_for('admin.admin_dashboard'))
+
+
+@admin_bp.route('/admin/access-requests/alerts/<int:alert_id>/mark-seen', methods=['POST'])
+@login_required
+@admin_required
+def mark_alert_seen(alert_id):
+    """Segna un alert come visto."""
+    try:
+        alert = AccessRequestAlert.query.get_or_404(alert_id)
+        alert.status = AccessRequestAlertStatus.SEEN
+        db.session.commit()
+        
+        flash('Alert segnato come visto.', 'success')
+        return redirect(url_for('admin.access_request_alerts'))
+        
+    except Exception as e:
+        flash(f'Errore nell\'aggiornamento dell\'alert: {str(e)}', 'error')
+        return redirect(url_for('admin.access_request_alerts'))
+
+@admin_bp.route('/admin/access-requests/alerts/<int:alert_id>/resolve', methods=['POST'])
+@login_required
+@admin_required
+def resolve_alert(alert_id):
+    """Risolve un alert."""
+    try:
+        alert = AccessRequestAlert.query.get_or_404(alert_id)
+        alert.status = AccessRequestAlertStatus.RESOLVED
+        alert.resolved_at = datetime.utcnow()
+        alert.resolved_by = current_user.id
+        db.session.commit()
+        
+        flash('Alert risolto.', 'success')
+        return redirect(url_for('admin.access_request_alerts'))
+        
+    except Exception as e:
+        flash(f'Errore nella risoluzione dell\'alert: {str(e)}', 'error')
+        return redirect(url_for('admin.access_request_alerts'))
+
+@admin_bp.route('/admin/access-requests/alerts/<int:alert_id>/details', methods=['GET'])
+@login_required
+@admin_required
+def alert_details(alert_id):
+    """Dettagli di un alert (per modal)."""
+    try:
+        alert = AccessRequestAlert.query.get_or_404(alert_id)
+        return jsonify({
+            'id': alert.id,
+            'rule': alert.rule,
+            'severity': alert.severity.value,
+            'status': alert.status.value,
+            'created_at': alert.created_at.isoformat(),
+            'details': alert.details_json,
+            'user': alert.user.username if alert.user else None,
+            'file': alert.file.title if alert.file else None
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/admin/access-requests/alerts/export', methods=['GET'])
+@login_required
+@admin_required
+def export_access_request_alerts():
+    """Export CSV degli alert delle richieste di accesso."""
+    try:
+        # Filtri (stessi della dashboard)
+        severity_filter = request.args.get('severity', 'all')
+        status_filter = request.args.get('status', 'all')
+        rule_filter = request.args.get('rule', 'all')
+        user_id = request.args.get('user_id')
+        file_id = request.args.get('file_id')
+        from_date = request.args.get('from_date')
+        to_date = request.args.get('to_date')
+        
+        # Query base
+        query = AccessRequestAlert.query
+        
+        # Applica filtri
+        if severity_filter != 'all':
+            query = query.filter_by(severity=severity_filter)
+        if status_filter != 'all':
+            query = query.filter_by(status=status_filter)
+        if rule_filter != 'all':
+            query = query.filter_by(rule=rule_filter)
+        if user_id:
+            query = query.filter_by(user_id=int(user_id))
+        if file_id:
+            query = query.filter_by(file_id=int(file_id))
+        if from_date:
+            query = query.filter(AccessRequestAlert.created_at >= datetime.strptime(from_date, '%Y-%m-%d'))
+        if to_date:
+            query = query.filter(AccessRequestAlert.created_at <= datetime.strptime(to_date, '%Y-%m-%d') + timedelta(days=1))
+        
+        # Ordina per data creazione
+        alerts = query.order_by(AccessRequestAlert.created_at.desc()).all()
+        
+        # Genera nome file
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"access_request_alerts_{timestamp}.csv"
+        
+        # Genera CSV
+        def generate_csv():
+            # BOM UTF-8
+            yield b'\xef\xbb\xbf'
+            
+            # Header
+            header = [
+                'id', 'rule', 'severity', 'status', 'user_id', 'username', 'file_id', 'filename',
+                'ip_address', 'user_agent', 'window_from', 'window_to', 'created_at', 'resolved_at', 'resolved_by'
+            ]
+            yield ','.join(header) + '\n'
+            
+            # Dati
+            for alert in alerts:
+                csv_row = [
+                    str(alert.id),
+                    alert.rule,
+                    alert.severity.value,
+                    alert.status.value,
+                    str(alert.user_id or ''),
+                    f'"{alert.user.username if alert.user else ""}"',
+                    str(alert.file_id or ''),
+                    f'"{alert.file.title if alert.file else ""}"',
+                    f'"{alert.ip_address or ""}"',
+                    f'"{alert.user_agent or ""}"',
+                    alert.window_from.strftime('%Y-%m-%d %H:%M:%S') if alert.window_from else '',
+                    alert.window_to.strftime('%Y-%m-%d %H:%M:%S') if alert.window_to else '',
+                    alert.created_at.strftime('%Y-%m-%d %H:%M:%S') if alert.created_at else '',
+                    alert.resolved_at.strftime('%Y-%m-%d %H:%M:%S') if alert.resolved_at else '',
+                    str(alert.resolved_by or '')
+                ]
+                yield ','.join(csv_row) + '\n'
+        
+        return Response(
+            generate_csv(),
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Cache-Control': 'no-cache'
+            }
+        )
+        
+    except Exception as e:
+        flash(f'Errore durante l\'export: {str(e)}', 'error')
+        return redirect(url_for('admin.access_request_alerts'))
+
+
+@admin_bp.post("/download-alerts/<int:alert_id>/ai-explain")
+@login_required
+@admin_required
+def download_alert_ai_explain(alert_id: int):
+    """
+    Genera una spiegazione AI per un download alert.
+    
+    Args:
+        alert_id (int): ID dell'alert
+        
+    Returns:
+        JSON con la spiegazione AI
+    """
+    try:
+        from models import DownloadAlert
+        alert = DownloadAlert.query.get_or_404(alert_id)
+        
+        # Costruisci il contesto
+        ctx = build_alert_context(alert)
+        
+        # Genera spiegazione AI
+        explanation = gpt.explain_alert(ctx)
+        
+        return jsonify({"explanation": explanation}), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 

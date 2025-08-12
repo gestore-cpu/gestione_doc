@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}📊 Letture PDF - Dashboard Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h2><i class="fas fa-eye text-primary"></i> Dashboard Letture PDF</h2>
+                            <p class="text-muted mb-0">Monitoraggio completo delle visualizzazioni PDF</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{{ url_for('docs.export_letture_pdf_csv') }}" class="btn btn-success">
+                                <i class="fas fa-download"></i> Export CSV
+                            </a>
+                            <a href="{{ url_for('docs.dashboard_docs') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Torna ai Documenti
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-eye"></i> Totali</h4>
+                            <h2 class="mb-0">{{ total_letture }}</h2>
+                            <p class="mb-0">Letture registrate</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-line fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-calendar-day"></i> Oggi</h4>
+                            <h2 class="mb-0">{{ letture_oggi }}</h2>
+                            <p class="mb-0">Letture di oggi</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-calendar fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-file-pdf"></i> Documenti</h4>
+                            <h2 class="mb-0">{{ documenti_letture|length }}</h2>
+                            <p class="mb-0">Documenti visualizzati</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-file-pdf fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabella Letture -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list"></i> Lista Letture PDF</h5>
+                </div>
+                <div class="card-body">
+                    {% if letture %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th><i class="fas fa-hashtag"></i> ID</th>
+                                        <th><i class="fas fa-user"></i> Utente</th>
+                                        <th><i class="fas fa-envelope"></i> Email</th>
+                                        <th><i class="fas fa-file-pdf"></i> Documento</th>
+                                        <th><i class="fas fa-calendar"></i> Data/Ora</th>
+                                        <th><i class="fas fa-globe"></i> IP Address</th>
+                                        <th><i class="fas fa-desktop"></i> Dispositivo</th>
+                                        <th><i class="fas fa-cogs"></i> Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for lettura in letture %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ lettura.id }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-user-circle text-primary me-2"></i>
+                                                <strong>{{ lettura.user_display }}</strong>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="text-muted">{{ lettura.user.email if lettura.user else 'N/A' }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-file-pdf text-danger me-2"></i>
+                                                <span title="{{ lettura.document_display }}">
+                                                    {{ lettura.document_display[:30] }}{% if lettura.document_display|length > 30 %}...{% endif %}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-clock"></i> {{ lettura.timestamp_formatted }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <code class="text-muted">{{ lettura.ip_address or 'N/A' }}</code>
+                                        </td>
+                                        <td>
+                                            <span class="text-muted" title="{{ lettura.user_agent or 'N/A' }}">
+                                                {% if lettura.user_agent %}
+                                                    {% if 'Mobile' in lettura.user_agent %}
+                                                        <i class="fas fa-mobile-alt text-success"></i> Mobile
+                                                    {% elif 'Chrome' in lettura.user_agent %}
+                                                        <i class="fab fa-chrome text-primary"></i> Chrome
+                                                    {% elif 'Firefox' in lettura.user_agent %}
+                                                        <i class="fab fa-firefox text-warning"></i> Firefox
+                                                    {% elif 'Safari' in lettura.user_agent %}
+                                                        <i class="fab fa-safari text-info"></i> Safari
+                                                    {% else %}
+                                                        <i class="fas fa-desktop text-secondary"></i> Desktop
+                                                    {% endif %}
+                                                {% else %}
+                                                    <i class="fas fa-question text-muted"></i> Sconosciuto
+                                                {% endif %}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-sm btn-outline-info" 
+                                                        data-bs-toggle="tooltip" title="Dettagli"
+                                                        onclick="showLetturaDetails({{ lettura.id }})">
+                                                    <i class="fas fa-info-circle"></i>
+                                                </button>
+                                                {% if lettura.document %}
+                                                <a href="{{ url_for('docs.view_pdf_tracciato', id=lettura.document_id) }}" 
+                                                   class="btn btn-sm btn-outline-primary"
+                                                   data-bs-toggle="tooltip" title="Visualizza PDF">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-eye-slash fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">Nessuna lettura registrata</h4>
+                            <p class="text-muted">Non ci sono ancora visualizzazioni PDF tracciate nel sistema.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raggruppamento per Documento -->
+    {% if documenti_letture %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-pie"></i> Statistiche per Documento</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for doc_id, letture_doc in documenti_letture.items() %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-file-pdf"></i> 
+                                        {% set doc = letture_doc[0].document %}
+                                        {{ doc.title if doc else f'Documento {doc_id}' }}
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-2">
+                                        <strong>Letture totali:</strong> {{ letture_doc|length }}
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Ultima lettura:</strong> {{ letture_doc[0].timestamp_formatted }}
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>Utenti unici:</strong> 
+                                        {{ letture_doc|map(attribute='user_id')|unique|list|length }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal per dettagli lettura -->
+<div class="modal fade" id="letturaDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-info-circle"></i> Dettagli Lettura</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="letturaDetailsContent">
+                <!-- Contenuto dinamico -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Inizializza tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+
+    // Funzione per mostrare dettagli lettura
+    function showLetturaDetails(letturaId) {
+        // Qui potresti fare una chiamata AJAX per ottenere più dettagli
+        // Per ora mostriamo un messaggio di esempio
+        document.getElementById('letturaDetailsContent').innerHTML = `
+            <div class="text-center">
+                <i class="fas fa-spinner fa-spin fa-2x text-primary mb-3"></i>
+                <p>Caricamento dettagli lettura ID: ${letturaId}</p>
+                <p class="text-muted">Funzionalità in sviluppo...</p>
+            </div>
+        `;
+        
+        var modal = new bootstrap.Modal(document.getElementById('letturaDetailsModal'));
+        modal.show();
+    }
+
+    // Auto-refresh ogni 30 secondi per aggiornamenti in tempo reale
+    setInterval(function() {
+        // Qui potresti aggiungere una chiamata AJAX per aggiornare i dati
+        console.log('Aggiornamento automatico dashboard letture PDF...');
+    }, 30000);
+</script>
+{% endblock %}

@@ -51,4 +51,22 @@ def roles_required(roles):
                 abort(403)
             return f(*args, **kwargs)
         return decorated_function
-    return decorator 
+    return decorator
+
+
+def ceo_or_admin_required(f):
+    """Permette accesso solo a CEO e Admin."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not hasattr(current_user, 'role') or current_user.role not in ('ceo', 'admin'):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function 
+def ceo_or_admin_required(f):
+    """Permette accesso solo a CEO e Admin."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not hasattr(current_user, "role") or current_user.role not in ("ceo", "admin"):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function

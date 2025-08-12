@@ -1,471 +1,417 @@
+"""
+Utility per analisi AI avanzate del sistema documentale.
+Gestisce analisi intelligenti su reparti, utenti, documenti e pattern di utilizzo.
+"""
+
 from datetime import datetime, timedelta
+from sqlalchemy import func, and_, desc, or_
+from typing import Dict, List, Any, Optional
 import logging
 
+from models import (
+    Department, User, Document, DownloadLog, DocumentSignature,
+    LogInvioPDF, LetturaPDF
+)
+from extensions import db
+
 # Configurazione logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def genera_suggerimenti_guest_ai(accessi):
-    """
-    Genera suggerimenti AI automatici per la gestione degli ospiti.
-    
-    Args:
-        accessi (list): Lista degli accessi guest da analizzare
-        
-    Returns:
-        list: Lista di suggerimenti AI
-    """
-    oggi = datetime.utcnow()
-    suggerimenti = []
-    
-    try:
-        # Contatori per statistiche
-        scaduti = 0
-        in_scadenza = 0
-        non_registrati = 0
-        totali = len(accessi)
-        
-        for access in accessi:
-            # Calcola giorni rimanenti
-            giorni_restanti = (access.expires_at - oggi).days
-            
-            # Accessi scaduti
-            if giorni_restanti < 0:
-                scaduti += 1
-                suggerimenti.append({
-                    'tipo': 'scaduto',
-                    'severita': 'critico',
-                    'messaggio': f"❌ Accesso scaduto per {access.guest.email} – valuta revoca o proroga.",
-                    'access_id': access.id,
-                    'email': access.guest.email,
-                    'giorni': giorni_restanti
-                })
-            
-            # Accessi in scadenza (entro 3 giorni)
-            elif giorni_restanti <= 3:
-                in_scadenza += 1
-                suggerimenti.append({
-                    'tipo': 'in_scadenza',
-                    'severita': 'attenzione',
-                    'messaggio': f"⏳ Accesso in scadenza ({giorni_restanti}gg) per {access.guest.email}",
-                    'access_id': access.id,
-                    'email': access.guest.email,
-                    'giorni': giorni_restanti
-                })
-            
-            # Guest non registrati
-            if not access.guest.password:
-                non_registrati += 1
-                suggerimenti.append({
-                    'tipo': 'non_registrato',
-                    'severita': 'info',
-                    'messaggio': f"⚠️ {access.guest.email} non si è ancora registrato – reinvia invito?",
-                    'access_id': access.id,
-                    'email': access.guest.email
-                })
-        
-        # Suggerimenti generali basati su statistiche
-        if scaduti > 0:
-            suggerimenti.append({
-                'tipo': 'statistica',
-                'severita': 'critico',
-                'messaggio': f"📊 Hai {scaduti} accessi scaduti su {totali} totali. Considera una pulizia.",
-                'access_id': None
-            })
-        
-        if in_scadenza > 0:
-            suggerimenti.append({
-                'tipo': 'statistica',
-                'severita': 'attenzione',
-                'messaggio': f"📊 {in_scadenza} accessi scadono entro 3 giorni. Valuta proroghe.",
-                'access_id': None
-            })
-        
-        if non_registrati > 0:
-            suggerimenti.append({
-                'tipo': 'statistica',
-                'severita': 'info',
-                'messaggio': f"📊 {non_registrati} guest non si sono ancora registrati.",
-                'access_id': None
-            })
-        
-        # Se non ci sono problemi, suggerimento positivo
-        if not suggerimenti:
-            suggerimenti.append({
-                'tipo': 'positivo',
-                'severita': 'success',
-                'messaggio': "✅ Tutti gli accessi guest sono in regola!",
-                'access_id': None
-            })
-        
-        logger.info(f"Generati {len(suggerimenti)} suggerimenti AI per {totali} accessi guest")
-        
-    except Exception as e:
-        logger.error(f"Errore nella generazione suggerimenti AI: {str(e)}")
-        suggerimenti.append({
-            'tipo': 'errore',
-            'severita': 'danger',
-            'messaggio': "❌ Errore nell'analisi AI degli accessi guest",
-            'access_id': None
-        })
-    
-    return suggerimenti
 
-def analizza_pattern_accessi_guest(accessi):
+def analizza_attivita_ai() -> Dict[str, Any]:
     """
-    Analizza pattern negli accessi guest per identificare anomalie.
+    Esegue tutte le analisi AI aggiuntive sul sistema documentale.
     
-    Args:
-        accessi (list): Lista degli accessi guest
-        
     Returns:
-        dict: Risultati dell'analisi
+        Dict: Risultati di tutte le analisi AI
     """
     try:
         oggi = datetime.utcnow()
-        analisi = {
-            'totali': len(accessi),
-            'scaduti': 0,
-            'in_scadenza': 0,
-            'attivi': 0,
-            'non_registrati': 0,
-            'con_download': 0,
-            'solo_vista': 0,
-            'creati_ultimi_7gg': 0,
-            'creati_ultimi_30gg': 0
+        trenta_giorni_fa = oggi - timedelta(days=30)
+        
+        risultati = {
+            "timestamp": oggi.isoformat(),
+            "periodo_analisi": "ultimi 30 giorni",
+            "analisi": {}
         }
         
-        for access in accessi:
-            giorni_restanti = (access.expires_at - oggi).days
-            
-            # Conta per stato
-            if giorni_restanti < 0:
-                analisi['scaduti'] += 1
-            elif giorni_restanti <= 3:
-                analisi['in_scadenza'] += 1
-            else:
-                analisi['attivi'] += 1
-            
-            # Conta per permessi
-            if access.can_download:
-                analisi['con_download'] += 1
-            else:
-                analisi['solo_vista'] += 1
-            
-            # Conta per registrazione
-            if not access.guest.password:
-                analisi['non_registrati'] += 1
-            
-            # Conta per data creazione
-            giorni_creazione = (oggi - access.created_at).days
-            if giorni_creazione <= 7:
-                analisi['creati_ultimi_7gg'] += 1
-            if giorni_creazione <= 30:
-                analisi['creati_ultimi_30gg'] += 1
+        # 1. 📌 Reparti inattivi negli ultimi 30gg
+        risultati["analisi"]["reparti_inattivi"] = analizza_reparti_inattivi(trenta_giorni_fa)
         
-        return analisi
+        # 2. 🚨 File mai scaricati ma obbligatori
+        risultati["analisi"]["file_obbligatori_non_scaricati"] = analizza_file_obbligatori_non_scaricati()
+        
+        # 3. 📤 Utenti che scaricano ma non firmano
+        risultati["analisi"]["utenti_scaricano_non_firmano"] = analizza_utenti_scaricano_non_firmano(trenta_giorni_fa)
+        
+        # 4. 🕒 Picchi di download fuori orario
+        risultati["analisi"]["download_fuori_orario"] = analizza_download_fuori_orario(trenta_giorni_fa)
+        
+        # 5. 🏷️ Tipologie documenti poco utilizzate
+        risultati["analisi"]["tipologie_poco_utilizzate"] = analizza_tipologie_poco_utilizzate(trenta_giorni_fa)
+        
+        # 6. 📊 Statistiche generali
+        risultati["analisi"]["statistiche_generali"] = genera_statistiche_generali(trenta_giorni_fa)
+        
+        # 7. 🎯 Suggerimenti AI
+        risultati["analisi"]["suggerimenti_ai"] = genera_suggerimenti_ai(risultati["analisi"])
+        
+        return risultati
         
     except Exception as e:
-        logger.error(f"Errore nell'analisi pattern accessi guest: {str(e)}")
-        return {}
+        logger.error(f"Errore nell'analisi AI attività: {str(e)}")
+        return {
+            "error": f"Errore nell'analisi AI: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
-def genera_raccomandazioni_ai(analisi):
+
+def analizza_reparti_inattivi(data_inizio: datetime) -> Dict[str, Any]:
     """
-    Genera raccomandazioni AI basate sull'analisi dei pattern.
+    Analizza reparti inattivi negli ultimi 30 giorni.
     
     Args:
-        analisi (dict): Risultati dell'analisi pattern
+        data_inizio: Data di inizio per l'analisi
         
     Returns:
-        list: Lista di raccomandazioni
+        Dict: Risultati analisi reparti inattivi
     """
-    raccomandazioni = []
-    
     try:
-        totali = analisi.get('totali', 0)
-        if totali == 0:
-            return raccomandazioni
+        # Trova reparti con attività recente
+        reparti_attivi = db.session.query(Department.name).distinct()\
+            .join(User, User.department_id == Department.id)\
+            .outerjoin(DownloadLog, DownloadLog.user_id == User.id)\
+            .outerjoin(DocumentSignature, DocumentSignature.signed_by == User.username)\
+            .filter(
+                or_(
+                    DownloadLog.timestamp >= data_inizio,
+                    DocumentSignature.signed_at >= data_inizio
+                )
+            ).all()
         
-        # Calcola percentuali
-        pct_scaduti = (analisi.get('scaduti', 0) / totali) * 100
-        pct_non_registrati = (analisi.get('non_registrati', 0) / totali) * 100
-        pct_download = (analisi.get('con_download', 0) / totali) * 100
+        reparti_attivi_nomi = [r[0] for r in reparti_attivi]
         
-        # Raccomandazioni basate su percentuali
-        if pct_scaduti > 20:
-            raccomandazioni.append({
-                'tipo': 'pulizia',
-                'severita': 'critico',
-                'messaggio': f"🧹 {pct_scaduti:.1f}% degli accessi sono scaduti. Considera una pulizia automatica.",
-                'azione': 'cleanup_expired'
-            })
+        # Tutti i reparti
+        tutti_reparti = db.session.query(Department.name).all()
+        tutti_reparti_nomi = [r[0] for r in tutti_reparti]
         
-        if pct_non_registrati > 30:
-            raccomandazioni.append({
-                'tipo': 'inviti',
-                'severita': 'attenzione',
-                'messaggio': f"📧 {pct_non_registrati:.1f}% dei guest non si sono registrati. Valuta reinvio inviti.",
-                'azione': 'resend_invites'
-            })
+        # Reparti inattivi
+        reparti_inattivi = [r for r in tutti_reparti_nomi if r not in reparti_attivi_nomi]
         
-        if pct_download > 80:
-            raccomandazioni.append({
-                'tipo': 'sicurezza',
-                'severita': 'info',
-                'messaggio': f"🔒 {pct_download:.1f}% degli accessi hanno permesso download. Verifica necessità.",
-                'azione': 'review_permissions'
-            })
-        
-        # Raccomandazioni per attività recente
-        if analisi.get('creati_ultimi_7gg', 0) > 10:
-            raccomandazioni.append({
-                'tipo': 'attivita',
-                'severita': 'info',
-                'messaggio': f"📈 Alta attività: {analisi['creati_ultimi_7gg']} nuovi accessi questa settimana.",
-                'azione': 'monitor_activity'
-            })
-        
-        return raccomandazioni
+        return {
+            "reparti_inattivi": reparti_inattivi,
+            "totale_reparti": len(tutti_reparti_nomi),
+            "reparti_attivi": len(reparti_attivi_nomi),
+            "percentuale_inattivi": round(len(reparti_inattivi) / len(tutti_reparti_nomi) * 100, 1) if tutti_reparti_nomi else 0
+        }
         
     except Exception as e:
-        logger.error(f"Errore nella generazione raccomandazioni AI: {str(e)}")
-        return []
+        logger.error(f"Errore analisi reparti inattivi: {str(e)}")
+        return {"error": str(e)}
 
 
-def suggerisci_documenti_da_caricare():
+def analizza_file_obbligatori_non_scaricati() -> Dict[str, Any]:
     """
-    Suggerisce documenti approvati ma non ancora caricati su Google Drive.
+    Trova documenti obbligatori mai scaricati.
     
     Returns:
-        list: Lista di dizionari con documento e motivo
+        Dict: Risultati analisi file obbligatori
     """
-    from models import Document
-    
-    # Documenti firmati dal CEO ma non caricati su Drive
-    da_caricare = Document.query.filter(
-        Document.firmato_ceo == True,
-        Document.drive_uploaded_at == None
-    ).all()
-    
-    suggeriti = []
-    for doc in da_caricare:
-        motivo = "✅ Approvato ma non caricato su Drive"
+    try:
+        # Documenti obbligatori
+        documenti_obbligatori = Document.query.filter(Document.obbligatorio == True).all()
         
-        # Controlla approvazioni intermedie
-        if not doc.approvato_da_responsabile:
-            motivo = "⚠️ Mancano approvazioni intermedie"
-        elif not doc.approvato_da_admin:
-            motivo = "⚠️ Mancano approvazioni amministrative"
+        file_non_scaricati = []
+        for doc in documenti_obbligatori:
+            # Verifica se è mai stato scaricato
+            download_count = DownloadLog.query.filter(DownloadLog.file_id == doc.id).count()
+            if download_count == 0:
+                file_non_scaricati.append({
+                    "id": doc.id,
+                    "nome": doc.nome,
+                    "categoria": doc.categoria,
+                    "data_creazione": doc.created_at.isoformat() if doc.created_at else None
+                })
         
-        # Controlla se il file esiste fisicamente
-        import os
-        from flask import current_app
-        file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], doc.path)
-        if not os.path.exists(file_path):
-            motivo = "❌ File fisico non trovato"
+        return {
+            "file_non_scaricati": file_non_scaricati,
+            "totale_obbligatori": len(documenti_obbligatori),
+            "non_scaricati": len(file_non_scaricati),
+            "percentuale_non_scaricati": round(len(file_non_scaricati) / len(documenti_obbligatori) * 100, 1) if documenti_obbligatori else 0
+        }
         
-        suggeriti.append({
-            "doc": doc,
-            "motivo": motivo,
-            "priorita": "alta" if "❌" in motivo else "media"
-        })
-    
-    return suggeriti
+    except Exception as e:
+        logger.error(f"Errore analisi file obbligatori: {str(e)}")
+        return {"error": str(e)}
 
 
-def analizza_stato_drive_ai():
+def analizza_utenti_scaricano_non_firmano(data_inizio: datetime) -> Dict[str, Any]:
     """
-    Analizza lo stato generale dei documenti su Google Drive.
+    Trova utenti che scaricano ma non firmano.
     
+    Args:
+        data_inizio: Data di inizio per l'analisi
+        
     Returns:
-        dict: Statistiche e raccomandazioni per Drive
+        Dict: Risultati analisi utenti
     """
-    from models import Document
-    
-    # Statistiche generali
-    totali = Document.query.count()
-    su_drive = Document.query.filter(Document.drive_uploaded_at.isnot(None)).count()
-    da_caricare = Document.query.filter(
-        Document.firmato_ceo == True,
-        Document.drive_uploaded_at == None
-    ).count()
-    
-    # Documenti con errori
-    con_errori = Document.query.filter(
-        Document.drive_status_note.like('%❌%')
-    ).count()
-    
-    return {
-        'totali': totali,
-        'su_drive': su_drive,
-        'da_caricare': da_caricare,
-        'con_errori': con_errori,
-        'percentuale_completamento': round((su_drive / totali * 100) if totali > 0 else 0, 1)
-    }
+    try:
+        # Utenti che hanno scaricato documenti
+        utenti_con_download = db.session.query(User.id, User.username, User.email)\
+            .join(DownloadLog, DownloadLog.user_id == User.id)\
+            .filter(DownloadLog.timestamp >= data_inizio)\
+            .distinct().all()
+        
+        utenti_problematici = []
+        for utente in utenti_con_download:
+            # Conta download dell'utente
+            download_count = DownloadLog.query.filter(
+                DownloadLog.user_id == utente.id,
+                DownloadLog.timestamp >= data_inizio
+            ).count()
+            
+            # Conta firme dell'utente
+            firme_count = DocumentSignature.query.filter(
+                DocumentSignature.signed_by == utente.username,
+                DocumentSignature.signed_at >= data_inizio
+            ).count()
+            
+            # Se ha scaricato ma non ha firmato
+            if download_count > 0 and firme_count == 0:
+                utenti_problematici.append({
+                    "id": utente.id,
+                    "username": utente.username,
+                    "email": utente.email,
+                    "download_count": download_count,
+                    "firme_count": firme_count
+                })
+        
+        return {
+            "utenti_problematici": utenti_problematici,
+            "totale_utenti_con_download": len(utenti_con_download),
+            "utenti_senza_firme": len(utenti_problematici),
+            "percentuale_problematici": round(len(utenti_problematici) / len(utenti_con_download) * 100, 1) if utenti_con_download else 0
+        }
+        
+    except Exception as e:
+        logger.error(f"Errore analisi utenti: {str(e)}")
+        return {"error": str(e)}
 
 
-def analizza_documenti_obsoleti():
+def analizza_download_fuori_orario(data_inizio: datetime) -> Dict[str, Any]:
     """
-    Analizza documenti per identificare quelli obsoleti, da revisionare o duplicati.
+    Analizza download fuori orario lavorativo (6:00-20:00).
     
+    Args:
+        data_inizio: Data di inizio per l'analisi
+        
     Returns:
-        list: Lista di suggerimenti AI per revisione documenti
+        Dict: Risultati analisi download fuori orario
     """
-    from datetime import datetime, timedelta
-    from models import Document
+    try:
+        # Download fuori orario (prima delle 6 o dopo le 20)
+        download_fuori_orario = db.session.query(
+            DownloadLog.id,
+            DownloadLog.user_id,
+            DownloadLog.file_id,
+            DownloadLog.timestamp,
+            User.username,
+            Document.nome.label('documento_nome')
+        ).join(User, DownloadLog.user_id == User.id)\
+         .join(Document, DownloadLog.file_id == Document.id)\
+         .filter(
+            DownloadLog.timestamp >= data_inizio,
+            or_(
+                func.extract('hour', DownloadLog.timestamp) < 6,
+                func.extract('hour', DownloadLog.timestamp) >= 20
+            )
+        ).all()
+        
+        # Raggruppa per utente
+        utenti_sospetti = {}
+        for download in download_fuori_orario:
+            username = download.username
+            if username not in utenti_sospetti:
+                utenti_sospetti[username] = {
+                    "username": username,
+                    "download_fuori_orario": [],
+                    "count": 0
+                }
+            
+            utenti_sospetti[username]["download_fuori_orario"].append({
+                "id": download.id,
+                "documento": download.documento_nome,
+                "timestamp": download.timestamp.isoformat(),
+                "ora": download.timestamp.strftime('%H:%M')
+            })
+            utenti_sospetti[username]["count"] += 1
+        
+        return {
+            "download_fuori_orario": list(utenti_sospetti.values()),
+            "totale_download_sospetti": len(download_fuori_orario),
+            "utenti_sospetti": len(utenti_sospetti),
+            "orario_min": "06:00",
+            "orario_max": "20:00"
+        }
+        
+    except Exception as e:
+        logger.error(f"Errore analisi download fuori orario: {str(e)}")
+        return {"error": str(e)}
+
+
+def analizza_tipologie_poco_utilizzate(data_inizio: datetime) -> Dict[str, Any]:
+    """
+    Analizza tipologie di documenti poco utilizzate.
     
-    oggi = datetime.utcnow()
+    Args:
+        data_inizio: Data di inizio per l'analisi
+        
+    Returns:
+        Dict: Risultati analisi tipologie
+    """
+    try:
+        # Statistiche per categoria/tipologia
+        stats_categoria = db.session.query(
+            Document.categoria,
+            func.count(Document.id).label('totale_documenti'),
+            func.count(DownloadLog.id).label('download_totali')
+        ).outerjoin(DownloadLog, Document.id == DownloadLog.file_id)\
+         .filter(DownloadLog.timestamp >= data_inizio)\
+         .group_by(Document.categoria)\
+         .all()
+        
+        tipologie_poco_utilizzate = []
+        for categoria, totale_doc, download in stats_categoria:
+            if totale_doc > 0:
+                percentuale_utilizzo = (download / totale_doc) * 100
+                if percentuale_utilizzo < 50:  # Meno del 50% di utilizzo
+                    tipologie_poco_utilizzate.append({
+                        "categoria": categoria,
+                        "totale_documenti": totale_doc,
+                        "download_totali": download,
+                        "percentuale_utilizzo": round(percentuale_utilizzo, 1)
+                    })
+        
+        # Ordina per percentuale di utilizzo (meno utilizzate prima)
+        tipologie_poco_utilizzate.sort(key=lambda x: x["percentuale_utilizzo"])
+        
+        return {
+            "tipologie_poco_utilizzate": tipologie_poco_utilizzate,
+            "totale_categorie": len(stats_categoria),
+            "categorie_problematiche": len(tipologie_poco_utilizzate),
+            "soglia_utilizzo": 50  # percentuale
+        }
+        
+    except Exception as e:
+        logger.error(f"Errore analisi tipologie: {str(e)}")
+        return {"error": str(e)}
+
+
+def genera_statistiche_generali(data_inizio: datetime) -> Dict[str, Any]:
+    """
+    Genera statistiche generali del sistema.
+    
+    Args:
+        data_inizio: Data di inizio per l'analisi
+        
+    Returns:
+        Dict: Statistiche generali
+    """
+    try:
+        # Statistiche base
+        totale_utenti = User.query.count()
+        totale_documenti = Document.query.count()
+        totale_download = DownloadLog.query.filter(DownloadLog.timestamp >= data_inizio).count()
+        totale_firme = DocumentSignature.query.filter(DocumentSignature.signed_at >= data_inizio).count()
+        
+        # Documenti obbligatori
+        documenti_obbligatori = Document.query.filter(Document.obbligatorio == True).count()
+        
+        # Reparti
+        totale_reparti = Department.query.count()
+        
+        return {
+            "totale_utenti": totale_utenti,
+            "totale_documenti": totale_documenti,
+            "documenti_obbligatori": documenti_obbligatori,
+            "totale_reparti": totale_reparti,
+            "download_ultimi_30gg": totale_download,
+            "firme_ultimi_30gg": totale_firme,
+            "periodo_analisi": "ultimi 30 giorni"
+        }
+        
+    except Exception as e:
+        logger.error(f"Errore generazione statistiche: {str(e)}")
+        return {"error": str(e)}
+
+
+def genera_suggerimenti_ai(analisi: Dict[str, Any]) -> List[str]:
+    """
+    Genera suggerimenti AI basati sui risultati delle analisi.
+    
+    Args:
+        analisi: Risultati delle analisi AI
+        
+    Returns:
+        List: Lista di suggerimenti AI
+    """
     suggerimenti = []
     
     try:
-        # Ottieni tutti i documenti
-        documenti = Document.query.all()
+        # Suggerimenti basati su reparti inattivi
+        if "reparti_inattivi" in analisi:
+            reparti_data = analisi["reparti_inattivi"]
+            if not isinstance(reparti_data, dict) or "error" in reparti_data:
+                return ["⚠️ Errore nell'analisi dei reparti inattivi"]
+            
+            if reparti_data.get("percentuale_inattivi", 0) > 30:
+                suggerimenti.append("🚨 Alta percentuale di reparti inattivi. Considera campagne di sensibilizzazione.")
+            elif reparti_data.get("reparti_inattivi"):
+                suggerimenti.append("📊 Alcuni reparti sono inattivi. Verifica la necessità di formazione.")
         
-        for doc in documenti:
-            # Calcola ultimo accesso/download
-            last_download = doc.uploaded_at  # Default alla data di upload
+        # Suggerimenti basati su file obbligatori
+        if "file_obbligatori_non_scaricati" in analisi:
+            file_data = analisi["file_obbligatori_non_scaricati"]
+            if not isinstance(file_data, dict) or "error" in file_data:
+                return ["⚠️ Errore nell'analisi dei file obbligatori"]
             
-            # Se ci sono download logs, usa il più recente
-            if hasattr(doc, 'download_logs') and doc.download_logs:
-                download_timestamps = [d.timestamp for d in doc.download_logs if hasattr(d, 'timestamp')]
-                if download_timestamps:
-                    last_download = max(download_timestamps)
-            
-            # Calcola giorni di inattività
-            giorni_inattivo = (oggi - last_download).days
-            
-            # === DOCUMENTI OBSOLETI (> 1 anno) ===
-            if giorni_inattivo > 365:
-                suggerimenti.append({
-                    "tipo": "🛑 Obsoleto",
-                    "severita": "critico",
-                    "documento": doc,
-                    "motivo": f"Non è stato visualizzato o scaricato da {giorni_inattivo} giorni",
-                    "giorni_inattivo": giorni_inattivo,
-                    "azione_suggerita": "archivia"
-                })
-            
-            # === DOCUMENTI DA REVISIONARE (> 6 mesi per procedure/policy) ===
-            elif giorni_inattivo > 180:
-                tipo_doc = doc.tipo.lower() if hasattr(doc, 'tipo') and doc.tipo else ""
-                if tipo_doc in ["procedura", "policy", "modulo", "procedura", "politica"]:
-                    suggerimenti.append({
-                        "tipo": "🔁 Da revisionare",
-                        "severita": "media",
-                        "documento": doc,
-                        "motivo": f"È una {tipo_doc} non aggiornata da {giorni_inattivo} giorni",
-                        "giorni_inattivo": giorni_inattivo,
-                        "azione_suggerita": "revisiona"
-                    })
-            
-            # === DOCUMENTI INATTIVI (> 3 mesi) ===
-            elif giorni_inattivo > 90:
-                suggerimenti.append({
-                    "tipo": "⚠️ Inattivo",
-                    "severita": "bassa",
-                    "documento": doc,
-                    "motivo": f"Non accesso da {giorni_inattivo} giorni",
-                    "giorni_inattivo": giorni_inattivo,
-                    "azione_suggerita": "monitora"
-                })
-            
-            # === RICERCA DUPLICATI ===
-            if hasattr(doc, 'name') and doc.name:
-                # Cerca documenti con nomi simili nella stessa azienda
-                duplicati = Document.query.filter(
-                    Document.id != doc.id,
-                    Document.name.ilike(f"%{doc.name}%"),
-                    Document.company_id == doc.company_id if hasattr(doc, 'company_id') else True
-                ).all()
-                
-                if duplicati:
-                    suggerimenti.append({
-                        "tipo": "⚠️ Possibile duplicato",
-                        "severita": "media",
-                        "documento": doc,
-                        "motivo": f"Trovati {len(duplicati)} documenti con nomi simili",
-                        "duplicati": duplicati,
-                        "azione_suggerita": "verifica"
-                    })
-            
-            # === DOCUMENTI MAI APPROVATI ===
-            if hasattr(doc, 'validazione_ceo') and not doc.validazione_ceo:
-                if (oggi - doc.created_at).days > 30:
-                    suggerimenti.append({
-                        "tipo": "❌ Mai approvato",
-                        "severita": "media",
-                        "documento": doc,
-                        "motivo": "Documento creato da più di 30 giorni ma mai approvato",
-                        "giorni_inattivo": (oggi - doc.created_at).days,
-                        "azione_suggerita": "approva_o_archivia"
-                    })
+            if file_data.get("non_scaricati", 0) > 0:
+                suggerimenti.append("📋 Documenti obbligatori non scaricati. Implementa notifiche automatiche.")
         
-        # Ordina per severità e giorni di inattività
-        suggerimenti.sort(key=lambda x: (
-            {"critico": 3, "media": 2, "bassa": 1}.get(x["severita"], 0),
-            x.get("giorni_inattivo", 0)
-        ), reverse=True)
+        # Suggerimenti basati su utenti problematici
+        if "utenti_scaricano_non_firmano" in analisi:
+            utenti_data = analisi["utenti_scaricano_non_firmano"]
+            if not isinstance(utenti_data, dict) or "error" in utenti_data:
+                return ["⚠️ Errore nell'analisi degli utenti"]
+            
+            if utenti_data.get("utenti_senza_firme", 0) > 0:
+                suggerimenti.append("👤 Utenti scaricano ma non firmano. Verifica il processo di firma.")
         
-        logger.info(f"Analisi documenti obsoleti completata: {len(suggerimenti)} suggerimenti trovati")
+        # Suggerimenti basati su download fuori orario
+        if "download_fuori_orario" in analisi:
+            download_data = analisi["download_fuori_orario"]
+            if not isinstance(download_data, dict) or "error" in download_data:
+                return ["⚠️ Errore nell'analisi dei download fuori orario"]
+            
+            if download_data.get("totale_download_sospetti", 0) > 10:
+                suggerimenti.append("🕒 Molti download fuori orario. Verifica attività sospette.")
+        
+        # Suggerimenti basati su tipologie poco utilizzate
+        if "tipologie_poco_utilizzate" in analisi:
+            tipologie_data = analisi["tipologie_poco_utilizzate"]
+            if not isinstance(tipologie_data, dict) or "error" in tipologie_data:
+                return ["⚠️ Errore nell'analisi delle tipologie"]
+            
+            if tipologie_data.get("categorie_problematiche", 0) > 0:
+                suggerimenti.append("🏷️ Alcune categorie documenti poco utilizzate. Considera formazione specifica.")
+        
+        # Se non ci sono suggerimenti specifici
+        if not suggerimenti:
+            suggerimenti.append("✅ Sistema ben gestito. Continua così!")
+        
         return suggerimenti
         
     except Exception as e:
-        logger.error(f"Errore nell'analisi documenti obsoleti: {str(e)}")
-        return []
-
-
-def analizza_statistiche_revisione():
-    """
-    Analizza statistiche generali per la revisione documenti.
-    
-    Returns:
-        dict: Statistiche per la dashboard di revisione
-    """
-    from models import Document
-    from datetime import datetime, timedelta
-    
-    oggi = datetime.utcnow()
-    
-    try:
-        totali = Document.query.count()
-        obsoleti = 0
-        da_revisionare = 0
-        inattivi = 0
-        mai_approvati = 0
-        
-        documenti = Document.query.all()
-        
-        for doc in documenti:
-            # Calcola ultimo accesso
-            last_download = doc.uploaded_at
-            if hasattr(doc, 'download_logs') and doc.download_logs:
-                download_timestamps = [d.timestamp for d in doc.download_logs if hasattr(d, 'timestamp')]
-                if download_timestamps:
-                    last_download = max(download_timestamps)
-            
-            giorni_inattivo = (oggi - last_download).days
-            
-            # Conta per categoria
-            if giorni_inattivo > 365:
-                obsoleti += 1
-            elif giorni_inattivo > 180:
-                da_revisionare += 1
-            elif giorni_inattivo > 90:
-                inattivi += 1
-            
-            # Conta mai approvati
-            if hasattr(doc, 'validazione_ceo') and not doc.validazione_ceo:
-                if (oggi - doc.created_at).days > 30:
-                    mai_approvati += 1
-        
-        return {
-            'totali': totali,
-            'obsoleti': obsoleti,
-            'da_revisionare': da_revisionare,
-            'inattivi': inattivi,
-            'mai_approvati': mai_approvati,
-            'percentuale_obsoleti': round((obsoleti / totali * 100) if totali > 0 else 0, 1)
-        }
-        
-    except Exception as e:
-        logger.error(f"Errore nell'analisi statistiche revisione: {str(e)}")
-        return {} 
+        logger.error(f"Errore generazione suggerimenti AI: {str(e)}")
+        return ["⚠️ Errore nella generazione dei suggerimenti AI"] 

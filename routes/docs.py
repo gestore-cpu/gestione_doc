@@ -70,6 +70,11 @@ def create_access_request():
     if not document:
         return jsonify({"message": "Documento non trovato"}), 404
 
+    # Controllo cooldown - verifica se l'utente è in cooldown
+    from services.access_request_detector import access_request_detector
+    if access_request_detector.check_user_cooldown(current_user.id):
+        return jsonify({"message": "Limite temporaneo raggiunto. Riprova più tardi."}), 429
+    
     # Controllo duplicati - verifica se esiste già una richiesta pending
     existing = AccessRequest.query.filter_by(
         user_id=current_user.id, 

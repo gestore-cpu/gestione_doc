@@ -28,6 +28,12 @@ from tasks.alert_tasks import verifica_documenti_abbandonati
 # Import per monitoraggio AI download sospetti
 from services.ai_monitoring import analizza_download_sospetti, create_ai_alert
 
+# Import per report CEO mensile
+from services.ceo_monthly_report import genera_report_ceo_mensile
+
+# Import per reminder PDF
+from services.pdf_reminder_service import PDFReminderService
+
 # Configurazione logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -485,6 +491,55 @@ def monitora_download_sospetti():
         logger.error(f"Errore durante monitoraggio AI download sospetti: {e}")
 
 
+def genera_report_ceo_mensile_automatico():
+    """
+    Genera automaticamente il report PDF mensile del CEO.
+    """
+    try:
+        with current_app.app_context():
+            logger.info("📊 Avvio generazione report CEO mensile automatico...")
+            
+            # Verifica se l'invio email è abilitato
+            enable_email = current_app.config.get('ENABLE_CEO_EMAIL_REPORTS', False)
+            
+            # Genera il report
+            result = genera_report_ceo_mensile(send_email=enable_email)
+            
+            if result['success']:
+                logger.info(f"✅ Report CEO generato: {result['file_path']}")
+                if result.get('email_sent'):
+                    logger.info("✅ Report inviato via email al CEO")
+                else:
+                    logger.info("ℹ️ Report salvato su file (email disabilitata)")
+            else:
+                logger.error(f"❌ Errore generazione report: {result.get('error', 'Errore sconosciuto')}")
+                
+    except Exception as e:
+        logger.error(f"❌ Errore generazione report CEO automatico: {e}")
+
+
+def check_reminder_pdf_automatico():
+    """
+    Controlla automaticamente i PDF inviati e invia reminder per documenti non letti o non firmati.
+    """
+    try:
+        with current_app.app_context():
+            logger.info("📧 Avvio controllo automatico reminder PDF...")
+            
+            # Esegui il controllo reminder
+            result = PDFReminderService.check_reminder_pdf()
+            
+            if result.get('success'):
+                reminder_inviati = result.get('reminder_inviati', 0)
+                errori = result.get('errori', 0)
+                logger.info(f"✅ Controllo reminder PDF completato - {reminder_inviati} reminder inviati, {errori} errori")
+            else:
+                logger.error(f"❌ Errore nel controllo reminder PDF: {result.get('error', 'Errore sconosciuto')}")
+                
+    except Exception as e:
+        logger.error(f"❌ Errore nel controllo automatico reminder PDF: {e}")
+
+
 def avvia_scheduler(app):
     """
     Avvia il scheduler APScheduler per i reminder automatici.
@@ -558,6 +613,15 @@ def avvia_scheduler(app):
             replace_existing=True
         )
         
+        # Aggiungi job per reminder PDF (ogni giorno alle 8:00)
+        scheduler.add_job(
+            func=check_reminder_pdf_automatico,
+            trigger=CronTrigger(hour=8, minute=0),
+            id='reminder_pdf',
+            name='Controllo Reminder PDF Automatici',
+            replace_existing=True
+        )
+        
         # Aggiungi job per verifica documenti abbandonati (ogni venerdì alle 10:00)
         scheduler.add_job(
             func=verifica_documenti_abbandonati,
@@ -573,6 +637,15 @@ def avvia_scheduler(app):
             trigger=CronTrigger(minute='*/10'),
             id='monitora_download_sospetti',
             name='Monitoraggio AI Download Sospetti',
+            replace_existing=True
+        )
+        
+        # Aggiungi job per report CEO mensile (primo giorno del mese alle 9:00)
+        scheduler.add_job(
+            func=genera_report_ceo_mensile_automatico,
+            trigger=CronTrigger(day=1, hour=9, minute=0),
+            id='report_ceo_mensile',
+            name='Report CEO Mensile Automatico',
             replace_existing=True
         )
         

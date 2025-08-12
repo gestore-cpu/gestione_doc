@@ -9,7 +9,7 @@ from app.services.pdf_ai import (
 from app.services.focusme import generate_task_from_doc, send_ceo_suggestion
 from app.services.notifications import notify_missing_or_expired
 from app.services.persistence import salva_risultato_analisi
-from app.database import get_db
+from app.database import db
 from app.dependencies import get_current_user
 from app.models import User
 from sqlalchemy.orm import Session
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/ai-documents", tags=["AI Document Intelligence"])
 async def analyze_pdf(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(db)
 ):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Solo PDF ammessi")

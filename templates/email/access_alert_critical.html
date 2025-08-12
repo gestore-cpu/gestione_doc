@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alert Critico Richieste Accesso</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #dc3545;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+        }
+        .alert-details {
+            background-color: white;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #dc3545;
+            border-radius: 3px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-box {
+            background-color: white;
+            padding: 10px;
+            border-radius: 3px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #dc3545;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .footer {
+            background-color: #6c757d;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 0 0 5px 5px;
+            font-size: 12px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 3px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚨 Alert Critico Richieste Accesso</h1>
+        <p>Pattern sospetto rilevato nel sistema DOCS</p>
+    </div>
+    
+    <div class="content">
+        <h2>Dettagli Alert</h2>
+        
+        <div class="alert-details">
+            <h3>Regola: {{ alert.rule }}</h3>
+            <p><strong>Severità:</strong> <span style="color: #dc3545; font-weight: bold;">{{ alert.severity_display }}</span></p>
+            <p><strong>Data Rilevamento:</strong> {{ alert.created_at.strftime('%d/%m/%Y %H:%M:%S') }}</p>
+            <p><strong>Finestra Temporale:</strong> {{ alert.window_from.strftime('%d/%m/%Y %H:%M') }} - {{ alert.window_to.strftime('%d/%m/%Y %H:%M') }}</p>
+            
+            {% if alert.user %}
+            <p><strong>Utente Coinvolto:</strong> {{ alert.user.username }} (ID: {{ alert.user_id }})</p>
+            {% endif %}
+            
+            {% if alert.file %}
+            <p><strong>File Coinvolto:</strong> {{ alert.file.title }} (ID: {{ alert.file_id }})</p>
+            {% endif %}
+        </div>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-number">{{ details.count if details.count else details.total_requests if details.total_requests else details.denied_count if details.denied_count else 'N/A' }}</div>
+                <div class="stat-label">
+                    {% if alert.rule == 'R1' %}
+                    Richieste Stesso File
+                    {% elif alert.rule == 'R2' %}
+                    Richieste Totali
+                    {% elif alert.rule == 'R3' %}
+                    Richieste Negate
+                    {% elif alert.rule == 'R4' %}
+                    IP Distinti
+                    {% elif alert.rule == 'R5' %}
+                    Richieste Totali
+                    {% endif %}
+                </div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number">{{ details.threshold if details.threshold else 'N/A' }}</div>
+                <div class="stat-label">Soglia</div>
+            </div>
+        </div>
+        
+        <div class="warning">
+            <strong>⚠️ Attenzione:</strong> Questo è un alert critico che richiede attenzione immediata.
+            {% if alert.rule == 'R3' %}
+            È stato applicato un cooldown di 24 ore all'utente coinvolto.
+            {% elif alert.rule == 'R5' %}
+            Si è verificato un picco anomalo di richieste aziendali.
+            {% endif %}
+        </div>
+        
+        <h3>Azioni Raccomandate</h3>
+        <ul>
+            <li>Verificare l'attività dell'utente coinvolto</li>
+            <li>Controllare i log di accesso per pattern sospetti</li>
+            <li>Valutare se applicare restrizioni aggiuntive</li>
+            <li>Monitorare l'evoluzione della situazione</li>
+        </ul>
+        
+        <a href="{{ url_for('admin.access_request_alerts', _external=True) }}" class="button">
+            📊 Visualizza Dashboard Alert
+        </a>
+        
+        <h3>Dettagli Tecnici</h3>
+        <pre style="background-color: #f8f9fa; padding: 10px; border-radius: 3px; font-size: 12px; overflow-x: auto;">{{ alert.details }}</pre>
+    </div>
+    
+    <div class="footer">
+        <p>Questo alert è stato generato automaticamente dal sistema DOCS</p>
+        <p>Per disabilitare le notifiche, contatta l'amministratore del sistema</p>
+        <p>Data invio: {{ datetime.now().strftime('%d/%m/%Y %H:%M:%S') }}</p>
+    </div>
+</body>
+</html>

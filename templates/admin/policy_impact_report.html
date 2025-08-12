@@ -1,0 +1,400 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-chart-line me-2"></i>
+            📊 Report AI Impatto Policy #{{ report.id }}
+        </h2>
+        <div class="d-flex gap-2">
+            {% if not report.reviewed %}
+            <button class="btn btn-success" onclick="showMarkReviewedModal()">
+                <i class="fas fa-check me-1"></i>
+                Marca Revisionato
+            </button>
+            {% endif %}
+            <a href="{{ url_for('admin.policy_impact_reports_list') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>
+                Torna alla Lista
+            </a>
+        </div>
+    </div>
+
+    <!-- Informazioni Generali -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Informazioni Report
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><strong>ID Report:</strong></td>
+                            <td>#{{ report.id }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Data Creazione:</strong></td>
+                            <td>{{ report.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Periodo Analizzato:</strong></td>
+                            <td>{{ report.get_period_display() }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Tempo Elaborazione:</strong></td>
+                            <td>{{ report.get_processing_time_display() }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status:</strong></td>
+                            <td>
+                                {% if report.reviewed %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check me-1"></i>
+                                    Revisionato
+                                </span>
+                                {% else %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-clock me-1"></i>
+                                    In Attesa
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if report.reviewed %}
+                        <tr>
+                            <td><strong>Revisionato da:</strong></td>
+                            <td>{{ report.reviewer.name if report.reviewer else 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Data Revisione:</strong></td>
+                            <td>{{ report.reviewed_at.strftime('%d/%m/%Y %H:%M') if report.reviewed_at else 'N/A' }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>
+                        Statistiche Principali
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h3 class="text-primary">{{ report.total_auto_processed }}</h3>
+                                <small class="text-muted">Richieste Processate</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h3 class="text-success">{{ report.approve_count }}</h3>
+                            <small class="text-muted">Approvazioni</small>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h3 class="text-danger">{{ report.deny_count }}</h3>
+                                <small class="text-muted">Dinieghi</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h3 class="{% if report.success_rate >= 80 %}text-success{% elif report.success_rate >= 60 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ report.get_success_rate_display() }}
+                            </h3>
+                            <small class="text-muted">Success Rate</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grafici e Visualizzazioni -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-doughnut me-2"></i>
+                        Distribuzione Decisioni
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="decisionsChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Success Rate Trend
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3" style="height: 30px;">
+                        <div class="progress-bar {% if report.success_rate >= 80 %}bg-success{% elif report.success_rate >= 60 %}bg-warning{% else %}bg-danger{% endif %}" 
+                             style="width: {{ report.success_rate }}%">
+                            {{ report.get_success_rate_display() }}
+                        </div>
+                    </div>
+                    <small class="text-muted">
+                        {% if report.success_rate >= 80 %}
+                        🎉 Eccellente! Le policy stanno funzionando molto bene.
+                        {% elif report.success_rate >= 60 %}
+                        ⚠️ Buono, ma c'è spazio per miglioramenti.
+                        {% else %}
+                        ❌ Necessita attenzione. Considera di rivedere le policy.
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Breakdown per Policy -->
+    {% if report.policy_breakdown %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-list me-2"></i>
+                📋 Breakdown per Policy
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Policy</th>
+                            <th>Azione</th>
+                            <th>Richieste Processate</th>
+                            <th>Success Rate</th>
+                            <th>Performance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for policy in report.get_policy_breakdown_summary() %}
+                        <tr>
+                            <td>
+                                <strong>{{ policy.policy_name }}</strong>
+                                <br><small class="text-muted">ID: {{ policy.policy_id }}</small>
+                            </td>
+                            <td>
+                                {% if policy.action == 'approve' %}
+                                <span class="badge bg-success">Approva</span>
+                                {% else %}
+                                <span class="badge bg-danger">Nega</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-primary">{{ policy.requests_processed }}</span>
+                            </td>
+                            <td>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar {% if policy.success_rate >= 80 %}bg-success{% elif policy.success_rate >= 60 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                         style="width: {{ policy.success_rate }}%">
+                                        {{ "%.1f"|format(policy.success_rate) }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if policy.success_rate >= 80 %}
+                                <span class="badge bg-success">Eccellente</span>
+                                {% elif policy.success_rate >= 60 %}
+                                <span class="badge bg-warning">Buono</span>
+                                {% else %}
+                                <span class="badge bg-danger">Da Migliorare</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Casi di Errore -->
+    {% if report.error_cases %}
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                ⚠️ Casi di Errore Identificati
+            </h5>
+        </div>
+        <div class="card-body">
+            {% for error_case in report.get_error_cases_summary() %}
+            <div class="alert alert-warning">
+                <h6>
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    {{ error_case.type|title }} ({{ error_case.count }} casi)
+                </h6>
+                <p class="mb-2">{{ error_case.description }}</p>
+                {% if error_case.examples %}
+                <small class="text-muted">
+                    <strong>Esempi:</strong>
+                    {% for example in error_case.examples[:3] %}
+                    <code>{{ example }}</code>{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </small>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Analisi AI -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-brain me-2"></i>
+                🧠 Analisi AI
+            </h5>
+        </div>
+        <div class="card-body">
+            <div style="white-space: pre-line; font-size: 0.95rem;">
+                {{ report.ai_analysis }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Raccomandazioni -->
+    {% if report.recommendations %}
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-lightbulb me-2"></i>
+                💡 Raccomandazioni AI
+            </h5>
+        </div>
+        <div class="card-body">
+            {% for recommendation in report.get_recommendations_summary() %}
+            <div class="alert alert-info">
+                <h6>
+                    <i class="fas fa-lightbulb me-2"></i>
+                    {{ recommendation.type|title }}
+                    <span class="badge bg-{% if recommendation.priority == 'high' %}danger{% elif recommendation.priority == 'medium' %}warning{% else %}success{% endif %} float-end">
+                        {{ recommendation.priority|title }}
+                    </span>
+                </h6>
+                <p class="mb-2">{{ recommendation.description }}</p>
+                {% if recommendation.impact %}
+                <small class="text-muted">
+                    <strong>Impatto:</strong> {{ recommendation.impact }}
+                </small>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Note Admin -->
+    {% if report.admin_notes %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-sticky-note me-2"></i>
+                📝 Note Admin
+            </h5>
+        </div>
+        <div class="card-body">
+            <div style="white-space: pre-line;">
+                {{ report.admin_notes }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Marca Revisionato -->
+{% if not report.reviewed %}
+<div class="modal fade" id="markReviewedModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-check me-2"></i>
+                    📋 Marca come Revisionato
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin.mark_impact_report_reviewed', report_id=report.id) }}">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle me-2"></i>Revisione Report</h6>
+                        <p class="mb-0">
+                            Marca questo report come revisionato per indicare che è stato analizzato 
+                            e che eventuali azioni necessarie sono state intraprese.
+                        </p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="adminNotes" class="form-label">Note Admin (opzionale)</label>
+                        <textarea class="form-control" id="adminNotes" name="admin_notes" rows="3" 
+                                  placeholder="Inserisci eventuali note, commenti o azioni intraprese..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check me-1"></i>
+                        Marca Revisionato
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Grafico distribuzione decisioni
+const ctx = document.getElementById('decisionsChart').getContext('2d');
+const decisionsChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Approvazioni', 'Dinieghi'],
+        datasets: [{
+            data: [{{ report.approve_count }}, {{ report.deny_count }}],
+            backgroundColor: ['#28a745', '#dc3545'],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+function showMarkReviewedModal() {
+    const modal = new bootstrap.Modal(document.getElementById('markReviewedModal'));
+    modal.show();
+}
+</script>
+{% endblock %} 

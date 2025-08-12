@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2>🔍 Analisi Dettagliata Risk Score</h2>
+            <p class="text-muted">Richiesta #{{ request_obj.id }}</p>
+
+            <!-- Informazioni base -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Informazioni Richiesta</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Utente:</strong> {{ request_obj.user.first_name }} {{ request_obj.user.last_name }}</p>
+                            <p><strong>Email:</strong> {{ request_obj.user.email }}</p>
+                            <p><strong>Ruolo:</strong> {{ request_obj.user.role }}</p>
+                            <p><strong>Data richiesta:</strong> {{ request_obj.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Documento:</strong> {{ request_obj.document.title }}</p>
+                            <p><strong>Tipo:</strong> {{ request_obj.document.original_filename.split('.')[-1] if request_obj.document.original_filename else 'N/A' }}</p>
+                            <p><strong>Scadenza:</strong> {{ request_obj.document.expiry_date.strftime('%d/%m/%Y') if request_obj.document.expiry_date else 'N/A' }}</p>
+                            <p><strong>Critico:</strong> {% if request_obj.document.is_critical %}Sì{% else %}No{% endif %}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risk Score -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Risk Score AI</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 class="mb-0">
+                                    <span class="badge {{ request_obj.risk_badge_class }} fs-1">
+                                        {{ request_obj.risk_display }}
+                                    </span>
+                                </h3>
+                                <p class="text-muted mt-2">Punteggio di Rischio</p>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            {% if request_obj.risk_factors and request_obj.risk_factors.explanation %}
+                            <h6>Spiegazione AI:</h6>
+                            <p>{{ request_obj.risk_factors.explanation }}</p>
+                            {% endif %}
+                            
+                            {% if request_obj.risk_factors and request_obj.risk_factors.risk_factors %}
+                            <h6>Fattori di Rischio Identificati:</h6>
+                            <ul>
+                                {% for factor in request_obj.risk_factors.risk_factors %}
+                                <li>{{ factor }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dettagli analisi -->
+            {% if request_obj.risk_factors and request_obj.risk_factors.factors_analyzed %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Fattori Analizzati dall'AI</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Fattori Utente:</h6>
+                            <ul>
+                                <li><strong>Ruolo:</strong> {{ request_obj.risk_factors.factors_analyzed.user_role }}</li>
+                                <li><strong>Email:</strong> {{ request_obj.risk_factors.factors_analyzed.user_email }}</li>
+                                <li><strong>Richieste negate precedenti:</strong> {{ request_obj.risk_factors.factors_analyzed.user_history_denied }}</li>
+                                <li><strong>Totale richieste:</strong> {{ request_obj.risk_factors.factors_analyzed.user_history_total }}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Fattori Documento:</h6>
+                            <ul>
+                                <li><strong>Titolo:</strong> {{ request_obj.risk_factors.factors_analyzed.document_title }}</li>
+                                <li><strong>Tipo file:</strong> {{ request_obj.risk_factors.factors_analyzed.document_type or 'N/A' }}</li>
+                                <li><strong>Scadenza:</strong> {{ request_obj.risk_factors.factors_analyzed.document_expiry or 'N/A' }}</li>
+                                <li><strong>Critico:</strong> {% if request_obj.risk_factors.factors_analyzed.document_is_critical %}Sì{% else %}No{% endif %}</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6>Motivazione Richiesta:</h6>
+                            <p class="border p-3 bg-light">{{ request_obj.risk_factors.factors_analyzed.request_note or 'Nessuna motivazione fornita' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Azioni -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>Azioni</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{{ url_for('risk.risk_scoring_dashboard') }}" class="btn btn-secondary">
+                        ← Torna alla Dashboard
+                    </a>
+                    
+                    {% if request_obj.status == 'pending' %}
+                    <a href="{{ url_for('admin.access_requests') }}" class="btn btn-primary">
+                        📋 Gestisci Richiesta
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

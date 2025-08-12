@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}📊 Statistiche Notifiche CEO - Mercury{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">📊 Statistiche Notifiche CEO</h1>
+                <div>
+                    <a href="{{ url_for('ceo_notifications.notifiche_list') }}" class="btn btn-outline-secondary btn-sm">
+                        ← Torna alla lista
+                    </a>
+                </div>
+            </div>
+
+            <!-- Statistiche Generali -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ totale_notifiche }}</h4>
+                            <p class="mb-0">📊 Totale Notifiche</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ notifiche_lette }}</h4>
+                            <p class="mb-0">✅ Notifiche Lette</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <h4>{{ notifiche_non_lette }}</h4>
+                            <p class="mb-0">🆕 Notifiche Non Lette</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ notifiche_ultimo_mese }}</h4>
+                            <p class="mb-0">📅 Ultimi 30 Giorni</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Statistiche per Tipo -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">📈 Notifiche per Tipo</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if stats_per_tipo %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Tipo</th>
+                                                <th>Conteggio</th>
+                                                <th>Percentuale</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for tipo, count in stats_per_tipo %}
+                                            <tr>
+                                                <td>
+                                                    {% if tipo == 'invio_pdf_sensibile' %}
+                                                        📄 Invio PDF Sensibile
+                                                    {% elif tipo == 'alert_ai' %}
+                                                        🤖 Alert AI
+                                                    {% elif tipo == 'guest_scadenza' %}
+                                                        ⏰ Guest Scadenza
+                                                    {% else %}
+                                                        {{ tipo }}
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ count }}</td>
+                                                <td>
+                                                    {% set percentuale = (count / totale_notifiche * 100) if totale_notifiche > 0 else 0 %}
+                                                    <div class="progress" style="height: 20px;">
+                                                        <div class="progress-bar" style="width: {{ percentuale }}%">
+                                                            {{ "%.1f"|format(percentuale) }}%
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted text-center">Nessuna statistica disponibile</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grafico Notifiche per Giorno -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">📊 Notifiche per Giorno (Ultimi 7 giorni)</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if notifiche_per_giorno %}
+                                <canvas id="notificheChart" width="400" height="200"></canvas>
+                            {% else %}
+                                <p class="text-muted text-center">Nessun dato disponibile per gli ultimi 7 giorni</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Informazioni Aggiuntive -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">ℹ️ Informazioni sul Sistema</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>🎯 Criteri di Notifica</h6>
+                                    <ul class="list-unstyled">
+                                        <li>✅ <strong>Email esterna:</strong> Destinatario non aziendale</li>
+                                        <li>✅ <strong>Guest scadenza:</strong> Accesso che scade in < 3 giorni</li>
+                                        <li>✅ <strong>Alert AI critico:</strong> Utente con alert AI alto/critico</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>📧 Configurazione Email</h6>
+                                    <ul class="list-unstyled">
+                                        <li>📧 <strong>Email CEO:</strong> Configurata tramite variabile d'ambiente</li>
+                                        <li>📧 <strong>Oggetto:</strong> "🔔 [Titolo Notifica] - DOCS Mercury"</li>
+                                        <li>📧 <strong>Contenuto:</strong> Dettagli completi dell'invio PDF</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if notifiche_per_giorno %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('notificheChart').getContext('2d');
+const chartData = {
+    labels: [
+        {% for data, count in notifiche_per_giorno %}
+            '{{ data }}',
+        {% endfor %}
+    ],
+    datasets: [{
+        label: 'Notifiche',
+        data: [
+            {% for data, count in notifiche_per_giorno %}
+                {{ count }},
+            {% endfor %}
+        ],
+        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+    }]
+};
+
+new Chart(ctx, {
+    type: 'bar',
+    data: chartData,
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                display: false
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

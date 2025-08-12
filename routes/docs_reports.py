@@ -8,14 +8,14 @@ import pdfkit
 import os
 from typing import Optional
 from sqlalchemy.orm import Session
-from database import get_db
+from extensions import db
 from models import Document, User, Company, Department
 from sqlalchemy import func, and_, case
 
 router = APIRouter()
 
 @router.get("/api/jack/docs/report_ceo/{year}/{month}")
-def genera_report_ceo_docs(year: int, month: int, db: Session = Depends(get_db)):
+def genera_report_ceo_docs(year: int, month: int, db: Session = Depends(db)):
     """
     Genera report mensile AI per il CEO con statistiche documentali
     
@@ -353,7 +353,7 @@ def genera_report_personalizzato(
     start_date: str,
     end_date: str,
     company_id: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(db)
 ):
     """
     Genera report personalizzato per periodo specifico

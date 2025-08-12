@@ -1,0 +1,703 @@
+{% extends "base_admin.html" %}
+
+{% block title %}🧠 Report AI Attività - Gestione Documenti{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header del Report -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-gradient-primary text-white">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h1 class="mb-2"><i class="fas fa-brain"></i> 🧠 Report AI Attività</h1>
+                            <p class="mb-0 opacity-75">
+                                Analisi intelligente completa del sistema documentale con insights automatici e suggerimenti AI
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-light btn-sm" onclick="exportReport('csv')">
+                                    <i class="fas fa-download"></i> CSV
+                                </button>
+                                <button class="btn btn-light btn-sm" onclick="exportReport('json')">
+                                    <i class="fas fa-code"></i> JSON
+                                </button>
+                                <button class="btn btn-light btn-sm" onclick="exportReport('pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn btn-light btn-sm" onclick="refreshReport()">
+                                    <i class="fas fa-sync-alt"></i> Aggiorna
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spinner di caricamento -->
+    <div id="loadingSpinner" class="text-center py-5" style="display: none;">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Caricamento...</span>
+        </div>
+        <p class="mt-3 text-muted">🤖 Analisi AI in corso...</p>
+    </div>
+
+    <!-- Form nascosto per export PDF -->
+    <form id="pdf-form" method="POST" action="/admin/ai/report/attivita/export/pdf" style="display: none;">
+        <input type="hidden" name="html" id="html-input">
+    </form>
+
+    <!-- Contenuto principale -->
+    <div id="reportContent" style="display: none;">
+        
+        <!-- Suggerimenti AI -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-lightbulb"></i> 💡 Suggerimenti AI</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="suggerimentiAI" class="alert alert-info">
+                            <i class="fas fa-spinner fa-spin"></i> Caricamento suggerimenti...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistiche Generali -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-line"></i> 📊 Statistiche Generali</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="statisticheGenerali">
+                            <!-- Popolato via JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grafici principali -->
+        <div class="row mb-4">
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-chart-pie"></i> 📈 Reparti Attivi vs Inattivi</h6>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="repartiDonutChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0"><i class="fas fa-chart-bar"></i> 📊 Utenti Problematici</h6>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="utentiBarChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analisi 1: Reparti Inattivi -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> 📌 Reparti Inattivi (Ultimi 30gg)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div id="repartiInattiviContent">
+                                    <!-- Popolato via JavaScript -->
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="alert alert-warning">
+                                    <strong>Percentuale inattivi:</strong>
+                                    <span id="percentualeInattivi">-</span>%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analisi 2: File Obbligatori -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-file-alt"></i> 🚨 File Obbligatori Non Scaricati</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="fileObbligatoriTable">
+                                <thead>
+                                    <tr>
+                                        <th>Nome File</th>
+                                        <th>Categoria</th>
+                                        <th>Data Creazione</th>
+                                        <th>Stato</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Popolato via JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analisi 3: Utenti Problematici -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-user-times"></i> 📤 Utenti che Scaricano ma Non Firmano</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="utentiProblematiciTable">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Download</th>
+                                        <th>Firme</th>
+                                        <th>Rapporto</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Popolato via JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analisi 4: Download Fuori Orario -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-clock"></i> 🕒 Download Fuori Orario</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div id="downloadFuoriOrarioContent">
+                                    <!-- Popolato via JavaScript -->
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="alert alert-info">
+                                    <strong>Orario lavorativo:</strong><br>
+                                    06:00 - 20:00
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analisi 5: Tipologie Poco Utilizzate -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-tags"></i> 🏷️ Tipologie Documenti Poco Utilizzate</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <canvas id="tipologieLineChart" height="200"></canvas>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="table-responsive">
+                                    <table class="table table-sm" id="tipologieTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Categoria</th>
+                                                <th>Utilizzo %</th>
+                                                <th>Stato</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Popolato via JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer con timestamp -->
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center text-muted">
+                    <small>
+                        <i class="fas fa-clock"></i> Report generato il: <span id="reportTimestamp">-</span>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Variabili globali per i grafici
+let repartiDonutChart = null;
+let utentiBarChart = null;
+let tipologieLineChart = null;
+
+// Funzione principale per caricare il report
+function loadAIReport() {
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const reportContent = document.getElementById('reportContent');
+    
+    loadingSpinner.style.display = 'block';
+    reportContent.style.display = 'none';
+    
+    fetch('/admin/ai/report/attivita')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                renderReport(data.report);
+            } else {
+                throw new Error(data.error || 'Errore sconosciuto');
+            }
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento del report:', error);
+            document.getElementById('reportContent').innerHTML = `
+                <div class="alert alert-danger">
+                    <h5><i class="fas fa-exclamation-triangle"></i> Errore nel caricamento del report</h5>
+                    <p>${error.message}</p>
+                    <button class="btn btn-primary" onclick="loadAIReport()">
+                        <i class="fas fa-redo"></i> Riprova
+                    </button>
+                </div>
+            `;
+            document.getElementById('reportContent').style.display = 'block';
+        })
+        .finally(() => {
+            loadingSpinner.style.display = 'none';
+        });
+}
+
+// Funzione per renderizzare il report
+function renderReport(report) {
+    // Timestamp
+    document.getElementById('reportTimestamp').textContent = new Date(report.timestamp).toLocaleString('it-IT');
+    
+    // Suggerimenti AI
+    renderSuggerimentiAI(report.analisi.suggerimenti_ai);
+    
+    // Statistiche generali
+    renderStatisticheGenerali(report.analisi.statistiche_generali);
+    
+    // Reparti inattivi
+    renderRepartiInattivi(report.analisi.reparti_inattivi);
+    
+    // File obbligatori
+    renderFileObbligatori(report.analisi.file_obbligatori_non_scaricati);
+    
+    // Utenti problematici
+    renderUtentiProblematici(report.analisi.utenti_scaricano_non_firmano);
+    
+    // Download fuori orario
+    renderDownloadFuoriOrario(report.analisi.download_fuori_orario);
+    
+    // Tipologie poco utilizzate
+    renderTipologiePocoUtilizzate(report.analisi.tipologie_poco_utilizzate);
+    
+    // Grafici
+    if (report.chart_data) {
+        renderGrafici(report.chart_data);
+    }
+    
+    // Mostra il contenuto
+    document.getElementById('reportContent').style.display = 'block';
+}
+
+// Funzione per renderizzare i suggerimenti AI
+function renderSuggerimentiAI(suggerimenti) {
+    const container = document.getElementById('suggerimentiAI');
+    
+    if (!suggerimenti || suggerimenti.length === 0) {
+        container.innerHTML = '<p class="mb-0">✅ Nessun suggerimento specifico. Il sistema funziona correttamente!</p>';
+        return;
+    }
+    
+    let html = '<ul class="mb-0">';
+    suggerimenti.forEach(suggerimento => {
+        html += `<li>${suggerimento}</li>`;
+    });
+    html += '</ul>';
+    
+    container.innerHTML = html;
+}
+
+// Funzione per renderizzare le statistiche generali
+function renderStatisticheGenerali(stats) {
+    const container = document.getElementById('statisticheGenerali');
+    
+    if (!stats) {
+        container.innerHTML = '<p class="text-muted">Statistiche non disponibili</p>';
+        return;
+    }
+    
+    const metriche = [
+        { key: 'totale_utenti', label: 'Utenti Totali', icon: 'fas fa-users', color: 'primary' },
+        { key: 'totale_documenti', label: 'Documenti Totali', icon: 'fas fa-file-alt', color: 'info' },
+        { key: 'documenti_obbligatori', label: 'Documenti Obbligatori', icon: 'fas fa-exclamation-circle', color: 'warning' },
+        { key: 'totale_reparti', label: 'Reparti', icon: 'fas fa-building', color: 'success' },
+        { key: 'download_ultimi_30gg', label: 'Download (30gg)', icon: 'fas fa-download', color: 'secondary' },
+        { key: 'firme_ultimi_30gg', label: 'Firme (30gg)', icon: 'fas fa-signature', color: 'dark' }
+    ];
+    
+    let html = '';
+    metriche.forEach(metrica => {
+        const valore = stats[metrica.key] || 0;
+        html += `
+            <div class="col-md-4 col-lg-2 mb-3">
+                <div class="card border-${metrica.color}">
+                    <div class="card-body text-center">
+                        <i class="${metrica.icon} text-${metrica.color} fa-2x mb-2"></i>
+                        <h4 class="text-${metrica.color}">${valore}</h4>
+                        <small class="text-muted">${metrica.label}</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Funzione per renderizzare i reparti inattivi
+function renderRepartiInattivi(data) {
+    const container = document.getElementById('repartiInattiviContent');
+    const percentualeSpan = document.getElementById('percentualeInattivi');
+    
+    if (!data || data.error) {
+        container.innerHTML = '<p class="text-muted">Dati non disponibili</p>';
+        return;
+    }
+    
+    const repartiInattivi = data.reparti_inattivi || [];
+    const percentuale = data.percentuale_inattivi || 0;
+    
+    percentualeSpan.textContent = percentuale;
+    
+    if (repartiInattivi.length === 0) {
+        container.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Tutti i reparti sono attivi! ✅</div>';
+    } else {
+        let html = '<div class="alert alert-danger"><strong>Reparti inattivi:</strong><ul class="mb-0">';
+        repartiInattivi.forEach(reparto => {
+            html += `<li>${reparto}</li>`;
+        });
+        html += '</ul></div>';
+        container.innerHTML = html;
+    }
+}
+
+// Funzione per renderizzare i file obbligatori
+function renderFileObbligatori(data) {
+    const tbody = document.querySelector('#fileObbligatoriTable tbody');
+    
+    if (!data || data.error) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Dati non disponibili</td></tr>';
+        return;
+    }
+    
+    const fileNonScaricati = data.file_non_scaricati || [];
+    
+    if (fileNonScaricati.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-success"><i class="fas fa-check-circle"></i> Tutti i file obbligatori sono stati scaricati!</td></tr>';
+    } else {
+        let html = '';
+        fileNonScaricati.forEach(file => {
+            html += `
+                <tr>
+                    <td><strong>${file.nome}</strong></td>
+                    <td><span class="badge bg-secondary">${file.categoria}</span></td>
+                    <td>${file.data_creazione ? new Date(file.data_creazione).toLocaleDateString('it-IT') : 'N/A'}</td>
+                    <td><span class="badge bg-danger">Non scaricato</span></td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+}
+
+// Funzione per renderizzare gli utenti problematici
+function renderUtentiProblematici(data) {
+    const tbody = document.querySelector('#utentiProblematiciTable tbody');
+    
+    if (!data || data.error) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Dati non disponibili</td></tr>';
+        return;
+    }
+    
+    const utentiProblematici = data.utenti_problematici || [];
+    
+    if (utentiProblematici.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-success"><i class="fas fa-check-circle"></i> Tutti gli utenti firmano correttamente!</td></tr>';
+    } else {
+        let html = '';
+        utentiProblematici.forEach(utente => {
+            const rapporto = utente.download_count > 0 ? ((utente.firme_count / utente.download_count) * 100).toFixed(1) : 0;
+            const stato = rapporto == 0 ? 'danger' : rapporto < 50 ? 'warning' : 'info';
+            
+            html += `
+                <tr>
+                    <td><strong>${utente.username}</strong></td>
+                    <td>${utente.email}</td>
+                    <td><span class="badge bg-info">${utente.download_count}</span></td>
+                    <td><span class="badge bg-warning">${utente.firme_count}</span></td>
+                    <td><span class="badge bg-${stato}">${rapporto}%</span></td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+}
+
+// Funzione per renderizzare i download fuori orario
+function renderDownloadFuoriOrario(data) {
+    const container = document.getElementById('downloadFuoriOrarioContent');
+    
+    if (!data || data.error) {
+        container.innerHTML = '<p class="text-muted">Dati non disponibili</p>';
+        return;
+    }
+    
+    const utentiSospetti = data.download_fuori_orario || [];
+    
+    if (utentiSospetti.length === 0) {
+        container.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Nessun download fuori orario rilevato! ✅</div>';
+    } else {
+        let html = '<div class="alert alert-warning"><strong>Utenti con download fuori orario:</strong><ul class="mb-0">';
+        utentiSospetti.forEach(utente => {
+            html += `<li><strong>${utente.username}</strong> - ${utente.count} download sospetti</li>`;
+        });
+        html += '</ul></div>';
+        container.innerHTML = html;
+    }
+}
+
+// Funzione per renderizzare le tipologie poco utilizzate
+function renderTipologiePocoUtilizzate(data) {
+    const tbody = document.querySelector('#tipologieTable tbody');
+    
+    if (!data || data.error) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Dati non disponibili</td></tr>';
+        return;
+    }
+    
+    const tipologie = data.tipologie_poco_utilizzate || [];
+    
+    if (tipologie.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-success"><i class="fas fa-check-circle"></i> Tutte le tipologie sono ben utilizzate!</td></tr>';
+    } else {
+        let html = '';
+        tipologie.forEach(tipologia => {
+            const stato = tipologia.percentuale_utilizzo < 25 ? 'danger' : tipologia.percentuale_utilizzo < 50 ? 'warning' : 'info';
+            html += `
+                <tr>
+                    <td><strong>${tipologia.categoria}</strong></td>
+                    <td><span class="badge bg-${stato}">${tipologia.percentuale_utilizzo}%</span></td>
+                    <td><span class="badge bg-${stato}">${tipologia.percentuale_utilizzo < 50 ? 'Basso utilizzo' : 'Utilizzo normale'}</span></td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+}
+
+// Funzione per renderizzare i grafici
+function renderGrafici(chartData) {
+    // Distruggi grafici esistenti
+    if (repartiDonutChart) repartiDonutChart.destroy();
+    if (utentiBarChart) utentiBarChart.destroy();
+    if (tipologieLineChart) tipologiesLineChart.destroy();
+    
+    // Grafico donut per reparti
+    if (chartData.reparti_donut) {
+        const ctx = document.getElementById('repartiDonutChart').getContext('2d');
+        repartiDonutChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: chartData.reparti_donut.labels,
+                datasets: [{
+                    data: chartData.reparti_donut.data,
+                    backgroundColor: ['#28a745', '#dc3545'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+    
+    // Grafico bar per utenti problematici
+    if (chartData.utenti_bar) {
+        const ctx = document.getElementById('utentiBarChart').getContext('2d');
+        utentiBarChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartData.utenti_bar.labels,
+                datasets: [{
+                    label: 'Download',
+                    data: chartData.utenti_bar.download,
+                    backgroundColor: '#17a2b8'
+                }, {
+                    label: 'Firme',
+                    data: chartData.utenti_bar.firme,
+                    backgroundColor: '#ffc107'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    // Grafico line per tipologie
+    if (chartData.tipologie_line) {
+        const ctx = document.getElementById('tipologieLineChart').getContext('2d');
+        tipologieLineChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartData.tipologie_line.labels,
+                datasets: [{
+                    label: 'Percentuale Utilizzo',
+                    data: chartData.tipologie_line.data,
+                    borderColor: '#6f42c1',
+                    backgroundColor: 'rgba(111, 66, 193, 0.1)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    }
+}
+
+// Funzione per export del report
+function exportReport(format) {
+    const url = `/admin/ai/report/attivita/export/${format}`;
+    
+    if (format === 'json') {
+        // Download JSON
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `report_ai_attivita_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => {
+                console.error('Errore export JSON:', error);
+                alert('Errore durante l\'export JSON');
+            });
+    } else if (format === 'csv') {
+        // Download CSV
+        window.open(url, '_blank');
+    } else if (format === 'pdf') {
+        // Export PDF - converti grafici in immagini e invia HTML
+        const charts = document.querySelectorAll('canvas');
+        charts.forEach(canvas => {
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL('image/png');
+            img.style.display = 'block';
+            img.style.maxWidth = '600px';
+            img.style.margin = '10px 0';
+            canvas.parentNode.insertBefore(img, canvas);
+            canvas.style.display = 'none';
+        });
+
+        const cloned = document.documentElement.cloneNode(true);
+        const html = cloned.outerHTML;
+        document.getElementById('html-input').value = html;
+        document.getElementById('pdf-form').submit();
+        
+        // Ripristina i canvas dopo l'invio
+        setTimeout(() => {
+            charts.forEach(canvas => {
+                canvas.style.display = 'block';
+                const img = canvas.previousElementSibling;
+                if (img && img.tagName === 'IMG') {
+                    img.remove();
+                }
+            });
+        }, 1000);
+    }
+}
+
+// Funzione per aggiornare il report
+function refreshReport() {
+    loadAIReport();
+}
+
+// Carica il report all'avvio
+document.addEventListener('DOMContentLoaded', function() {
+    loadAIReport();
+});
+</script>
+{% endblock %}

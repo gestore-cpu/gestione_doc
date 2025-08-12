@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from flask import Flask, flash, render_template, session, redirect, url_for, request, send_file
+from flask import Flask, flash, render_template, session, redirect, url_for, request, send_file, jsonify
 from flask_wtf import CSRFProtect
 from flask_login import LoginManager, login_required, current_user, logout_user
 from flask_migrate import Migrate
@@ -21,7 +21,10 @@ from routes.admin_routes import admin_bp
 from routes.user_routes import user_bp
 from routes.docs import docs_bp
 from routes.dashboard_ceo import ceo_bp
-from routes.ceo_routes import ceo_bp as ceo_brighter_bp
+from routes.ceo_routes import ceo_bp as ceo_diario_bp
+from routes.ceo_notifications_routes import ceo_notifications_bp
+from routes.ceo_report_routes import ceo_report_bp
+from routes.ceo_report_alert_routes import ceo_report_alert_bp
 from drive_routes import drive_bp
 from upload_routes import upload_bp
 from routes.welcome import welcome_bp
@@ -30,7 +33,17 @@ from routes.firme_manuali_routes import firme_manuali_bp
 from routes.prove_evacuazione_routes import prove_evacuazione_bp
 from routes.visite_mediche_avanzate_routes import visite_mediche_avanzate_bp
 from routes.quality_routes import quality_bp
-from models import User, Document, AdminLog
+from routes.ai_monitoring_routes import ai_monitoring_bp
+from routes.risk_scoring_routes import risk_bp
+from routes.files_api import files_api
+from routes.access_requests import access_requests_bp
+from routes.admin_access_requests import admin_access_requests_bp
+from routes.ai_routes import ai_bp
+from routes.manus_webhook import manus_webhook_bp
+from routes.manus_admin import manus_admin_bp
+from routes.manus_mapping_admin import manus_map_bp
+from app_socket import socketio
+from models import User, Document, AdminLog, DiarioEntry, PrincipioPersonale
 from werkzeug.utils import secure_filename
 from googleapiclient.http import MediaFileUpload
 import uuid
@@ -80,7 +93,14 @@ app.config.update({
     'SESSION_COOKIE_DOMAIN': None,
     'SESSION_COOKIE_SECURE': False,
     'SESSION_COOKIE_SAMESITE': 'Lax',
-    'MAX_CONTENT_LENGTH': 16 * 1024 * 1024
+    'MAX_CONTENT_LENGTH': 16 * 1024 * 1024,
+    # Manus Core Configuration
+    'MANUS_BASE_URL': os.getenv("MANUS_BASE_URL", "https://api.manus.example/v1"),
+    'MANUS_API_KEY': os.getenv("MANUS_API_KEY", ""),
+    'MANUS_WEBHOOK_SECRET': os.getenv("MANUS_WEBHOOK_SECRET", ""),
+    # Redis Configuration
+    'REDIS_URL': os.getenv("REDIS_URL", "redis://localhost:6379/2"),
+    'IDEMP_TTL_SEC': int(os.getenv("IDEMP_TTL_SEC", "7200"))  # 2h
 })
 
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
@@ -97,11 +117,26 @@ try:
 except Exception as e:
     raise RuntimeError(f"✖ Errore inizializzazione Fernet: {e}")
 
+# === FILTRI TEMPLATE ===
+@app.template_filter('nl2br')
+def nl2br_filter(text):
+    """Converte i newline in <br> per i template."""
+    if text:
+        return text.replace('\n', '<br>')
+    return text
+
 # === EXTENSIONS INITIALIZATION ===
 csrf.init_app(app)
 db.init_app(app)
 bcrypt.init_app(app)
 mail.init_app(app)
+
+# === SOCKET.IO INITIALIZATION ===
+socketio.init_app(app, cors_allowed_origins="*")
+
+# === MIDDLEWARE INITIALIZATION ===
+from middleware import AuditMiddleware
+audit_middleware = AuditMiddleware(app)
 
 from itsdangerous import URLSafeTimedSerializer
 serializer = URLSafeTimedSerializer(app.secret_key)
@@ -117,15 +152,19 @@ from routes.guest_routes import guest_bp
 from routes.qms_routes import qms_bp
 from routes.drive_upload import drive_bp
 from routes.documents import docs_bp
-from routes.synthia_eventi import router as synthia_eventi_bp
-from routes.jack_docs_routes import router as jack_docs_bp
+# from routes.docs_ai import router as docs_ai_router  # FastAPI router temporaneamente disabilitato
+# from routes.synthia_eventi import router as synthia_eventi_bp
+# from routes.jack_docs_routes import router as jack_docs_bp
 
 # === REGISTER BLUEPRINTS ===
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(ceo_bp, url_prefix="/ceo", name="ceo_dashboard")
-app.register_blueprint(ceo_brighter_bp, url_prefix="/ceo")
+app.register_blueprint(ceo_diario_bp, url_prefix="/ceo")
+app.register_blueprint(ceo_notifications_bp, url_prefix="/ceo/notifiche")
+app.register_blueprint(ceo_report_bp, url_prefix="/ceo/report")
+app.register_blueprint(ceo_report_alert_bp, url_prefix="/ceo/report-alert")
 app.register_blueprint(drive_bp, url_prefix="/drive")
 app.register_blueprint(upload_bp)
 app.register_blueprint(welcome_bp)
@@ -136,9 +175,19 @@ app.register_blueprint(visite_mediche_bp, url_prefix="/visite_mediche")
 app.register_blueprint(firme_manuali_bp, url_prefix="/firme_manuali")
 app.register_blueprint(prove_evacuazione_bp, url_prefix="/prove_evacuazione")
 app.register_blueprint(visite_mediche_avanzate_bp, url_prefix="/visite_mediche_avanzate")
-app.register_blueprint(synthia_eventi_bp, url_prefix="/synthia")
-app.register_blueprint(jack_docs_bp, url_prefix="/jack")
+# app.register_blueprint(synthia_eventi_bp, url_prefix="/synthia")
+# app.register_blueprint(jack_docs_bp, url_prefix="/jack")
 app.register_blueprint(quality_bp, url_prefix="/quality")
+app.register_blueprint(ai_monitoring_bp, url_prefix="/admin/ai")
+app.register_blueprint(risk_bp, url_prefix="/admin")
+app.register_blueprint(files_api)
+app.register_blueprint(access_requests_bp)
+app.register_blueprint(admin_access_requests_bp)
+app.register_blueprint(ai_bp)
+app.register_blueprint(manus_webhook_bp, url_prefix='/webhooks')
+app.register_blueprint(manus_admin_bp, url_prefix='/admin')
+app.register_blueprint(manus_map_bp, url_prefix='/admin')
+# app.register_blueprint(docs_ai_router, url_prefix="/docs/ai")  # FastAPI router temporaneamente disabilitato
 
 # === SCHEDULER SETUP ===
 try:
@@ -879,12 +928,13 @@ if __name__ == '__main__':
 #     departments = Department.query.all()
 #     return render_template("upload.html", all_companies=companies, all_departments=departments)
 
-# === Download file con verifica approvazione ===
+# === Download file con verifica approvazione e enforcement accesso ===
 @app.route('/download_file/<filename>')
 @login_required
 def download_file(filename):
     """
     Download di un file con verifica che sia approvato da Admin e CEO.
+    Implementa enforcement per il sistema di richieste di accesso.
     
     Args:
         filename (str): Nome del file da scaricare.
@@ -913,34 +963,68 @@ def download_file(filename):
         flash("⛔ Documento non ancora approvato da Admin e CEO.", "warning")
         return redirect(url_for('index'))
     
-    # Verifica che l'utente abbia accesso al documento
-    if not current_user.is_admin and not current_user.is_ceo:
-        # Per utenti normali, verifica che siano l'uploader o abbiano accesso autorizzato
-        if doc.user_id != current_user.id:
-            # Verifica se l'utente ha accesso autorizzato
-            authorized = AuthorizedAccess.query.filter_by(
-                user_id=current_user.id,
-                document_id=doc.id
-            ).first()
-            if not authorized:
-                # Log dell'accesso non autorizzato
-                audit_log = AuditLog(
-                    user_id=current_user.id,
-                    document_id=doc.id,
-                    azione='accesso_negato',
-                    note=f'Accesso non autorizzato al documento: "{doc.title or doc.original_filename}"'
-                )
-                db.session.add(audit_log)
-                db.session.commit()
-                
-                flash("🚫 Accesso non autorizzato al documento", "danger")
-                return redirect(url_for('index'))
+    # === ENFORCEMENT SISTEMA RICHIESTE ACCESSO ===
+    from routes.access_requests import check_document_access
+    from models import DownloadLog
+    
+    # Verifica accesso al documento
+    has_access, access_reason = check_document_access(current_user.id, doc.id)
+    
+    if not has_access:
+        # Log del download bloccato
+        download_log = DownloadLog(
+            user_id=current_user.id,
+            document_id=doc.id,
+            success=False,
+            reason=f"Accesso bloccato: {access_reason}",
+            source="enforcement",
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        db.session.add(download_log)
+        db.session.commit()
+        
+        # Log dell'accesso negato
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            document_id=doc.id,
+            azione='accesso_negato',
+            note=f'Accesso bloccato dal sistema enforcement: {access_reason}'
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+        
+        # Se è una richiesta AJAX, restituisci JSON per mostrare il modale
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'ok': False,
+                'message': 'Accesso non autorizzato',
+                'show_modal': True,
+                'file_id': doc.id,
+                'file_name': doc.title or doc.original_filename
+            }), 403
+        
+        # Altrimenti redirect con messaggio
+        flash("🚫 Accesso non autorizzato al documento. Puoi richiedere l'accesso tramite il sistema di richieste.", "danger")
+        return redirect(url_for('index'))
     
     # Verifica che il file esista
     local_path = os.path.join(app.config['UPLOAD_FOLDER'], doc.company.name, doc.department.name, doc.filename)
     if not os.path.exists(local_path):
         flash("❌ File non trovato sul server", "danger")
         return redirect(url_for('index'))
+    
+    # Log del download riuscito
+    download_log = DownloadLog(
+        user_id=current_user.id,
+        document_id=doc.id,
+        success=True,
+        reason=access_reason,
+        source="standard" if access_reason == "Proprietario" else "share",
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent', '')
+    )
+    db.session.add(download_log)
     
     # Log del download
     log = DocumentActivityLog(
@@ -1136,3 +1220,12 @@ def page_not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     return render_template('errors/500.html'), 500
+
+# === SCHEDULER APSCHEDULER ===
+try:
+    from scheduler_config import start_scheduler
+    scheduler = start_scheduler()
+    app.logger.info("✅ Scheduler APScheduler avviato con successo")
+except Exception as e:
+    app.logger.error(f"❌ Errore nell'avvio del scheduler: {str(e)}")
+    scheduler = None

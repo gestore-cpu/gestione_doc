@@ -22,6 +22,50 @@ class PrioritaTask(enum.Enum):
     MEDIUM = "Medium"
     HIGH = "High"
 
+# === ENUM PER SICUREZZA ===
+class SeverityLevel(enum.Enum):
+    """Enum per il livello di severità degli alert di sicurezza."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+class AlertStatus(enum.Enum):
+    """Enum per lo stato degli alert di sicurezza."""
+    OPEN = "open"
+    CLOSED = "closed"
+
+class AntivirusVerdict(enum.Enum):
+    """Enum per il verdetto dell'antivirus."""
+    CLEAN = "clean"
+    INFECTED = "infected"
+
+class AccessRequestStatus(enum.Enum):
+    """Enum per lo stato delle richieste di accesso."""
+    PENDING = "pending"
+    APPROVED = "approved"
+    DENIED = "denied"
+    EXTENDED = "extended"
+
+# === ENUM PER ALERT DOWNLOAD ===
+class DownloadAlertStatus(enum.Enum):
+    """Enum per lo stato degli alert di download."""
+    NEW = 'new'
+    SEEN = 'seen'
+    RESOLVED = 'resolved'
+
+class DownloadAlertSeverity(enum.Enum):
+    """Enum per la severità degli alert di download."""
+    WARNING = 'warning'
+    CRITICAL = 'critical'
+
+# === ENUM PER RICHIESTE ACCESSO ===
+class AccessRequestStatus(enum.Enum):
+    """Enum per lo stato delle richieste di accesso."""
+    PENDING = "pending"
+    APPROVED = "approved"
+    DENIED = "denied"
+    EXPIRED = "expired"
+
 # === Tabelle di associazione molti-a-molti ===
 user_companies = db.Table('user_companies',
     db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
@@ -31,6 +75,18 @@ user_companies = db.Table('user_companies',
 user_departments = db.Table('user_departments',
     db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
     db.Column('department_id', db.Integer, db.ForeignKey('departments.id'), primary_key=True)
+)
+
+# === Tabella di associazione Documenti-Tag ===
+file_tag = db.Table('file_tag',
+    db.Column('document_id', db.Integer, db.ForeignKey('documents.id'), primary_key=True),
+    db.Column('tag_id', db.Integer, db.ForeignKey('tags.id'), primary_key=True)
+)
+
+# === Tabella di associazione Diario-Principi ===
+diario_principi_association = db.Table('diario_principi_association',
+    db.Column('diario_id', db.Integer, db.ForeignKey('diario_entries.id'), primary_key=True),
+    db.Column('principio_id', db.Integer, db.ForeignKey('principi_personali.id'), primary_key=True)
 )
 
 # === MODELLO APPROVAZIONE DOCUMENTO ===
@@ -139,14 +195,15 @@ class User(UserMixin, db.Model):
     phone = db.Column(db.String(20), nullable=True)  # Numero WhatsApp
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    cooldown_until = db.Column(db.DateTime, nullable=True)  # Per blocchi temporanei
 
     # === Relazioni ===
     companies = db.relationship('Company', secondary=user_companies, backref='users')
     departments = db.relationship('Department', secondary=user_departments, backref='users')
-    documents = db.relationship('Document', backref='uploader', lazy=True)
+    documents = db.relationship('Document', foreign_keys='Document.user_id', backref='uploader', lazy=True)
     guest_activities = db.relationship('GuestActivity', backref='user', lazy=True)
     password_links = db.relationship('PasswordLink', backref='creator', lazy=True, foreign_keys='PasswordLink.created_by_id')
-    ai_tasks = db.relationship('Task', backref='document_ai', lazy=True, foreign_keys='Document.ai_task_id')
+    # ai_tasks = db.relationship('Task', backref='document_ai', lazy=True, foreign_keys='Document.ai_task_id')
     tasks_ai = db.relationship('TaskAI', back_populates='utente', cascade='all, delete-orphan')
 
     def __repr__(self):
@@ -278,12 +335,21 @@ class Document(db.Model):
     # === Campo per ricerca semantica ===
     contenuto_testuale = db.Column(db.Text, nullable=True)
     
+    # === Campi per File Manager ===
+    classification = db.Column(db.String(20), default='public')  # public, internal, confidential
+    file_size = db.Column(db.BigInteger, nullable=True)  # Dimensione file in bytes
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Proprietario file
+    
     # === Campi per Document Intelligence AI ===
     ai_status = db.Column(db.String(50), nullable=True)  # completo, incompleto, scaduto, manca_firma
     ai_explain = db.Column(db.Text, nullable=True)  # Spiegazione AI sulla criticità
     ai_task_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=True)  # Task AI associato
     ai_analysis = db.Column(db.Text, nullable=True)  # JSON con analisi completa AI
     ai_analyzed_at = db.Column(db.DateTime, nullable=True)  # Data analisi AI
+    
+    # === Relazione con i tag ===
+    tags = db.relationship('Tag', secondary=file_tag, back_populates='documents')
     
     # === Campi per Revisione Ciclica AI ===
     frequenza_revisione = db.Column(db.String(20), nullable=True)  # annuale, biennale, trimestrale, mensile
@@ -537,6 +603,37 @@ class Document(db.Model):
     # )
 
 # === MODELLO AZIENDA ===
+class Tag(db.Model):
+    """
+    Modello per i tag dei documenti.
+    
+    Attributi:
+        id (int): ID primario.
+        name (str): Nome del tag.
+        color (str): Colore del tag (es. 'primary', 'secondary').
+        created_at (datetime): Data creazione.
+        documents (list): Documenti associati.
+    """
+    __tablename__ = 'tags'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    color = db.Column(db.String(20), default='primary')  # Bootstrap colors
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relazione con i documenti
+    documents = db.relationship('Document', secondary=file_tag, back_populates='tags')
+    
+    def __repr__(self):
+        """Rappresentazione stringa del tag."""
+        return f'<Tag {self.name}>'
+    
+    @property
+    def color_class(self):
+        """Restituisce la classe CSS del colore."""
+        return f'bg-{self.color}'
+
+
 class Company(db.Model):
     """
     Modello azienda.
@@ -641,6 +738,11 @@ class AdminLog(db.Model):
     downloadable = db.Column(db.Boolean, default=False)
     extra_info = db.Column(db.Text, nullable=True)  # Informazioni aggiuntive per alert
 
+
+# === ALIAS PER COMPATIBILITÀ ===
+# Mantiene compatibilità con il codice esistente che usa AuditLog
+AuditLog = AdminLog
+
 # === MODELLO LINK/PASSWORD SICURE ===
 class PasswordLink(db.Model):
     """
@@ -684,73 +786,68 @@ class GuestUser(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     registered_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# === MODELLO RICHIESTE ACCESSO DOCUMENTI ===
-class AccessRequest(db.Model):
-    __tablename__ = "access_requests"
 
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=False)
-    status = db.Column(db.String(20), default="pending")  # pending, approved, denied
-    note = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    resolved_at = db.Column(db.DateTime, nullable=True)
-    
-    # === Campi per risposta AI automatica ===
-    risposta_ai = db.Column(db.Text, nullable=True)  # Risposta formale generata dall'AI
-    parere_ai = db.Column(db.Text, nullable=True)    # Parere AI per admin (es. "consigliato concedere")
-    email_inviata = db.Column(db.Boolean, default=False)  # Se l'email è stata inviata
-    email_destinatario = db.Column(db.String(150), nullable=True)  # Email destinatario
-    email_testo = db.Column(db.Text, nullable=True)  # Testo email inviata
-    email_inviata_at = db.Column(db.DateTime, nullable=True)  # Data invio email
-    ai_analyzed_at = db.Column(db.DateTime, nullable=True)  # Data analisi AI
-
-    user = db.relationship("User", backref="access_requests")
-    document = db.relationship("Document", backref="access_requests")
-
-    def __repr__(self):
-        return f"<AccessRequest {self.id}: {self.user_id} -> {self.document_id} ({self.status})>"
-    
-    @property
-    def has_ai_response(self):
-        """Verifica se esiste una risposta AI."""
-        return bool(self.risposta_ai)
-    
-    @property
-    def ai_parere_display(self):
-        """Restituisce il parere AI per visualizzazione."""
-        if not self.parere_ai:
-            return "Nessun parere AI"
-        
-        parere_lower = self.parere_ai.lower()
-        if "consigliato" in parere_lower and "concedere" in parere_lower:
-            return "✅ Consigliato concedere"
-        elif "consigliato" in parere_lower and "negare" in parere_lower:
-            return "❌ Consigliato negare"
-        elif "valutare" in parere_lower:
-            return "🤔 Richiede valutazione"
-        else:
-            return f"💬 {self.parere_ai}"
-    
-    @property
-    def email_status_display(self):
-        """Restituisce lo stato dell'email per visualizzazione."""
-        if not self.email_inviata:
-            return "📧 Non inviata"
-        elif self.email_inviata and self.email_inviata_at:
-            return f"✅ Inviata il {self.email_inviata_at.strftime('%d/%m/%Y %H:%M')}"
-        else:
-            return "📧 Inviata"
 
 # === MODELLO LOG DOWNLOAD DOCUMENTI ===
 class DownloadLog(db.Model):
+    """
+    Modello per il log dei download dei documenti.
+    
+    Attributi:
+        id (int): ID primario.
+        user_id (int): ID utente che ha fatto il download.
+        document_id (int): ID documento scaricato.
+        timestamp (datetime): Data/ora del download.
+        ip_address (str): Indirizzo IP del client.
+        user_agent (str): User agent del browser.
+        status (str): Stato del download ('success', 'blocked').
+        reason_block (str): Motivo del blocco (se status='blocked').
+        source (str): Fonte del download ('web', 'api').
+        filesize (int): Dimensione del file scaricato in bytes.
+        user (User): Relazione con l'utente.
+        document (Document): Relazione con il documento.
+    """
+    __tablename__ = "download_log"
+    
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
-    document_id = db.Column(db.Integer, db.ForeignKey("documents.id"))
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=False, index=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    ip_address = db.Column(db.String(45), nullable=True)  # IPv4 or IPv6
+    user_agent = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), default='success', nullable=False, index=True)  # success, blocked
+    reason_block = db.Column(db.String(255), nullable=True)  # Motivo del blocco
+    source = db.Column(db.String(20), default='web', nullable=False)  # web, api
+    filesize = db.Column(db.BigInteger, nullable=True)  # Dimensione file in bytes
 
     user = db.relationship("User", backref="download_logs")
     document = db.relationship("Document", backref="download_logs")
+    
+    def __repr__(self):
+        """Rappresentazione stringa del log download."""
+        return f'<DownloadLog {self.user_id}:{self.document_id}:{self.timestamp}>'
+    
+    @property
+    def username(self):
+        """Restituisce lo username dell'utente."""
+        return self.user.username if self.user else 'N/A'
+    
+    @property
+    def filename(self):
+        """Restituisce il nome del file."""
+        return self.document.filename if self.document else 'N/A'
+    
+    @property
+    def filesize_formatted(self):
+        """Restituisce la dimensione del file formattata."""
+        if not self.filesize:
+            return 'N/A'
+        
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if self.filesize < 1024.0:
+                return f"{self.filesize:.1f} {unit}"
+            self.filesize /= 1024.0
+        return f"{self.filesize:.1f} TB"
 
 class AuthorizedAccess(db.Model):
     __tablename__ = 'authorized_access'
@@ -830,59 +927,7 @@ class DocumentReadLog(db.Model):
         else:
             return "firmata"
 
-# === MODELLO AUDIT LOG ===
-class AuditLog(db.Model):
-    """
-    Modello per audit log di tutte le azioni critiche.
 
-    Attributi:
-        id (int): ID primario.
-        user_id (int): ID utente che ha eseguito l'azione.
-        document_id (int): ID documento coinvolto.
-        azione (str): Tipo di azione ('approvazione_admin', 'approvazione_ceo', 'firma', 'download').
-        timestamp (datetime): Data/ora dell'azione.
-        user (User): Relazione con l'utente.
-        document (Document): Relazione con il documento.
-    """
-    __tablename__ = 'audit_logs'
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False)
-    azione = db.Column(db.String(50), nullable=False)  # 'approvazione_admin', 'approvazione_ceo', 'firma', 'download'
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    note = db.Column(db.Text, nullable=True)  # Note aggiuntive opzionali
-
-    # Relazioni
-    user = db.relationship('User', backref='audit_logs')
-    document = db.relationship('Document', backref='audit_logs')
-
-    def __repr__(self):
-        """
-        Rappresentazione stringa dell'audit log.
-
-        Returns:
-            str: Rappresentazione.
-        """
-        return f'<AuditLog {self.user.username}:{self.azione}:{self.document.title}:{self.timestamp}>'
-
-    @property
-    def azione_display(self):
-        """
-        Restituisce il nome visualizzabile dell'azione.
-
-        Returns:
-            str: Nome visualizzabile dell'azione.
-        """
-        azioni_map = {
-            'approvazione_admin': '✅ Approvazione Admin',
-            'approvazione_ceo': '👑 Approvazione CEO',
-            'firma': '✍️ Firma/Presa Visione',
-            'download': '📥 Download',
-            'accesso_negato': '🚫 Accesso Negato',
-            'visualizzazione': '👁️ Visualizzazione'
-        }
-        return azioni_map.get(self.azione, self.azione)
 
 # === MODELLO VERSIONI DOCUMENTI ===
 class DocumentVersion(db.Model):
@@ -1812,125 +1857,91 @@ class PartecipazioneFormazione(db.Model):
 # === MODELLO FIRMA DOCUMENTO ===
 class FirmaDocumento(db.Model):
     """
-    Modello per gestire le firme elettroniche sui documenti.
+    Modello per tracciare le firme digitali sui documenti.
     
     Attributi:
         id (int): ID primario.
-        document_id (int): ID del documento firmato.
-        user_id (int): ID dell'utente che ha firmato.
-        data_firma (datetime): Data/ora della firma.
-        nome_firma (str): Nome inserito dall'utente per la firma.
-        ip_address (str): IP del client al momento della firma.
+        user_id (int): ID utente che ha firmato.
+        document_id (int): ID documento firmato.
+        timestamp (datetime): Data/ora della firma.
+        ip_address (str): IP del client.
         user_agent (str): User agent del browser.
-        document (Document): Relazione con il documento.
+        stato (str): Stato firma ('firmato', 'rifiutato', 'in_attesa').
+        commento (str): Commento opzionale alla firma.
         user (User): Relazione con l'utente.
+        document (Document): Relazione con il documento.
     """
-    __tablename__ = "firme_documenti"
+    __tablename__ = 'firme_documenti'
     
     id = db.Column(db.Integer, primary_key=True)
-    document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    nome_firma = db.Column(db.String(200), nullable=False)
-    data_firma = db.Column(db.DateTime, default=datetime.utcnow)
-    ip = db.Column(db.String(50), nullable=True)
-    user_agent = db.Column(db.String(255), nullable=True)
-    firma_immagine = db.Column(db.String(255), nullable=True)  # path PNG firma
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    ip_address = db.Column(db.String(100), nullable=True)
+    user_agent = db.Column(db.String(300), nullable=True)
+    stato = db.Column(db.String(20), default='in_attesa')  # firmato, rifiutato, in_attesa
+    commento = db.Column(db.Text, nullable=True)
     
-    # === Campi per validazione gerarchica ===
-    firma_admin = db.Column(db.Boolean, default=False)  # Validazione admin
-    data_firma_admin = db.Column(db.DateTime, nullable=True)  # Data validazione admin
-    approvato_dal_ceo = db.Column(db.Boolean, default=False)  # Approvazione finale CEO
-    data_firma_ceo = db.Column(db.DateTime, nullable=True)  # Data approvazione CEO
+    # Relazioni
+    user = db.relationship('User', backref='firme_documenti')
+    document = db.relationship('Document', backref='firme_documenti')
     
-    # === Campi per invio automatico ===
-    inviato_auto = db.Column(db.Boolean, default=False)  # Indica se il documento è già stato inviato
-    data_invio_auto = db.Column(db.DateTime, nullable=True)  # Data e ora dell'invio automatico
-    email_inviata_a = db.Column(db.String(255), nullable=True)  # Email del destinatario (o lista)
-    errore_invio = db.Column(db.String(255), nullable=True)  # Eventuale messaggio di errore per il retry
-
-    document = db.relationship("Document", backref="firme")
-    user = db.relationship("User", backref="firme_documenti")
-
     def __repr__(self):
-        return f"<FirmaDocumento(id={self.id}, document_id={self.document_id}, user_id={self.user_id})>"
+        return f'<FirmaDocumento {self.id}: User {self.user_id} -> Document {self.document_id} - {self.stato}>'
     
     @property
-    def data_firma_formatted(self):
-        """Restituisce la data della firma formattata."""
-        return self.data_firma.strftime('%d/%m/%Y %H:%M')
+    def timestamp_formatted(self):
+        """Formatta il timestamp per la visualizzazione."""
+        return self.timestamp.strftime('%d/%m/%Y %H:%M:%S')
     
     @property
-    def firma_completa(self):
-        """Restituisce la firma completa con nome e data."""
-        return f"{self.nome_firma} - {self.data_firma_formatted}"
+    def user_display(self):
+        """Nome completo dell'utente."""
+        if self.user:
+            return f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username
+        return "Utente sconosciuto"
     
     @property
-    def stato_firma_gerarchica(self):
-        """Restituisce lo stato della firma gerarchica."""
-        if self.approvato_dal_ceo:
-            return "approvato"
-        elif self.firma_admin:
-            return "in_attesa_ceo"
-        elif self.data_firma:
-            return "firmato_utente"
+    def document_display(self):
+        """Titolo del documento."""
+        if self.document:
+            return self.document.title
+        return "Documento sconosciuto"
+    
+    @property
+    def stato_badge_class(self):
+        """Classe CSS per il badge dello stato."""
+        if self.stato == 'firmato':
+            return 'bg-success'
+        elif self.stato == 'rifiutato':
+            return 'bg-danger'
         else:
-            return "non_firmato"
+            return 'bg-warning'
     
     @property
-    def stato_firma_display(self):
-        """Restituisce lo stato visualizzabile della firma."""
+    def stato_display(self):
+        """Testo dello stato per la visualizzazione."""
         stati = {
-            "approvato": "✅ Approvato",
-            "in_attesa_ceo": "⚠️ In attesa CEO",
-            "firmato_utente": "📝 Firmato Utente",
-            "non_firmato": "❌ Non firmato"
+            'firmato': '✅ Firmato',
+            'rifiutato': '❌ Rifiutato',
+            'in_attesa': '⏳ In Attesa'
         }
-        return stati.get(self.stato_firma_gerarchica, "❓ Stato sconosciuto")
+        return stati.get(self.stato, self.stato)
     
     @property
-    def badge_class_stato(self):
-        """Restituisce la classe CSS per il badge dello stato."""
-        classi = {
-            "approvato": "bg-success",
-            "in_attesa_ceo": "bg-warning text-dark",
-            "firmato_utente": "bg-info",
-            "non_firmato": "bg-danger"
-        }
-        return classi.get(self.stato_firma_gerarchica, "bg-secondary")
+    def is_firmato(self):
+        """Verifica se il documento è stato firmato."""
+        return self.stato == 'firmato'
     
     @property
-    def stato_invio_auto(self):
-        """Restituisce lo stato dell'invio automatico."""
-        if self.inviato_auto and not self.errore_invio:
-            return "inviato"
-        elif self.inviato_auto and self.errore_invio:
-            return "errore"
-        elif self.approvato_dal_ceo and not self.inviato_auto:
-            return "da_inviare"
-        else:
-            return "non_applicabile"
+    def is_rifiutato(self):
+        """Verifica se il documento è stato rifiutato."""
+        return self.stato == 'rifiutato'
     
     @property
-    def stato_invio_display(self):
-        """Restituisce lo stato visualizzabile dell'invio."""
-        stati = {
-            "inviato": "✅ Inviato",
-            "errore": "❌ Errore Invio",
-            "da_inviare": "📤 Da Inviare",
-            "non_applicabile": "⏸️ Non Applicabile"
-        }
-        return stati.get(self.stato_invio_auto, "❓ Stato sconosciuto")
-    
-    @property
-    def badge_class_invio(self):
-        """Restituisce la classe CSS per il badge dell'invio."""
-        classi = {
-            "inviato": "bg-success",
-            "errore": "bg-danger",
-            "da_inviare": "bg-warning text-dark",
-            "non_applicabile": "bg-secondary"
-        }
-        return classi.get(self.stato_invio_auto, "bg-secondary")
+    def is_in_attesa(self):
+        """Verifica se il documento è in attesa di firma."""
+        return self.stato == 'in_attesa'
 
 class DocumentoAIInsight(db.Model):
     """
@@ -3696,3 +3707,1818 @@ class AttestatoFormazione(db.Model):
     
     def __repr__(self):
         return f'<AttestatoFormazione {self.evento.titolo}:{self.user.username}>'
+
+# === MODELLO ATTIVITÀ AI POST-MIGRAZIONE ===
+class AttivitaAI(db.Model):
+    """
+    Modello per tracciare le attività AI degli utenti/guest post-migrazione.
+    
+    Attributi:
+        id (int): ID primario.
+        user_id (int): ID utente (opzionale).
+        guest_id (int): ID guest (opzionale).
+        stato_iniziale (str): Stato iniziale ('nuovo_import', 'monitorato', 'stabile').
+        note (str): Note sull'attività.
+        created_at (datetime): Data creazione record.
+        updated_at (datetime): Data ultimo aggiornamento.
+        user (User): Relazione con utente.
+        guest (GuestUser): Relazione con guest.
+    """
+    __tablename__ = 'attivita_ai'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    guest_id = db.Column(db.Integer, db.ForeignKey('guest_users.id'), nullable=True)
+    stato_iniziale = db.Column(db.String(50), nullable=False, default='nuovo_import')
+    note = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relazioni
+    user = db.relationship('User', backref='attivita_ai')
+    guest = db.relationship('GuestUser', backref='attivita_ai')
+    
+    def __repr__(self):
+        return f'<AttivitaAI {self.stato_iniziale} - {self.created_at}>'
+    
+    @property
+    def is_nuovo_import(self):
+        """Verifica se è un nuovo import."""
+        return self.stato_iniziale == 'nuovo_import'
+    
+    @property
+    def giorni_da_import(self):
+        """Calcola i giorni trascorsi dall'import."""
+        delta = datetime.utcnow() - self.created_at
+        return delta.days
+    
+    @property
+    def badge_class(self):
+        """Restituisce la classe CSS per il badge."""
+        if self.giorni_da_import <= 7:
+            return 'badge-danger'
+        elif self.giorni_da_import <= 30:
+            return 'badge-warning'
+        else:
+            return 'badge-success'
+    
+    @property
+    def display_text(self):
+        """Restituisce il testo di visualizzazione."""
+        if self.giorni_da_import <= 7:
+            return f"Nuovo import ({self.giorni_da_import} giorni)"
+        elif self.giorni_da_import <= 30:
+            return f"Import recente ({self.giorni_da_import} giorni)"
+        else:
+            return "Import stabile"
+
+
+# === MODELLO ALERT AI POST-MIGRAZIONE ===
+class AlertAI(db.Model):
+    """
+    Modello per gli alert AI post-migrazione.
+    
+    Attributi:
+        id (int): ID primario.
+        user_id (int): ID utente (opzionale).
+        guest_id (int): ID guest (opzionale).
+        tipo_alert (str): Tipo di alert ('download_massivo', 'accessi_falliti', 'ip_sospetto').
+        descrizione (str): Descrizione dell'alert.
+        timestamp (datetime): Data/ora dell'alert.
+        stato (str): Stato alert ('nuovo', 'in_revisione', 'chiuso').
+        ip_address (str): IP dell'utente.
+        user_agent (str): User agent del browser.
+        created_at (datetime): Data creazione.
+        user (User): Relazione con utente.
+        guest (GuestUser): Relazione con guest.
+    """
+    __tablename__ = 'alert_ai'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    guest_id = db.Column(db.Integer, db.ForeignKey('guest_users.id'), nullable=True)
+    tipo_alert = db.Column(db.String(50), nullable=False)
+    descrizione = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    stato = db.Column(db.String(20), default='nuovo')  # nuovo, in_revisione, chiuso
+    ip_address = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.Text, nullable=True)
+    livello = db.Column(db.String(20), default='medio')  # basso, medio, alto, critico
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relazioni
+    user = db.relationship('User', backref='alert_ai')
+    guest = db.relationship('GuestUser', backref='alert_ai')
+    
+    def __repr__(self):
+        return f'<AlertAI {self.tipo_alert} - {self.stato}>'
+    
+    @property
+    def is_nuovo(self):
+        """Verifica se l'alert è nuovo."""
+        return self.stato == 'nuovo'
+    
+    @property
+    def is_in_revisione(self):
+        """Verifica se l'alert è in revisione."""
+        return self.stato == 'in_revisione'
+    
+    @property
+    def is_chiuso(self):
+        """Verifica se l'alert è chiuso."""
+        return self.stato == 'chiuso'
+    
+    @property
+    def stato_badge_class(self):
+        """Restituisce la classe CSS per il badge di stato."""
+        if self.stato == 'nuovo':
+            return 'badge-danger'
+        elif self.stato == 'in_revisione':
+            return 'badge-warning'
+        else:
+            return 'badge-success'
+    
+    @property
+    def tipo_alert_display(self):
+        """Restituisce il testo di visualizzazione del tipo alert."""
+        tipo_display = {
+            'download_massivo': 'Download Massivo',
+            'accessi_falliti': 'Accessi Falliti',
+            'ip_sospetto': 'IP Sospetto',
+            'comportamento_anomalo': 'Comportamento Anomalo',
+            'accesso_fuori_orario': 'Accesso Fuori Orario',
+            'accesso_simultaneo': 'Accesso Simultaneo',
+            'accesso_non_autorizzato': 'Accesso Non Autorizzato'
+        }
+        return tipo_display.get(self.tipo_alert, self.tipo_alert)
+    
+    @property
+    def utente_display(self):
+        """Restituisce il nome dell'utente o guest."""
+        if self.user:
+            return f"{self.user.first_name} {self.user.last_name}"
+        elif self.guest:
+            return f"Guest: {self.guest.email}"
+        else:
+            return "Utente sconosciuto"
+    
+    @property
+    def livello_badge_class(self):
+        """Restituisce la classe CSS per il badge del livello."""
+        livello_classes = {
+            'basso': 'badge-secondary',
+            'medio': 'badge-warning',
+            'alto': 'badge-danger',
+            'critico': 'badge-dark'
+        }
+        return livello_classes.get(self.livello, 'badge-secondary')
+    
+    @property
+    def livello_display(self):
+        """Restituisce il testo di visualizzazione del livello."""
+        livello_display = {
+            'basso': 'Basso',
+            'medio': 'Medio',
+            'alto': 'Alto',
+            'critico': 'Critico'
+        }
+        return livello_display.get(self.livello, self.livello)
+
+
+class LogInvioPDF(db.Model):
+    """
+    Modello per il log centralizzato degli invii PDF via email.
+    
+    Attributi:
+        id (int): ID primario.
+        id_utente_o_guest (int): ID dell'utente o guest.
+        tipo (str): Tipo ('user' o 'guest').
+        inviato_da (str): Email dell'admin o CEO che ha inviato.
+        inviato_a (str): Email del destinatario.
+        oggetto_email (str): Oggetto dell'email.
+        messaggio_email (str): Messaggio aggiuntivo (opzionale).
+        timestamp (datetime): Data/ora dell'invio.
+        esito (str): Esito ('successo' o 'errore').
+        errore (str): Messaggio errore se fallito (nullable).
+        user (User): Relazione con l'utente (se tipo='user').
+    """
+    __tablename__ = 'log_invio_pdf'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    id_utente_o_guest = db.Column(db.Integer, nullable=False)  # ID utente o guest
+    tipo = db.Column(db.String(10), nullable=False)  # 'user' o 'guest'
+    inviato_da = db.Column(db.String(150), nullable=False)  # Email admin/CEO
+    inviato_a = db.Column(db.String(150), nullable=False)  # Email destinatario
+    oggetto_email = db.Column(db.String(255), nullable=False)
+    messaggio_email = db.Column(db.Text, nullable=True)  # Messaggio aggiuntivo
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    esito = db.Column(db.String(20), nullable=False)  # 'successo' o 'errore'
+    errore = db.Column(db.Text, nullable=True)  # Messaggio errore se fallito
+    
+    # Relazione con User (per tipo='user')
+    user = db.relationship('User', 
+                         primaryjoin="and_(LogInvioPDF.id_utente_o_guest == User.id, "
+                                   "LogInvioPDF.tipo == 'user')",
+                         backref='pdf_inviati',
+                         foreign_keys=[id_utente_o_guest])
+    
+    def __repr__(self):
+        """Rappresentazione stringa del log invio PDF."""
+        return f'<LogInvioPDF {self.tipo} - {self.inviato_a} - {self.esito}>'
+    
+    @property
+    def is_successo(self):
+        """Verifica se l'invio è stato un successo."""
+        return self.esito == 'successo'
+    
+    @property
+    def is_errore(self):
+        """Verifica se l'invio ha avuto un errore."""
+        return self.esito == 'errore'
+    
+    @property
+    def esito_badge_class(self):
+        """Restituisce la classe CSS per il badge dell'esito."""
+        return 'badge-success' if self.is_successo else 'badge-danger'
+    
+    @property
+    def esito_display(self):
+        """Restituisce il testo di visualizzazione dell'esito."""
+        return '✅ Successo' if self.is_successo else '❌ Errore'
+    
+    @property
+    def tipo_display(self):
+        """Restituisce il testo di visualizzazione del tipo."""
+        return 'Utente' if self.tipo == 'user' else 'Guest'
+    
+    @property
+    def nome_utente_guest(self):
+        """Restituisce il nome dell'utente o guest."""
+        if self.tipo == 'user' and self.user:
+            return f"{self.user.first_name or self.user.nome or ''} {self.user.last_name or self.user.cognome or ''}".strip() or self.user.email
+        else:
+            # Per guest, cerca nel database User con role='guest'
+            from extensions import db
+            guest = db.session.query(User).filter_by(id=self.id_utente_o_guest, role='guest').first()
+            if guest:
+                return f"{guest.first_name or guest.nome or ''} {guest.last_name or guest.cognome or ''}".strip() or guest.email
+            return f"Guest #{self.id_utente_o_guest}"
+    
+    @property
+    def timestamp_formatted(self):
+        """Restituisce il timestamp formattato."""
+        return self.timestamp.strftime('%d/%m/%Y %H:%M') if self.timestamp else 'N/A'
+    
+    @property
+    def messaggio_preview(self):
+        """Restituisce un'anteprima del messaggio email."""
+        if self.messaggio_email:
+            return self.messaggio_email[:50] + '...' if len(self.messaggio_email) > 50 else self.messaggio_email
+        return 'Nessun messaggio aggiuntivo'
+
+
+class QMSStandardRequirement(db.Model):
+    """
+    Modello per i requisiti normativi degli standard di qualità.
+    
+    Attributi:
+        id (int): ID primario.
+        standard_name (str): Nome dello standard (es. ISO 9001, HACCP, BRC, IFS).
+        clause (str): Clausola del requisito (es. "4.2.1", "7.5.1").
+        description (str): Descrizione dettagliata del requisito.
+        category (str): Categoria del requisito (es. "Documentazione", "Formazione", "Controllo").
+        priority (str): Priorità del requisito (bassa, media, alta, critica).
+        is_mandatory (bool): Se il requisito è obbligatorio.
+        created_at (datetime): Data creazione.
+        mappings (list): Mappature con documenti.
+    """
+    __tablename__ = 'qms_standard_requirements'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    standard_name = db.Column(db.String(100), nullable=False)  # ISO 9001, HACCP, BRC, IFS
+    clause = db.Column(db.String(50), nullable=False)  # 4.2.1, 7.5.1, ecc.
+    description = db.Column(db.Text, nullable=False)  # Descrizione dettagliata
+    category = db.Column(db.String(100), nullable=True)  # Documentazione, Formazione, Controllo
+    priority = db.Column(db.String(20), default='media')  # bassa, media, alta, critica
+    is_mandatory = db.Column(db.Boolean, default=True)  # Se obbligatorio
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relazioni
+    mappings = db.relationship('QMSRequirementMapping', backref='requirement', lazy=True)
+    
+    def __repr__(self):
+        """Rappresentazione stringa del requisito."""
+        return f'<QMSStandardRequirement {self.standard_name} - {self.clause}>'
+    
+    @property
+    def priority_badge_class(self):
+        """Restituisce la classe CSS per il badge della priorità."""
+        priority_classes = {
+            'bassa': 'badge-secondary',
+            'media': 'badge-warning',
+            'alta': 'badge-danger',
+            'critica': 'badge-dark'
+        }
+        return priority_classes.get(self.priority, 'badge-secondary')
+    
+    @property
+    def priority_display(self):
+        """Restituisce il testo di visualizzazione della priorità."""
+        priority_display = {
+            'bassa': 'Bassa',
+            'media': 'Media',
+            'alta': 'Alta',
+            'critica': 'Critica'
+        }
+        return priority_display.get(self.priority, self.priority)
+    
+    @property
+    def standard_display(self):
+        """Restituisce il nome dello standard formattato."""
+        return self.standard_name.replace('_', ' ').title()
+    
+    @property
+    def clause_display(self):
+        """Restituisce la clausola formattata."""
+        return f"Clausola {self.clause}"
+    
+    @property
+    def coverage_score(self):
+        """Calcola il punteggio di copertura basato sulle mappature."""
+        if not self.mappings:
+            return 0
+        
+        total_score = sum(mapping.mapping_score for mapping in self.mappings)
+        return min(100, total_score)  # Massimo 100
+    
+    @property
+    def coverage_status(self):
+        """Restituisce lo stato di copertura del requisito."""
+        score = self.coverage_score
+        if score >= 80:
+            return 'completo'
+        elif score >= 50:
+            return 'parziale'
+        else:
+            return 'mancante'
+    
+    @property
+    def coverage_badge_class(self):
+        """Restituisce la classe CSS per il badge di copertura."""
+        status_classes = {
+            'completo': 'badge-success',
+            'parziale': 'badge-warning',
+            'mancante': 'badge-danger'
+        }
+        return status_classes.get(self.coverage_status, 'badge-secondary')
+    
+    @property
+    def coverage_display(self):
+        """Restituisce il testo di visualizzazione della copertura."""
+        status_display = {
+            'completo': '✅ Completo',
+            'parziale': '⚠️ Parziale',
+            'mancante': '❌ Mancante'
+        }
+        return status_display.get(self.coverage_status, 'Sconosciuto')
+
+
+class QMSRequirementMapping(db.Model):
+    """
+    Modello per la mappatura tra requisiti normativi e documenti aziendali.
+    
+    Attributi:
+        id (int): ID primario.
+        requirement_id (int): ID requisito normativo.
+        document_id (int): ID documento aziendale.
+        mapped_by (str): Email dell'admin che ha creato la mappatura.
+        mapping_score (float): Punteggio di mappatura (0-100).
+        ai_analysis (str): Analisi AI della mappatura.
+        confidence_score (float): Punteggio di confidenza AI (0-100).
+        mapping_notes (str): Note sulla mappatura.
+        created_at (datetime): Data creazione.
+        requirement (QMSStandardRequirement): Relazione con il requisito.
+        document (Document): Relazione con il documento.
+    """
+    __tablename__ = 'qms_requirement_mappings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    requirement_id = db.Column(db.Integer, db.ForeignKey('qms_standard_requirements.id'), nullable=False)
+    document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False)
+    mapped_by = db.Column(db.String(150), nullable=False)  # Email admin
+    mapping_score = db.Column(db.Float, nullable=False)  # 0-100
+    ai_analysis = db.Column(db.Text, nullable=True)  # Analisi AI
+    confidence_score = db.Column(db.Float, nullable=True)  # 0-100
+    mapping_notes = db.Column(db.Text, nullable=True)  # Note mappatura
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relazioni
+    document = db.relationship('Document', backref='qms_mappings')
+    
+    def __repr__(self):
+        """Rappresentazione stringa della mappatura."""
+        return f'<QMSRequirementMapping {self.requirement_id} -> {self.document_id}>'
+    
+    @property
+    def mapping_score_display(self):
+        """Restituisce il punteggio di mappatura formattato."""
+        return f"{self.mapping_score:.1f}%"
+    
+    @property
+    def confidence_score_display(self):
+        """Restituisce il punteggio di confidenza formattato."""
+        if self.confidence_score:
+            return f"{self.confidence_score:.1f}%"
+        return "N/A"
+    
+    @property
+    def mapping_status(self):
+        """Restituisce lo stato della mappatura."""
+        if self.mapping_score >= 80:
+            return 'eccellente'
+        elif self.mapping_score >= 60:
+            return 'buona'
+        elif self.mapping_score >= 40:
+            return 'sufficiente'
+        else:
+            return 'insufficiente'
+    
+    @property
+    def mapping_badge_class(self):
+        """Restituisce la classe CSS per il badge di mappatura."""
+        status_classes = {
+            'eccellente': 'badge-success',
+            'buona': 'badge-info',
+            'sufficiente': 'badge-warning',
+            'insufficiente': 'badge-danger'
+        }
+        return status_classes.get(self.mapping_status, 'badge-secondary')
+    
+    @property
+    def mapping_display(self):
+        """Restituisce il testo di visualizzazione della mappatura."""
+        status_display = {
+            'eccellente': '⭐ Eccellente',
+            'buona': '✅ Buona',
+            'sufficiente': '⚠️ Sufficiente',
+            'insufficiente': '❌ Insufficiente'
+        }
+        return status_display.get(self.mapping_status, 'Sconosciuto')
+    
+    @property
+    def created_at_formatted(self):
+        """Restituisce la data di creazione formattata."""
+        return self.created_at.strftime('%d/%m/%Y %H:%M') if self.created_at else 'N/A'
+
+# === MODELLO PRINCIPIO PERSONALE ===
+class PrincipioPersonale(db.Model):
+    """
+    Modello per i principi personali del CEO.
+    
+    Attributi:
+        id (int): ID primario.
+        user_id (int): ID utente CEO.
+        titolo (str): Titolo del principio.
+        descrizione (str): Descrizione dettagliata.
+        categoria (str): Categoria del principio (es. "Leadership", "Equilibrio", "Innovazione").
+        attiva (bool): Se il principio è attualmente attivo.
+        data_creazione (datetime): Data creazione.
+        data_aggiornamento (datetime): Data ultimo aggiornamento.
+        priorita (int): Priorità del principio (1-10).
+        colore (str): Colore per visualizzazione.
+        user (User): Relazione con l'utente.
+        diario_entries (list): Entrate diario collegate.
+    """
+    __tablename__ = "principi_personali"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    titolo = db.Column(db.String(200), nullable=False)
+    descrizione = db.Column(db.Text, nullable=True)
+    categoria = db.Column(db.String(100), nullable=True)
+    attiva = db.Column(db.Boolean, default=True)
+    data_creazione = db.Column(db.DateTime, default=datetime.utcnow)
+    data_aggiornamento = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    priorita = db.Column(db.Integer, default=5)  # 1-10
+    colore = db.Column(db.String(20), default='primary')  # Bootstrap colors
+    
+    # Relazioni
+    user = db.relationship("User", backref="principi_personali")
+    diario_entries = db.relationship("DiarioEntry", secondary="diario_principi_association", back_populates="principi_collegati_rel")
+    
+    def __repr__(self):
+        return f"<PrincipioPersonale(id={self.id}, titolo={self.titolo}, attiva={self.attiva})>"
+    
+    @property
+    def is_active(self):
+        """Verifica se il principio è attivo."""
+        return self.attiva
+    
+    @property
+    def priority_display(self):
+        """Display della priorità."""
+        return f"⭐ {self.priorita}/10"
+    
+    @property
+    def color_class(self):
+        """Classe colore Bootstrap."""
+        return f"bg-{self.colore}"
+
+# === MODELLO DIARIO ENTRY ===
+class DiarioEntry(db.Model):
+    """
+    Modello per le entrate del diario CEO.
+    
+    Attributi:
+        id (int): ID primario.
+        user_id (int): ID utente CEO.
+        data (date): Data dell'entrata.
+        titolo (str): Titolo dell'entrata.
+        contenuto (str): Contenuto del diario.
+        umore (str): Umore del giorno (1-10).
+        energia (str): Livello energia (1-10).
+        gratitudine (str): Cosa sono grato oggi.
+        sfide (str): Sfide affrontate.
+        obiettivi (str): Obiettivi per domani.
+        riflessioni (str): Riflessioni personali.
+        data_creazione (datetime): Data creazione.
+        data_aggiornamento (datetime): Data ultimo aggiornamento.
+        analisi_ai (str): JSON con analisi AI.
+        principi_collegati (list): Principi collegati.
+        task_generati (list): Task AI generati.
+        user (User): Relazione con l'utente.
+        principi_collegati (list): Relazione con principi.
+        task_generati (list): Relazione con task AI.
+    """
+    __tablename__ = "diario_entries"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    data = db.Column(db.Date, nullable=False)
+    titolo = db.Column(db.String(200), nullable=False)
+    contenuto = db.Column(db.Text, nullable=True)
+    umore = db.Column(db.Integer, nullable=True)  # 1-10
+    energia = db.Column(db.Integer, nullable=True)  # 1-10
+    gratitudine = db.Column(db.Text, nullable=True)
+    sfide = db.Column(db.Text, nullable=True)
+    obiettivi = db.Column(db.Text, nullable=True)
+    riflessioni = db.Column(db.Text, nullable=True)
+    data_creazione = db.Column(db.DateTime, default=datetime.utcnow)
+    data_aggiornamento = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # === Campi per analisi AI e collegamenti ===
+    analisi_ai = db.Column(db.Text, nullable=True)  # JSON con analisi AI
+    principi_collegati = db.Column(db.Text, nullable=True)  # JSON array di ID principi
+    task_generati = db.Column(db.Text, nullable=True)  # JSON array di ID task
+    
+    # Relazioni
+    user = db.relationship("User", backref="diario_entries")
+    principi_collegati_rel = db.relationship("PrincipioPersonale", secondary="diario_principi_association", back_populates="diario_entries")
+    
+    def __repr__(self):
+        return f"<DiarioEntry(id={self.id}, data={self.data}, titolo={self.titolo})>"
+    
+    @property
+    def data_formatted(self):
+        """Data formattata."""
+        return self.data.strftime("%d/%m/%Y")
+    
+    @property
+    def umore_display(self):
+        """Display dell'umore."""
+        if self.umore:
+            emoji = "😊" if self.umore >= 7 else "😐" if self.umore >= 4 else "😔"
+            return f"{emoji} {self.umore}/10"
+        return "N/A"
+    
+    @property
+    def energia_display(self):
+        """Display dell'energia."""
+        if self.energia:
+            emoji = "⚡" if self.energia >= 7 else "🔋" if self.energia >= 4 else "🔋"
+            return f"{emoji} {self.energia}/10"
+        return "N/A"
+    
+    @property
+    def principi_collegati_list(self):
+        """Lista ID principi collegati."""
+        if self.principi_collegati:
+            try:
+                import json
+                return json.loads(self.principi_collegati)
+            except:
+                return []
+        return []
+    
+    @property
+    def task_generati_list(self):
+        """Lista ID task generati."""
+        if self.task_generati:
+            try:
+                import json
+                return json.loads(self.task_generati)
+            except:
+                return []
+        return []
+    
+    @property
+    def analisi_ai_dict(self):
+        """Dizionario analisi AI."""
+        if self.analisi_ai:
+            try:
+                import json
+                return json.loads(self.analisi_ai)
+            except:
+                return {}
+        return {}
+    
+    def aggiungi_principio_collegato(self, principio_id):
+        """Aggiunge un principio collegato."""
+        principi = self.principi_collegati_list
+        if principio_id not in principi:
+            principi.append(principio_id)
+            self.principi_collegati = json.dumps(principi)
+    
+    def aggiungi_task_generato(self, task_id):
+        """Aggiunge un task generato."""
+        task = self.task_generati_list
+        if task_id not in task:
+            task.append(task_id)
+            self.task_generati = json.dumps(task)
+
+# === MODELLO NOTIFICA CEO ===
+class NotificaCEO(db.Model):
+    """
+    Modello per le notifiche automatiche al CEO per invii PDF sensibili.
+    
+    Attributi:
+        id (int): ID primario.
+        titolo (str): Titolo della notifica.
+        descrizione (str): Descrizione dettagliata.
+        tipo (str): Tipo notifica ('invio_pdf_sensibile', 'alert_ai', 'guest_scadenza').
+        email_mittente (str): Email di chi ha inviato il PDF.
+        email_destinatario (str): Email destinatario del PDF.
+        nome_utente_guest (str): Nome dell'utente/guest coinvolto.
+        stato (str): Stato notifica ('nuovo', 'letto').
+        data_creazione (datetime): Data/ora creazione.
+        data_lettura (datetime): Data/ora lettura (opzionale).
+        log_invio_id (int): ID del log invio associato.
+        log_invio (LogInvioPDF): Relazione con il log invio.
+    """
+    __tablename__ = "notifiche_ceo"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    titolo = db.Column(db.String(200), nullable=False)
+    descrizione = db.Column(db.Text, nullable=True)
+    tipo = db.Column(db.String(50), nullable=False)  # invio_pdf_sensibile, alert_ai, guest_scadenza
+    email_mittente = db.Column(db.String(150), nullable=False)
+    email_destinatario = db.Column(db.String(150), nullable=False)
+    nome_utente_guest = db.Column(db.String(200), nullable=True)
+    stato = db.Column(db.String(20), default='nuovo')  # nuovo, letto
+    data_creazione = db.Column(db.DateTime, default=datetime.utcnow)
+    data_lettura = db.Column(db.DateTime, nullable=True)
+    log_invio_id = db.Column(db.Integer, db.ForeignKey('log_invio_pdf.id'), nullable=True)
+    
+    # Relazioni
+    log_invio = db.relationship("LogInvioPDF", backref="notifiche_ceo")
+    
+    def __repr__(self):
+        """Rappresentazione stringa della notifica."""
+        return f"<NotificaCEO {self.id} - {self.titolo} - {self.stato}>"
+    
+    @property
+    def is_nuovo(self):
+        """Verifica se la notifica è nuova."""
+        return self.stato == 'nuovo'
+    
+    @property
+    def is_letta(self):
+        """Verifica se la notifica è stata letta."""
+        return self.stato == 'letto'
+    
+    @property
+    def stato_badge_class(self):
+        """Restituisce la classe CSS per il badge dello stato."""
+        classi = {
+            'nuovo': 'bg-danger',
+            'letto': 'bg-secondary'
+        }
+        return classi.get(self.stato, 'bg-secondary')
+    
+    @property
+    def stato_display(self):
+        """Restituisce lo stato visualizzabile."""
+        stati = {
+            'nuovo': '🆕 Nuovo',
+            'letto': '✅ Letto'
+        }
+        return stati.get(self.stato, self.stato)
+    
+    @property
+    def tipo_display(self):
+        """Restituisce il tipo visualizzabile."""
+        tipi = {
+            'invio_pdf_sensibile': '📄 Invio PDF Sensibile',
+            'alert_ai': '🤖 Alert AI',
+            'guest_scadenza': '⏰ Guest Scadenza'
+        }
+        return tipi.get(self.tipo, self.tipo)
+    
+    @property
+    def data_creazione_formatted(self):
+        """Restituisce la data di creazione formattata."""
+        return self.data_creazione.strftime('%d/%m/%Y %H:%M:%S')
+    
+    @property
+    def data_lettura_formatted(self):
+        """Restituisce la data di lettura formattata."""
+        if self.data_lettura:
+            return self.data_lettura.strftime('%d/%m/%Y %H:%M:%S')
+        return '-'
+    
+    def marca_letta(self):
+        """Marca la notifica come letta."""
+        self.stato = 'letto'
+        self.data_lettura = datetime.utcnow()
+
+# === MODELLO ALERT REPORT CEO ===
+class AlertReportCEO(db.Model):
+    """
+    Modello per gli alert automatici sui report CEO mensili.
+    
+    Attributi:
+        id (int): ID primario.
+        mese (int): Mese del report (1-12).
+        anno (int): Anno del report.
+        numero_invii_critici (int): Numero di invii critici rilevati.
+        trigger_attivo (bool): Se l'alert è attualmente attivo.
+        data_trigger (datetime): Data/ora attivazione alert.
+        id_report_ceo (str): Nome file del report associato.
+        letto (bool): Se l'alert è stato letto dal CEO.
+        data_lettura (datetime): Data/ora lettura (opzionale).
+        note (str): Note aggiuntive sull'alert.
+    """
+    __tablename__ = "alert_report_ceo"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    mese = db.Column(db.Integer, nullable=False)
+    anno = db.Column(db.Integer, nullable=False)
+    numero_invii_critici = db.Column(db.Integer, nullable=False, default=0)
+    trigger_attivo = db.Column(db.Boolean, default=True)
+    data_trigger = db.Column(db.DateTime, default=datetime.utcnow)
+    id_report_ceo = db.Column(db.String(255), nullable=True)  # Nome file report
+    letto = db.Column(db.Boolean, default=False)
+    data_lettura = db.Column(db.DateTime, nullable=True)
+    note = db.Column(db.Text, nullable=True)
+    
+    def __repr__(self):
+        """Rappresentazione stringa dell'alert report."""
+        return f"<AlertReportCEO {self.mese}/{self.anno} - {self.numero_invii_critici} critici>"
+    
+    @property
+    def is_attivo(self):
+        """Verifica se l'alert è attivo."""
+        return self.trigger_attivo and not self.letto
+    
+    @property
+    def is_letto(self):
+        """Verifica se l'alert è stato letto."""
+        return self.letto
+    
+    @property
+    def periodo_display(self):
+        """Restituisce il periodo visualizzabile."""
+        mesi = {
+            1: 'Gennaio', 2: 'Febbraio', 3: 'Marzo', 4: 'Aprile',
+            5: 'Maggio', 6: 'Giugno', 7: 'Luglio', 8: 'Agosto',
+            9: 'Settembre', 10: 'Ottobre', 11: 'Novembre', 12: 'Dicembre'
+        }
+        return f"{mesi.get(self.mese, f'Mese {self.mese}')} {self.anno}"
+    
+    @property
+    def livello_criticita(self):
+        """Determina il livello di criticità basato sul numero di invii critici."""
+        if self.numero_invii_critici >= 10:
+            return 'critico'
+        elif self.numero_invii_critici >= 5:
+            return 'alto'
+        elif self.numero_invii_critici >= 3:
+            return 'medio'
+        else:
+            return 'basso'
+    
+    @property
+    def livello_badge_class(self):
+        """Restituisce la classe CSS per il badge del livello."""
+        classi = {
+            'critico': 'badge-danger',
+            'alto': 'badge-warning',
+            'medio': 'badge-info',
+            'basso': 'badge-secondary'
+        }
+        return classi.get(self.livello_criticita, 'badge-secondary')
+    
+    @property
+    def livello_display(self):
+        """Restituisce il testo di visualizzazione del livello."""
+        livelli = {
+            'critico': '🔴 Critico',
+            'alto': '🟡 Alto',
+            'medio': '🔵 Medio',
+            'basso': '⚪ Basso'
+        }
+        return livelli.get(self.livello_criticita, 'Sconosciuto')
+    
+    @property
+    def data_trigger_formatted(self):
+        """Restituisce la data di trigger formattata."""
+        return self.data_trigger.strftime('%d/%m/%Y %H:%M:%S') if self.data_trigger else '-'
+    
+    @property
+    def data_lettura_formatted(self):
+        """Restituisce la data di lettura formattata."""
+        if self.data_lettura:
+            return self.data_lettura.strftime('%d/%m/%Y %H:%M:%S')
+        return '-'
+    
+    def marca_letto(self):
+        """Marca l'alert come letto."""
+        self.letto = True
+        self.data_lettura = datetime.utcnow()
+    
+    def disattiva_alert(self):
+        """Disattiva l'alert."""
+        self.trigger_attivo = False
+    
+    @classmethod
+    def get_alert_attivo_per_periodo(cls, mese, anno):
+        """Ottiene l'alert attivo per un periodo specifico."""
+        return cls.query.filter_by(
+            mese=mese,
+            anno=anno,
+            trigger_attivo=True
+        ).first()
+    
+    @classmethod
+    def get_alert_non_letti(cls):
+        """Ottiene tutti gli alert non letti."""
+        return cls.query.filter_by(
+            trigger_attivo=True,
+            letto=False
+        ).order_by(cls.data_trigger.desc()).all()
+    
+    @classmethod
+    def count_alert_non_letti(cls):
+        """Conta gli alert non letti."""
+        return cls.query.filter_by(
+            trigger_attivo=True,
+            letto=False
+        ).count()
+
+# === MODELLO LETTURA PDF ===
+class LetturaPDF(db.Model):
+    """
+    Modello per tracciare ogni volta che un utente apre un PDF.
+    
+    Attributi:
+        id (int): ID primario.
+        user_id (int): ID utente che ha letto il PDF.
+        document_id (int): ID documento PDF letto.
+        timestamp (datetime): Data/ora della lettura.
+        ip_address (str): IP del client.
+        user_agent (str): User agent del browser.
+        user (User): Relazione con l'utente.
+        document (Document): Relazione con il documento.
+    """
+    __tablename__ = 'letture_pdf'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    ip_address = db.Column(db.String(100), nullable=True)
+    user_agent = db.Column(db.String(300), nullable=True)
+    
+    # Relazioni
+    user = db.relationship('User', backref='letture_pdf')
+    document = db.relationship('Document', backref='letture_pdf')
+    
+    def __repr__(self):
+        return f'<LetturaPDF {self.id}: User {self.user_id} -> Document {self.document_id} at {self.timestamp}>'
+    
+    @property
+    def timestamp_formatted(self):
+        """Formatta il timestamp per la visualizzazione."""
+        return self.timestamp.strftime('%d/%m/%Y %H:%M:%S')
+    
+    @property
+    def user_display(self):
+        """Nome completo dell'utente."""
+        if self.user:
+            return f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username
+        return "Utente sconosciuto"
+    
+    @property
+    def document_display(self):
+        """Titolo del documento."""
+        if self.document:
+            return self.document.title
+        return "Documento sconosciuto"
+
+# === MODELLO AGGREGATO REGISTRO INVII PDF ===
+class RegistroInviiDTO:
+    """
+    Data Transfer Object per aggregare i dati di invio, lettura e firma dei documenti.
+    Questo modello non è una tabella del database, ma un oggetto per rappresentare
+    i dati aggregati dal registro invii.
+    
+    Attributi:
+        documento_id (int): ID del documento.
+        documento_titolo (str): Titolo del documento.
+        utente_id (int): ID dell'utente destinatario.
+        utente_nome (str): Nome completo dell'utente.
+        utente_email (str): Email dell'utente.
+        data_invio (datetime): Data/ora dell'invio PDF.
+        inviato_da (str): Email di chi ha inviato.
+        esito_invio (str): Esito dell'invio ('successo' o 'errore').
+        data_lettura (datetime): Data/ora dell'ultima lettura (opzionale).
+        stato_lettura (str): Stato lettura ('letto', 'non_letto').
+        data_firma (datetime): Data/ora della firma (opzionale).
+        stato_firma (str): Stato firma ('firmato', 'rifiutato', 'in_attesa').
+        commento_firma (str): Commento alla firma (opzionale).
+        ip_lettura (str): IP dell'ultima lettura.
+        ip_firma (str): IP della firma.
+    """
+    
+    def __init__(self, documento_id, documento_titolo, utente_id, utente_nome, utente_email,
+                 data_invio, inviato_da, esito_invio, data_lettura=None, stato_lettura='non_letto',
+                 data_firma=None, stato_firma='in_attesa', commento_firma=None,
+                 ip_lettura=None, ip_firma=None):
+        self.documento_id = documento_id
+        self.documento_titolo = documento_titolo
+        self.utente_id = utente_id
+        self.utente_nome = utente_nome
+        self.utente_email = utente_email
+        self.data_invio = data_invio
+        self.inviato_da = inviato_da
+        self.esito_invio = esito_invio
+        self.data_lettura = data_lettura
+        self.stato_lettura = stato_lettura
+        self.data_firma = data_firma
+        self.stato_firma = stato_firma
+        self.commento_firma = commento_firma
+        self.ip_lettura = ip_lettura
+        self.ip_firma = ip_firma
+    
+    @property
+    def data_invio_formatted(self):
+        """Formatta la data di invio."""
+        return self.data_invio.strftime('%d/%m/%Y %H:%M') if self.data_invio else 'N/A'
+    
+    @property
+    def data_lettura_formatted(self):
+        """Formatta la data di lettura."""
+        return self.data_lettura.strftime('%d/%m/%Y %H:%M') if self.data_lettura else 'N/A'
+    
+    @property
+    def data_firma_formatted(self):
+        """Formatta la data di firma."""
+        return self.data_firma.strftime('%d/%m/%Y %H:%M') if self.data_firma else 'N/A'
+    
+    @property
+    def stato_lettura_badge_class(self):
+        """Classe CSS per il badge dello stato lettura."""
+        return 'bg-success' if self.stato_lettura == 'letto' else 'bg-secondary'
+    
+    @property
+    def stato_lettura_display(self):
+        """Testo dello stato lettura per la visualizzazione."""
+        return '✅ Letto' if self.stato_lettura == 'letto' else '❌ Non letto'
+    
+    @property
+    def stato_firma_badge_class(self):
+        """Classe CSS per il badge dello stato firma."""
+        if self.stato_firma == 'firmato':
+            return 'bg-success'
+        elif self.stato_firma == 'rifiutato':
+            return 'bg-danger'
+        else:
+            return 'bg-warning'
+    
+    @property
+    def stato_firma_display(self):
+        """Testo dello stato firma per la visualizzazione."""
+        stati = {
+            'firmato': '✅ Firmato',
+            'rifiutato': '❌ Rifiutato',
+            'in_attesa': '⏳ In Attesa'
+        }
+        return stati.get(self.stato_firma, self.stato_firma)
+    
+    @property
+    def esito_invio_badge_class(self):
+        """Classe CSS per il badge dell'esito invio."""
+        return 'bg-success' if self.esito_invio == 'successo' else 'bg-danger'
+    
+    @property
+    def esito_invio_display(self):
+        """Testo dell'esito invio per la visualizzazione."""
+        return '✅ Successo' if self.esito_invio == 'successo' else '❌ Errore'
+    
+    @property
+    def is_completo(self):
+        """Verifica se il processo è completo (letto e firmato)."""
+        return self.stato_lettura == 'letto' and self.stato_firma == 'firmato'
+    
+    @property
+    def is_in_attesa(self):
+        """Verifica se è in attesa di lettura o firma."""
+        return self.stato_lettura == 'non_letto' or self.stato_firma == 'in_attesa'
+    
+    @property
+    def is_rifiutato(self):
+        """Verifica se è stato rifiutato."""
+        return self.stato_firma == 'rifiutato'
+    
+    @property
+    def progresso_percentuale(self):
+        """Calcola la percentuale di completamento."""
+        progresso = 0
+        if self.stato_lettura == 'letto':
+            progresso += 50
+        if self.stato_firma == 'firmato':
+            progresso += 50
+        elif self.stato_firma == 'rifiutato':
+            progresso += 50  # Considera il rifiuto come completamento
+        return progresso
+    
+    @property
+    def progresso_badge_class(self):
+        """Classe CSS per il badge del progresso."""
+        if self.progresso_percentuale == 100:
+            return 'bg-success'
+        elif self.progresso_percentuale >= 50:
+            return 'bg-warning'
+        else:
+            return 'bg-secondary'
+    
+    @property
+    def progresso_display(self):
+        """Testo del progresso per la visualizzazione."""
+        if self.progresso_percentuale == 100:
+            return '✅ Completato'
+        elif self.progresso_percentuale >= 50:
+            return '🔄 In Corso'
+        else:
+            return '⏳ In Attesa'
+
+
+# === MODELLI SICUREZZA E AUDIT ===
+
+class SecurityAuditLog(db.Model):
+    """
+    Modello per il log di audit delle azioni degli utenti (Sistema sicurezza).
+    
+    Attributi:
+        id (int): ID primario.
+        ts (datetime): Timestamp dell'azione.
+        user_id (int): ID dell'utente (FK).
+        ip (str): Indirizzo IP dell'utente.
+        action (str): Azione eseguita (endpoint + metodo).
+        object_type (str): Tipo di oggetto interessato.
+        object_id (int): ID dell'oggetto interessato.
+        meta (dict): Metadati aggiuntivi in formato JSON.
+        user_agent (str): User agent del browser.
+    """
+    __tablename__ = 'security_audit_log'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    ts = db.Column(db.DateTime(timezone=True), default=datetime.utcnow, nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+    ip = db.Column(db.String(45), nullable=False)
+    action = db.Column(db.String(100), nullable=False)
+    object_type = db.Column(db.String(50), nullable=True)
+    object_id = db.Column(db.Integer, nullable=True)
+    meta = db.Column(db.JSON, nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+    
+    # Relazioni
+    user = db.relationship('User', backref='security_audit_logs')
+    
+    def __repr__(self):
+        return f'<SecurityAuditLog {self.id}: {self.action} by {self.user_id}>'
+
+
+class SecurityAlert(db.Model):
+    """
+    Modello per gli alert di sicurezza.
+    
+    Attributi:
+        id (int): ID primario.
+        ts (datetime): Timestamp dell'alert.
+        user_id (int): ID dell'utente coinvolto (FK).
+        rule_id (str): ID della regola che ha generato l'alert.
+        severity (SeverityLevel): Livello di severità.
+        details (str): Dettagli dell'alert.
+        status (AlertStatus): Stato dell'alert.
+    """
+    __tablename__ = 'security_alert'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    ts = db.Column(db.DateTime(timezone=True), default=datetime.utcnow, nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    rule_id = db.Column(db.String(50), nullable=False)
+    severity = db.Column(db.Enum(SeverityLevel), nullable=False, index=True)
+    details = db.Column(db.Text, nullable=False)
+    status = db.Column(db.Enum(AlertStatus), default=AlertStatus.OPEN, nullable=False, index=True)
+    
+    # Relazioni
+    user = db.relationship('User', backref='security_alerts')
+    
+    def __repr__(self):
+        return f'<SecurityAlert {self.id}: {self.rule_id} - {self.severity.value}>'
+
+
+class FileHash(db.Model):
+    """
+    Modello per gli hash dei file.
+    
+    Attributi:
+        file_id (int): ID del file (FK, PK).
+        algo (str): Algoritmo di hash utilizzato.
+        value (str): Valore dell'hash.
+        created_at (datetime): Data di creazione dell'hash.
+    """
+    __tablename__ = 'file_hash'
+    
+    file_id = db.Column(db.Integer, db.ForeignKey('documents.id'), primary_key=True)
+    algo = db.Column(db.String(10), nullable=False)
+    value = db.Column(db.String(256), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    
+    # Relazioni
+    file = db.relationship('Document', backref='hashes')
+    
+    def __repr__(self):
+        return f'<FileHash {self.file_id}: {self.algo}>'
+
+
+class AntivirusScan(db.Model):
+    """
+    Modello per i risultati delle scansioni antivirus.
+    
+    Attributi:
+        id (int): ID primario.
+        file_id (int): ID del file scansionato (FK).
+        engine (str): Nome del motore antivirus.
+        signature (str): Versione signature database.
+        verdict (AntivirusVerdict): Verdetto della scansione.
+        ts (datetime): Timestamp della scansione.
+    """
+    __tablename__ = 'antivirus_scan'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    file_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False, index=True)
+    engine = db.Column(db.String(50), nullable=False)
+    signature = db.Column(db.String(100), nullable=False)
+    verdict = db.Column(db.Enum(AntivirusVerdict), nullable=False)
+    ts = db.Column(db.DateTime(timezone=True), default=datetime.utcnow, nullable=False, index=True)
+    
+    # Relazioni
+    file = db.relationship('Document', backref='antivirus_scans')
+    
+    def __repr__(self):
+        return f'<AntivirusScan {self.id}: {self.file_id} - {self.verdict.value}>'
+
+
+class AccessRequest(db.Model):
+    """
+    Modello per le richieste di accesso ai file.
+    
+    Attributi:
+        id (int): ID primario.
+        file_id (int): ID del documento richiesto (FK).
+        requested_by (int): ID dell'utente richiedente (FK).
+        owner_id (int): ID del proprietario del documento (FK, nullable).
+        reason (str): Motivo della richiesta (nullable).
+        status (AccessRequestStatus): Stato della richiesta.
+        decision_reason (str): Motivo della decisione (nullable).
+        created_at (datetime): Data creazione.
+        updated_at (datetime): Data ultimo aggiornamento.
+        decided_at (datetime): Data decisione (nullable).
+        expires_at (datetime): Data scadenza accesso (nullable).
+        approver_id (int): ID dell'admin che ha deciso (nullable).
+    """
+    __tablename__ = 'access_requests'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    
+    # Campi principali
+    file_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False, index=True)
+    requested_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    reason = db.Column(db.Text, nullable=True)
+    status = db.Column(db.Enum(AccessRequestStatus), default=AccessRequestStatus.PENDING, nullable=False, index=True)
+    decision_reason = db.Column(db.Text, nullable=True)
+    
+    # Timestamp
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    decided_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    approver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    
+    # Campi per compatibilità con sistema esistente
+    ip_address = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.Text, nullable=True)
+    
+    # Relazioni
+    file = db.relationship('Document', backref='access_requests')
+    requested_by_user = db.relationship('User', foreign_keys=[requested_by], backref='access_requests_made')
+    owner = db.relationship('User', foreign_keys=[owner_id], backref='access_requests_received')
+    approver = db.relationship('User', foreign_keys=[approver_id], backref='access_requests_approved')
+    
+    # Indici compositi richiesti
+    __table_args__ = (
+        db.Index('idx_access_requests_status_created', 'status', 'created_at'),
+        db.Index('idx_access_requests_file_user', 'file_id', 'requested_by'),
+    )
+    
+    def __repr__(self):
+        """Rappresentazione stringa della richiesta di accesso."""
+        return f'<AccessRequest {self.id}: {self.file_id} - {self.status.value}>'
+    
+    @property
+    def is_pending(self):
+        """Verifica se la richiesta è in attesa."""
+        return self.status == AccessRequestStatus.PENDING
+    
+    @property
+    def is_approved(self):
+        """Verifica se la richiesta è stata approvata."""
+        return self.status == AccessRequestStatus.APPROVED
+    
+    @property
+    def is_denied(self):
+        """Verifica se la richiesta è stata negata."""
+        return self.status == AccessRequestStatus.DENIED
+    
+    @property
+    def is_expired(self):
+        """Verifica se la richiesta è scaduta."""
+        return self.status == AccessRequestStatus.EXPIRED
+    
+    @property
+    def is_active(self):
+        """Verifica se l'accesso è ancora attivo (approvato e non scaduto)."""
+        if not self.is_approved:
+            return False
+        if self.expires_at and self.expires_at < datetime.utcnow():
+            return False
+        return True
+    
+    @property
+    def status_display(self):
+        """Restituisce il nome visualizzabile dello stato."""
+        status_map = {
+            AccessRequestStatus.PENDING: "In attesa",
+            AccessRequestStatus.APPROVED: "Approvata",
+            AccessRequestStatus.DENIED: "Negata",
+            AccessRequestStatus.EXPIRED: "Scaduta"
+        }
+        return status_map.get(self.status, str(self.status.value))
+    
+    @property
+    def status_badge_class(self):
+        """Restituisce la classe CSS per il badge dello stato."""
+        status_map = {
+            AccessRequestStatus.PENDING: "badge-warning",
+            AccessRequestStatus.APPROVED: "badge-success",
+            AccessRequestStatus.DENIED: "badge-danger",
+            AccessRequestStatus.EXPIRED: "badge-secondary"
+        }
+        return status_map.get(self.status, "badge-secondary")
+
+# === MODELLO ALERT DOWNLOAD SOSPETTI ===
+class DownloadAlert(db.Model):
+    """
+    Modello per gli alert di download sospetti rilevati dall'AI.
+    
+    Attributi:
+        id (int): ID primario.
+        rule (str): Regola che ha generato l'alert (R1, R2, R3).
+        severity (DownloadAlertSeverity): Severità dell'alert.
+        user_id (int): ID dell'utente (FK, nullable).
+        ip_address (str): Indirizzo IP (nullable).
+        user_agent (str): User agent (nullable).
+        file_id (int): ID del file (FK, nullable).
+        window_from (datetime): Inizio finestra temporale.
+        window_to (datetime): Fine finestra temporale.
+        details (dict): Dettagli JSON con counts, esempi, note.
+        status (DownloadAlertStatus): Stato dell'alert.
+        created_at (datetime): Data creazione.
+        resolved_at (datetime): Data risoluzione (nullable).
+        resolved_by (int): ID utente che ha risolto (FK, nullable).
+    """
+    __tablename__ = "download_alerts"
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    rule = db.Column(db.String(10), nullable=False, index=True)  # R1, R2, R3
+    severity = db.Column(db.Enum(DownloadAlertSeverity), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+    ip_address = db.Column(db.String(45), nullable=True, index=True)
+    user_agent = db.Column(db.Text, nullable=True)
+    file_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=True, index=True)
+    window_from = db.Column(db.DateTime, nullable=False)
+    window_to = db.Column(db.DateTime, nullable=False)
+    details = db.Column(db.JSON, nullable=True)  # Payload con counts, esempi, note
+    status = db.Column(db.Enum(DownloadAlertStatus), default=DownloadAlertStatus.NEW, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    resolved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    
+    # Relazioni
+    user = db.relationship('User', foreign_keys=[user_id], backref='download_alerts')
+    file = db.relationship('Document', foreign_keys=[file_id], backref='download_alerts')
+    resolver = db.relationship('User', foreign_keys=[resolved_by], backref='resolved_download_alerts')
+    
+    # Indici compositi richiesti
+    __table_args__ = (
+        db.Index('idx_download_alerts_severity_status_created', 'severity', 'status', 'created_at'),
+    )
+    
+    def __repr__(self):
+        """Rappresentazione stringa dell'alert."""
+        return f'<DownloadAlert {self.user.username} - {self.filename} - {self.reason}>'
+    
+    def to_dict(self):
+        """
+        Converte l'alert in dizionario per API.
+        
+        Returns:
+            dict: Dizionario con i dati dell'alert.
+        """
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'user_name': self.user.username if self.user else 'N/A',
+            'document_id': self.document_id,
+            'filename': self.filename,
+            'reason': self.reason,
+            'ip_address': self.ip_address,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'status': self.status.value if self.status else None,
+            'severity': self.severity,
+            'details': self.details,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
+            'resolved_by': self.resolved_by_user.username if self.resolved_by_user else None
+        }
+
+# === MODELLO RICHIESTE ACCESSO (NUOVO) ===
+class AccessRequestNew(db.Model):
+    """
+    Modello per le richieste di accesso ai documenti bloccati.
+    
+    Attributi:
+        id (int): ID primario.
+        file_id (int): ID del documento richiesto.
+        requested_by (int): ID dell'utente che ha fatto la richiesta.
+        owner_id (int): ID del proprietario del documento (nullable).
+        reason (str): Motivo della richiesta (opzionale).
+        status (AccessRequestStatus): Stato della richiesta.
+        decision_reason (str): Motivo della decisione (opzionale).
+        created_at (datetime): Data creazione.
+        updated_at (datetime): Data ultimo aggiornamento.
+        decided_at (datetime): Data decisione (nullable).
+        expires_at (datetime): Data scadenza accesso (nullable).
+        approver_id (int): ID dell'admin che ha deciso (nullable).
+        file (Document): Relazione con il documento.
+        requested_by_user (User): Relazione con l'utente richiedente.
+        owner (User): Relazione con il proprietario.
+        approver (User): Relazione con l'approvatore.
+    """
+    __tablename__ = "access_requests_new"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    file_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False, index=True)
+    requested_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    reason = db.Column(db.Text, nullable=True)
+    status = db.Column(db.Enum(AccessRequestStatus), default=AccessRequestStatus.PENDING, nullable=False, index=True)
+    decision_reason = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    decided_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    approver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)  # IP del client
+    user_agent = db.Column(db.Text, nullable=True)  # User agent del browser
+    
+    # Relazioni
+    file = db.relationship('Document', backref='access_requests_new')
+    requested_by_user = db.relationship('User', foreign_keys=[requested_by], backref='access_requests_made')
+    owner = db.relationship('User', foreign_keys=[owner_id], backref='access_requests_received')
+    approver = db.relationship('User', foreign_keys=[approver_id], backref='access_requests_approved')
+    
+    def __repr__(self):
+        """Rappresentazione stringa della richiesta."""
+        return f'<AccessRequestNew {self.file_id}:{self.requested_by}:{self.status.value}>'
+    
+    @property
+    def is_pending(self):
+        """Verifica se la richiesta è in attesa."""
+        return self.status == AccessRequestStatus.PENDING
+    
+    @property
+    def is_approved(self):
+        """Verifica se la richiesta è stata approvata."""
+        return self.status == AccessRequestStatus.APPROVED
+    
+    @property
+    def is_denied(self):
+        """Verifica se la richiesta è stata negata."""
+        return self.status == AccessRequestStatus.DENIED
+    
+    @property
+    def is_expired(self):
+        """Verifica se la richiesta è scaduta."""
+        return self.status == AccessRequestStatus.EXPIRED
+    
+    @property
+    def is_active(self):
+        """Verifica se l'accesso è ancora attivo (approvato e non scaduto)."""
+        if not self.is_approved or not self.expires_at:
+            return False
+        return datetime.utcnow() < self.expires_at
+    
+    @property
+    def status_display(self):
+        """Restituisce lo stato per visualizzazione."""
+        status_map = {
+            AccessRequestStatus.PENDING: "In attesa",
+            AccessRequestStatus.APPROVED: "Approvata",
+            AccessRequestStatus.DENIED: "Negata",
+            AccessRequestStatus.EXPIRED: "Scaduta"
+        }
+        return status_map.get(self.status, str(self.status.value))
+    
+    @property
+    def status_badge_class(self):
+        """Restituisce la classe CSS per il badge dello stato."""
+        badge_map = {
+            AccessRequestStatus.PENDING: "bg-warning",
+            AccessRequestStatus.APPROVED: "bg-success",
+            AccessRequestStatus.DENIED: "bg-danger",
+            AccessRequestStatus.EXPIRED: "bg-secondary"
+        }
+        return badge_map.get(self.status, "bg-secondary")
+
+# === ENUM PER ALERT RICHIESTE ACCESSO ===
+class AccessRequestAlertSeverity(enum.Enum):
+    """Enum per la severità degli alert delle richieste di accesso."""
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+class AccessRequestAlertStatus(enum.Enum):
+    """Enum per lo stato degli alert delle richieste di accesso."""
+    NEW = "new"
+    SEEN = "seen"
+    RESOLVED = "resolved"
+
+# === MODELLO ALERT RICHIESTE ACCESSO ===
+class AccessRequestAlert(db.Model):
+    """
+    Modello per gli alert delle richieste di accesso anomale.
+    
+    Attributi:
+        id (int): ID primario.
+        rule (str): Regola che ha generato l'alert (R1, R2, R3, R4, R5).
+        severity (AccessRequestAlertSeverity): Severità dell'alert.
+        user_id (int): ID dell'utente coinvolto (nullable).
+        file_id (int): ID del file coinvolto (nullable).
+        ip_address (str): Indirizzo IP (nullable).
+        user_agent (str): User agent (nullable).
+        window_from (datetime): Inizio finestra temporale.
+        window_to (datetime): Fine finestra temporale.
+        details (str): Dettagli JSON dell'alert.
+        status (AccessRequestAlertStatus): Stato dell'alert.
+        created_at (datetime): Data creazione.
+        resolved_at (datetime): Data risoluzione (nullable).
+        resolved_by (int): ID admin che ha risolto (nullable).
+        user (User): Relazione con l'utente.
+        file (Document): Relazione con il documento.
+        resolver (User): Relazione con l'admin risolutore.
+    """
+    __tablename__ = "access_request_alerts"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    rule = db.Column(db.String(10), nullable=False, index=True)
+    severity = db.Column(db.Enum(AccessRequestAlertSeverity), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)
+    file_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=True, index=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.Text, nullable=True)
+    window_from = db.Column(db.DateTime, nullable=False)
+    window_to = db.Column(db.DateTime, nullable=False)
+    details = db.Column(db.Text, nullable=True)  # JSON string
+    status = db.Column(db.Enum(AccessRequestAlertStatus), default=AccessRequestAlertStatus.NEW, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    resolved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    
+    # Relazioni
+    user = db.relationship('User', foreign_keys=[user_id], backref='access_request_alerts')
+    file = db.relationship('Document', backref='access_request_alerts')
+    resolver = db.relationship('User', foreign_keys=[resolved_by], backref='access_request_alerts_resolved')
+    
+    def __repr__(self):
+        """Rappresentazione stringa dell'alert."""
+        return f'<AccessRequestAlert {self.rule}:{self.severity.value}:{self.status.value}>'
+    
+    @property
+    def is_new(self):
+        """Verifica se l'alert è nuovo."""
+        return self.status == AccessRequestAlertStatus.NEW
+    
+    @property
+    def is_critical(self):
+        """Verifica se l'alert è critico."""
+        return self.severity == AccessRequestAlertSeverity.CRITICAL
+    
+    @property
+    def is_warning(self):
+        """Verifica se l'alert è un warning."""
+        return self.severity == AccessRequestAlertSeverity.WARNING
+    
+    @property
+    def severity_display(self):
+        """Restituisce la severità per visualizzazione."""
+        severity_map = {
+            AccessRequestAlertSeverity.WARNING: "Warning",
+            AccessRequestAlertSeverity.CRITICAL: "Critical"
+        }
+        return severity_map.get(self.severity, str(self.severity.value))
+    
+    @property
+    def severity_badge_class(self):
+        """Restituisce la classe CSS per il badge della severità."""
+        badge_map = {
+            AccessRequestAlertSeverity.WARNING: "bg-warning",
+            AccessRequestAlertSeverity.CRITICAL: "bg-danger"
+        }
+        return badge_map.get(self.severity, "bg-secondary")
+    
+    @property
+    def status_display(self):
+        """Restituisce lo stato per visualizzazione."""
+        status_map = {
+            AccessRequestAlertSeverity.NEW: "Nuovo",
+            AccessRequestAlertSeverity.SEEN: "Visto",
+            AccessRequestAlertSeverity.RESOLVED: "Risolto"
+        }
+        return status_map.get(self.status, str(self.status.value))
+    
+    @property
+    def details_json(self):
+        """Restituisce i dettagli come JSON."""
+        if not self.details:
+            return {}
+        try:
+            return json.loads(self.details)
+        except:
+            return {}
+
+# === MODELLO CONCESSIONI TEMPORANEE ===
+class DocumentShare(db.Model):
+    """
+    Modello per le concessioni temporanee di accesso ai documenti.
+    
+    Attributi:
+        id (int): ID primario.
+        file_id (int): ID del documento (FK).
+        user_id (int): ID dell'utente che ha ricevuto l'accesso (FK).
+        granted_by (int): ID dell'admin che ha concesso l'accesso (FK).
+        granted_at (datetime): Data concessione.
+        expires_at (datetime): Data scadenza.
+        scope (str): Ambito dell'accesso (default 'download').
+        notes (str): Note aggiuntive (nullable).
+        file (Document): Relazione con il documento.
+        user (User): Relazione con l'utente.
+        granted_by_user (User): Relazione con l'admin.
+    """
+    __tablename__ = "document_shares"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    file_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    granted_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    granted_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    scope = db.Column(db.String(50), default='download', nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    
+    # Relazioni
+    file = db.relationship('Document', backref='document_shares')
+    user = db.relationship('User', foreign_keys=[user_id], backref='document_shares_received')
+    granted_by_user = db.relationship('User', foreign_keys=[granted_by], backref='document_shares_granted')
+    
+    # Indici compositi richiesti
+    __table_args__ = (
+        db.Index('idx_document_shares_file_user', 'file_id', 'user_id'),
+        db.Index('idx_document_shares_expires', 'expires_at'),
+    )
+    
+    def __repr__(self):
+        """Rappresentazione stringa della concessione."""
+        return f'<DocumentShare {self.file_id}:{self.user_id}:{self.scope}>'
+    
+    @property
+    def is_active(self):
+        """Verifica se la concessione è ancora attiva."""
+        return datetime.utcnow() < self.expires_at
+    
+    @property
+    def is_expired(self):
+        """Verifica se la concessione è scaduta."""
+        return datetime.utcnow() >= self.expires_at
+    
+    @property
+    def time_remaining(self):
+        """Restituisce il tempo rimanente in ore."""
+        if self.is_expired:
+            return 0
+        delta = self.expires_at - datetime.utcnow()
+        return max(0, delta.total_seconds() / 3600)
+    
+    @property
+    def time_remaining_display(self):
+        """Restituisce il tempo rimanente formattato."""
+        hours = self.time_remaining
+        if hours < 1:
+            return "Meno di 1 ora"
+        elif hours < 24:
+            return f"{int(hours)} ore"
+        else:
+            days = hours / 24
+            return f"{int(days)} giorni"
+
+
+# === MODELLI MANUS CORE ===
+
+class ManusManualLink(db.Model):
+    """
+    Modello per il collegamento tra documenti QMS e manuali Manus.
+    
+    Attributi:
+        id (int): ID primario.
+        azienda_id (int): ID dell'azienda (FK).
+        documento_id (int): ID del documento QMS (FK).
+        manus_manual_id (str): ID del manuale in Manus.
+        manus_version (str): Versione del manuale Manus.
+        last_sync_at (datetime): Data ultimo sync.
+    """
+    __tablename__ = "manus_manual_link"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    azienda_id = db.Column(db.Integer, db.ForeignKey("companies.id"), nullable=False)
+    documento_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=False)
+    manus_manual_id = db.Column(db.String(64), nullable=False, index=True)
+    manus_version = db.Column(db.String(64), nullable=False)
+    last_sync_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relazioni
+    azienda = db.relationship('Company', backref='manus_manual_links')
+    documento = db.relationship('Document', backref='manus_manual_links')
+    
+    def __repr__(self):
+        return f'<ManusManualLink {self.id}: {self.manus_manual_id} -> {self.documento_id}>'
+
+
+class ManusCourseLink(db.Model):
+    """
+    Modello per il collegamento tra requisiti formativi e corsi Manus.
+    
+    Attributi:
+        id (int): ID primario.
+        azienda_id (int): ID dell'azienda (FK).
+        requisito_id (int): ID del requisito formativo (FK).
+        manus_course_id (str): ID del corso in Manus.
+        last_sync_at (datetime): Data ultimo sync.
+    """
+    __tablename__ = "manus_course_link"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    azienda_id = db.Column(db.Integer, db.ForeignKey("companies.id"), nullable=False)
+    requisito_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=False)  # Usa documents come requisiti
+    manus_course_id = db.Column(db.String(64), nullable=False, index=True)
+    last_sync_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relazioni
+    azienda = db.relationship('Company', backref='manus_course_links')
+    requisito = db.relationship('Document', backref='manus_course_links')
+    
+    def __repr__(self):
+        return f'<ManusCourseLink {self.id}: {self.manus_course_id} -> {self.requisito_id}>'
+
+
+class TrainingCompletionManus(db.Model):
+    """
+    Modello per i completamenti di formazione da Manus.
+    
+    Attributi:
+        id (int): ID primario.
+        user_id (int): ID dell'utente (FK).
+        requisito_id (int): ID del requisito formativo (FK).
+        manus_course_id (str): ID del corso Manus.
+        completed_at (datetime): Data completamento.
+        source (str): Fonte del completamento (default 'manus').
+    """
+    __tablename__ = "training_completion_manus"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    requisito_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=False)
+    manus_course_id = db.Column(db.String(64), nullable=False)
+    completed_at = db.Column(db.DateTime, nullable=False)
+    source = db.Column(db.String(16), default="manus", nullable=False)
+    
+    # Relazioni
+    user = db.relationship('User', backref='training_completions_manus')
+    requisito = db.relationship('Document', backref='training_completions_manus')
+    
+    # Vincolo unico per evitare duplicati
+    __table_args__ = (db.UniqueConstraint("user_id", "requisito_id", name="uq_user_req_manus"),)
+    
+    def __repr__(self):
+        return f'<TrainingCompletionManus {self.id}: {self.user_id} -> {self.requisito_id}>'
+
+
+class ManusUserMapping(db.Model):
+    """
+    Modello per il mapping tra utenti Manus e utenti SYNTHIA.
+    
+    Attributi:
+        id (int): ID primario.
+        manus_user_id (str): ID utente in Manus.
+        email (str): Email utente in Manus.
+        syn_user_id (int): ID utente in SYNTHIA (FK).
+        active (bool): Se il mapping è attivo.
+        created_at (datetime): Data creazione mapping.
+        updated_at (datetime): Data ultimo aggiornamento.
+    """
+    __tablename__ = "manus_user_mapping"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    manus_user_id = db.Column(db.String(64), unique=True, index=True, nullable=False)
+    email = db.Column(db.String(255), index=True, nullable=True)
+    syn_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relazioni
+    syn_user = db.relationship('User', backref='manus_mappings')
+    
+    def __repr__(self):
+        return f'<ManusUserMapping {self.id}: {self.manus_user_id} -> {self.syn_user_id}>'
+
+
+class TrainingCoverageReport(db.Model):
+    """
+    Modello per i report di copertura formazione.
+    
+    Attributi:
+        id (int): ID primario.
+        azienda_id (int): ID dell'azienda.
+        user_id (int): ID dell'utente (FK).
+        requisito_id (int): ID del requisito formativo (FK).
+        status (str): Status copertura ('completo', 'parziale', 'mancante').
+        source (str): Fonte dati ('manus', 'manual', 'import').
+        last_seen_at (datetime): Data ultimo aggiornamento.
+    """
+    __tablename__ = "training_coverage_report"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    azienda_id = db.Column(db.Integer, db.ForeignKey("companies.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    requisito_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=False)
+    status = db.Column(db.String(16), nullable=False)  # 'completo','parziale','mancante'
+    source = db.Column(db.String(16), default="manus", nullable=False)
+    last_seen_at = db.Column(db.DateTime, nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relazioni
+    azienda = db.relationship('Company', backref='training_coverage_reports')
+    user = db.relationship('User', backref='training_coverage_reports')
+    requisito = db.relationship('Document', backref='training_coverage_reports')
+    
+    # Vincoli unici
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "requisito_id", name="uq_cov_user_req"),
+    )
+    
+    def __repr__(self):
+        return f'<TrainingCoverageReport {self.id}: {self.user_id} -> {self.requisito_id} ({self.status})>'
+
+

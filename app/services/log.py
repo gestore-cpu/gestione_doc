@@ -1,5 +1,5 @@
 from app.models.log import LogAttivitaDocumento
-from app.database import get_db
+from app.database import db
 
 def log_attivita_documento(user, document_id, azione, request):
     log = LogAttivitaDocumento(
@@ -9,6 +9,6 @@ def log_attivita_documento(user, document_id, azione, request):
         ip=request.client.host,
         user_agent=request.headers.get("user-agent", "")
     )
-    db = next(get_db())
+    db = next(db())
     db.add(log)
     db.commit() 

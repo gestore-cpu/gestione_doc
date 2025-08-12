@@ -1,0 +1,556 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Dettaglio Utente - {{ user.email }} - Mercury DOCS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-user text-primary"></i>
+                Dettaglio Utente
+            </h1>
+            <p class="text-muted mb-0">{{ user.email }} - {{ user.role|title }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin.mercury_users') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Torna alla Lista
+            </a>
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshData()">
+                <i class="fas fa-sync-alt"></i> Aggiorna
+            </button>
+            <a href="{{ url_for('admin.user_pdf', user_id=user.id) }}" class="btn btn-outline-success btn-sm">
+                <i class="fas fa-file-pdf"></i> Scarica PDF
+            </a>
+            <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#emailModal">
+                <i class="fas fa-envelope"></i> Invia PDF via Email
+            </button>
+        </div>
+    </div>
+
+    <!-- Sezione 1: Dati Anagrafici -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-id-card"></i>
+                        📋 Dati Anagrafici
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Nome:</strong></td>
+                                    <td>{{ user.first_name or user.nome or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Cognome:</strong></td>
+                                    <td>{{ user.last_name or user.cognome or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Email:</strong></td>
+                                    <td>{{ user.email }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Username:</strong></td>
+                                    <td>{{ user.username }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Ruolo:</strong></td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if user.role == 'admin' else 'info' if user.role == 'user' else 'warning' }}">
+                                            {{ user.role|title }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Azienda:</strong></td>
+                                    <td>
+                                        {% if user.companies %}
+                                            {{ user.companies[0].name if user.companies else 'N/A' }}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Reparto:</strong></td>
+                                    <td>
+                                        {% if user.departments %}
+                                            {{ user.departments[0].name if user.departments else 'N/A' }}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Stato:</strong></td>
+                                    <td>
+                                        {% if user.access_expiration and user.access_expiration < now %}
+                                            <span class="badge bg-danger">Scaduto</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Attivo</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Ultimo Accesso:</strong></td>
+                                    <td>{{ activity_stats.last_activity.strftime('%d/%m/%Y %H:%M') if activity_stats.last_activity else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Data Creazione:</strong></td>
+                                    <td>{{ user.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sezione 2: Cronologia Attività -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history"></i>
+                        📊 Cronologia Attività
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Filtri -->
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <select class="form-select form-select-sm" id="activityFilter">
+                                <option value="all">Tutte le attività</option>
+                                <option value="download">Download</option>
+                                <option value="view">Visualizzazioni</option>
+                                <option value="error">Errori</option>
+                                <option value="alert">Alert</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="date" class="form-control form-control-sm" id="dateFilter">
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-primary btn-sm" onclick="filterActivities()">
+                                <i class="fas fa-filter"></i> Filtra
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
+                                <i class="fas fa-times"></i> Pulisci
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Statistiche Attività -->
+                    <div class="row mb-3">
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-primary">{{ activity_stats.total_guest_activities }}</h4>
+                                <small>Attività Guest</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-info">{{ activity_stats.total_document_activities }}</h4>
+                                <small>Attività Documenti</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-danger">{{ activity_stats.total_denied_downloads }}</h4>
+                                <small>Download Negati</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-warning">{{ activity_stats.total_alerts }}</h4>
+                                <small>Alert AI</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-success">{{ activity_stats.total_logins }}</h4>
+                                <small>Login</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <h4 class="text-secondary">{{ activity_stats.last_activity.strftime('%d/%m') if activity_stats.last_activity else 'N/A' }}</h4>
+                                <small>Ultima Attività</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabella Attività -->
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover" id="activitiesTable">
+                            <thead>
+                                <tr>
+                                    <th>Data/Ora</th>
+                                    <th>Tipo Attività</th>
+                                    <th>Documento</th>
+                                    <th>Esito</th>
+                                    <th>Dettagli</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for activity in guest_activities %}
+                                <tr class="activity-row" data-type="guest" data-action="{{ activity.action }}">
+                                    <td>{{ activity.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if activity.action == 'download' else 'info' }}">
+                                            {{ activity.action|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if activity.document_id %}
+                                            <a href="{{ url_for('admin.view_document', document_id=activity.document_id) }}">
+                                                Documento #{{ activity.document_id }}
+                                            </a>
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">Successo</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">Attività guest</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+
+                                {% for activity in document_activities %}
+                                <tr class="activity-row" data-type="document" data-action="{{ activity.action }}">
+                                    <td>{{ activity.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ activity.action|title }}</span>
+                                    </td>
+                                    <td>
+                                        {% if activity.document_id %}
+                                            <a href="{{ url_for('admin.view_document', document_id=activity.document_id) }}">
+                                                Documento #{{ activity.document_id }}
+                                            </a>
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">Successo</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ activity.note or 'N/A' }}</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+
+                                {% for denied in denied_downloads %}
+                                <tr class="activity-row" data-type="error" data-action="denied">
+                                    <td>{{ denied.timestamp.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        <span class="badge bg-danger">Download Negato</span>
+                                    </td>
+                                    <td>
+                                        {% if denied.document_id %}
+                                            <a href="{{ url_for('admin.view_document', document_id=denied.document_id) }}">
+                                                Documento #{{ denied.document_id }}
+                                            </a>
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-danger">Errore</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ denied.reason }}</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+
+                                {% if not guest_activities and not document_activities and not denied_downloads %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">
+                                        Nessuna attività registrata
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sezione 3: Alert AI -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        🚨 Alert AI
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th>Descrizione</th>
+                                    <th>Livello</th>
+                                    <th>Stato</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for alert in user_alerts %}
+                                <tr>
+                                    <td>{{ alert.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ alert.tipo_alert_display }}</span>
+                                    </td>
+                                    <td>{{ alert.descrizione[:50] }}...</td>
+                                    <td>
+                                        <span class="badge {{ alert.livello_badge_class }}">
+                                            {{ alert.livello_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge {{ alert.stato_badge_class }}">
+                                            {{ alert.stato }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if alert.stato == 'nuovo' %}
+                                        <button class="btn btn-sm btn-outline-warning" onclick="updateAlertStatus({{ alert.id }}, 'in_revisione')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% endif %}
+                                        {% if alert.stato == 'in_revisione' %}
+                                        <button class="btn btn-sm btn-outline-success" onclick="updateAlertStatus({{ alert.id }}, 'chiuso')">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">
+                                        Nessun alert AI per questo utente
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sezione 4: Insight AI Personalizzati -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-brain"></i>
+                        🧠 Insight AI Personalizzati
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for insight in user_insights %}
+                        <div class="col-md-6 mb-3">
+                            <div class="alert alert-{{ insight.type }} alert-dismissible fade show" role="alert">
+                                <div class="d-flex align-items-start">
+                                    <span class="me-2 fs-4">{{ insight.icon }}</span>
+                                    <div class="flex-grow-1">
+                                        <strong>{{ insight.title }}</strong><br>
+                                        <small>{{ insight.message }}</small><br>
+                                        <small class="text-muted">{{ insight.action }}</small>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                Nessun insight AI disponibile per questo utente.
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function refreshData() {
+    location.reload();
+}
+
+function filterActivities() {
+    const filterType = document.getElementById('activityFilter').value;
+    const filterDate = document.getElementById('dateFilter').value;
+    const rows = document.querySelectorAll('.activity-row');
+    
+    rows.forEach(row => {
+        let show = true;
+        
+        // Filtro per tipo
+        if (filterType !== 'all') {
+            const action = row.getAttribute('data-action');
+            if (filterType === 'download' && action !== 'download') show = false;
+            if (filterType === 'view' && action !== 'view') show = false;
+            if (filterType === 'error' && row.getAttribute('data-type') !== 'error') show = false;
+            if (filterType === 'alert' && row.getAttribute('data-type') !== 'alert') show = false;
+        }
+        
+        // Filtro per data
+        if (filterDate) {
+            const rowDate = row.querySelector('td:first-child').textContent.split(' ')[0];
+            const formattedRowDate = rowDate.split('/').reverse().join('-');
+            if (formattedRowDate !== filterDate) show = false;
+        }
+        
+        row.style.display = show ? '' : 'none';
+    });
+}
+
+function clearFilters() {
+    document.getElementById('activityFilter').value = 'all';
+    document.getElementById('dateFilter').value = '';
+    document.querySelectorAll('.activity-row').forEach(row => {
+        row.style.display = '';
+    });
+}
+
+function updateAlertStatus(alertId, status) {
+    // Implementa aggiornamento stato alert via AJAX
+    console.log(`Aggiorna alert ${alertId} a stato ${status}`);
+    // TODO: Implementa chiamata AJAX per aggiornare stato
+    alert('Funzionalità di aggiornamento alert in sviluppo');
+}
+
+// Modal per invio email
+document.addEventListener('DOMContentLoaded', function() {
+    const emailModal = document.getElementById('emailModal');
+    if (emailModal) {
+        emailModal.addEventListener('show.bs.modal', function() {
+            // Precompila oggetto con nome utente
+            const oggettoInput = document.getElementById('oggetto');
+            if (oggettoInput) {
+                const userName = '{{ user.first_name or user.nome or "" }} {{ user.last_name or user.cognome or "" }}'.trim() || '{{ user.email }}';
+                oggettoInput.value = `Report attività utente - ${userName}`;
+            }
+        });
+    }
+});
+</script>
+
+<!-- Modal per invio email -->
+<div class="modal fade" id="emailModal" tabindex="-1" aria-labelledby="emailModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="emailModalLabel">
+                    <i class="fas fa-envelope"></i> Invia Report PDF via Email
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('admin.user_send_pdf', user_id=user.id) }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="email_destinatario" class="form-label">
+                            <i class="fas fa-user"></i> Email Destinatario *
+                        </label>
+                        <input type="email" class="form-control" id="email_destinatario" name="email_destinatario" 
+                               placeholder="es. it@azienda.com" required>
+                        <div class="form-text">Solo email aziendali sono consentite</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="oggetto" class="form-label">
+                            <i class="fas fa-tag"></i> Oggetto Email
+                        </label>
+                        <input type="text" class="form-control" id="oggetto" name="oggetto" 
+                               value="Report attività utente - {{ user.first_name or user.nome or '' }} {{ user.last_name or user.cognome or '' }}" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="messaggio" class="form-label">
+                            <i class="fas fa-comment"></i> Messaggio Aggiuntivo (Opzionale)
+                        </label>
+                        <textarea class="form-control" id="messaggio" name="messaggio" rows="4" 
+                                  placeholder="Inserisci un messaggio aggiuntivo per il destinatario..."></textarea>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Informazioni:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Il PDF includerà cronologia attività, alert AI e insight personalizzati</li>
+                            <li>L'email verrà inviata da: noreply@mercury-docs.com</li>
+                            <li>L'invio verrà registrato nei log per audit</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i> Invia Email
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-header {
+    border-bottom: none;
+    font-weight: 600;
+}
+
+.table th {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.alert {
+    border: none;
+    margin-bottom: 0.5rem;
+}
+</style>
+{% endblock %}

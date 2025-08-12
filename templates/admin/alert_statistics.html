@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Alert Statistics - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h2">📊 Statistiche Alert di Sicurezza</h1>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('admin.security_alerts') }}" class="btn btn-secondary">
+                        ← Torna agli Alert
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filtro periodo -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <form method="GET" class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">📅 Periodo</h5>
+                            <div class="mb-3">
+                                <label for="days" class="form-label">Giorni da analizzare</label>
+                                <select name="days" id="days" class="form-select" onchange="this.form.submit()">
+                                    <option value="7" {{ 'selected' if days == 7 else '' }}>Ultimi 7 giorni</option>
+                                    <option value="30" {{ 'selected' if days == 30 else '' }}>Ultimi 30 giorni</option>
+                                    <option value="90" {{ 'selected' if days == 90 else '' }}>Ultimi 90 giorni</option>
+                                    <option value="365" {{ 'selected' if days == 365 else '' }}>Ultimo anno</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Statistiche principali -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h2 class="text-primary">{{ stats.total_alerts }}</h2>
+                            <p class="card-text">Alert Totali</p>
+                            <small class="text-muted">Ultimi {{ days }} giorni</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h2 class="text-danger">{{ stats.open_alerts }}</h2>
+                            <p class="card-text">Alert Aperti</p>
+                            <small class="text-muted">Richiedono attenzione</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h2 class="text-success">{{ stats.closed_alerts }}</h2>
+                            <p class="card-text">Alert Chiusi</p>
+                            <small class="text-muted">Risolti</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h2 class="text-info">
+                                {% if stats.total_alerts > 0 %}
+                                {{ "%.1f"|format((stats.closed_alerts / stats.total_alerts) * 100) }}%
+                                {% else %}
+                                0%
+                                {% endif %}
+                            </h2>
+                            <p class="card-text">Tasso Risoluzione</p>
+                            <small class="text-muted">Alert chiusi vs totali</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Breakdown per severità -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🎯 Distribuzione per Severità</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if stats.severity_breakdown %}
+                            <div class="row">
+                                {% for severity, count in stats.severity_breakdown.items() %}
+                                <div class="col-4 text-center mb-3">
+                                    {% set severity_colors = {
+                                        'low': 'success',
+                                        'medium': 'warning',
+                                        'high': 'danger'
+                                    } %}
+                                    <div class="card border-{{ severity_colors.get(severity, 'secondary') }}">
+                                        <div class="card-body py-2">
+                                            <h4 class="text-{{ severity_colors.get(severity, 'secondary') }}">{{ count }}</h4>
+                                            <p class="mb-0">
+                                                <span class="badge bg-{{ severity_colors.get(severity, 'secondary') }}">
+                                                    {{ severity.title() }}
+                                                </span>
+                                            </p>
+                                            {% if stats.total_alerts > 0 %}
+                                            <small class="text-muted">
+                                                {{ "%.1f"|format((count / stats.total_alerts) * 100) }}%
+                                            </small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-muted text-center">Nessun dato disponibile</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Breakdown per regola -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🔍 Distribuzione per Regola</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if stats.rule_breakdown %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Regola</th>
+                                            <th class="text-end">Conteggio</th>
+                                            <th class="text-end">%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for rule_id, count in stats.rule_breakdown.items()|sort(attribute=1, reverse=True) %}
+                                        <tr>
+                                            <td>
+                                                <span class="badge bg-primary">{{ rule_id }}</span>
+                                            </td>
+                                            <td class="text-end">{{ count }}</td>
+                                            <td class="text-end">
+                                                {% if stats.total_alerts > 0 %}
+                                                {{ "%.1f"|format((count / stats.total_alerts) * 100) }}%
+                                                {% else %}
+                                                0%
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted text-center">Nessun dato disponibile</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Regola più attivata -->
+            {% if stats.most_triggered_rule %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <h6 class="alert-heading">🏆 Regola più attivata nel periodo</h6>
+                        <p class="mb-0">
+                            <strong>{{ stats.most_triggered_rule }}</strong> 
+                            con {{ stats.rule_breakdown.get(stats.most_triggered_rule, 0) }} attivazioni
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Raccomandazioni -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">💡 Raccomandazioni</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                {% if stats.open_alerts > 10 %}
+                                <li class="mb-2">
+                                    <span class="badge bg-warning">⚠️</span>
+                                    <strong>Alto numero di alert aperti:</strong> 
+                                    Considera di rivedere e chiudere gli alert risolti.
+                                </li>
+                                {% endif %}
+                                
+                                {% if stats.severity_breakdown.get('high', 0) > 0 %}
+                                <li class="mb-2">
+                                    <span class="badge bg-danger">🚨</span>
+                                    <strong>Alert ad alta severità presenti:</strong>
+                                    Richiedi attenzione immediata per {{ stats.severity_breakdown.get('high', 0) }} alert critici.
+                                </li>
+                                {% endif %}
+                                
+                                {% if stats.rule_breakdown.get('burst_downloads', 0) > stats.total_alerts * 0.5 %}
+                                <li class="mb-2">
+                                    <span class="badge bg-info">📊</span>
+                                    <strong>Molti alert per download burst:</strong>
+                                    Valuta di aumentare la soglia ALERT_BURST_THRESHOLD.
+                                </li>
+                                {% endif %}
+                                
+                                {% if stats.rule_breakdown.get('cross_department_access', 0) > 0 %}
+                                <li class="mb-2">
+                                    <span class="badge bg-secondary">🔐</span>
+                                    <strong>Accessi cross-reparto rilevati:</strong>
+                                    Verifica i permessi degli utenti sui documenti.
+                                </li>
+                                {% endif %}
+                                
+                                {% if stats.total_alerts == 0 %}
+                                <li class="mb-2">
+                                    <span class="badge bg-success">✅</span>
+                                    <strong>Nessun alert nel periodo:</strong>
+                                    Sistema di sicurezza funziona correttamente.
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card h2 {
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+.table th {
+    border-top: none;
+}
+
+.alert-heading {
+    margin-bottom: 0.5rem;
+}
+</style>
+{% endblock %}

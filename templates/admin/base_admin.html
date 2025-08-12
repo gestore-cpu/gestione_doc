@@ -79,8 +79,18 @@
     <button class="sidebar-btn" onclick="location.href='{{ url_for('welcome.download_page') }}'">⬇️ Download Documenti</button>
     <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.admin_stats') }}'">📊 Statistiche</button>
     <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.file_structure') }}'">🗂️ File Structure</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.ai_dashboard') }}'">🧠 Dashboard AI</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.qms_requirements_ai') }}'">🛡️ Analisi Requisiti QMS</button>
     <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.ai_list_tasks') }}'">🤖 Task AI</button>
     <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.audit_logs') }}'">📋 Audit Log</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.all_access_requests') }}'">📂 Storico richieste accesso</button>
+    <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.access_request_alerts') }}'">
+        🚨 Alert Richieste 
+        {% set alert_count = AccessRequestAlert.query.filter_by(status='new').count() %}
+        {% if alert_count > 0 %}
+        <span class="badge bg-danger">{{ alert_count }}</span>
+        {% endif %}
+    </button>
     <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.firme_documenti') }}'">🖋️ Log Firme</button>
     <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.approval_stats') }}'">📊 Statistiche Approvazioni</button>
     <button class="sidebar-btn" onclick="location.href='{{ url_for('admin.approval_history') }}'">📋 Storico Approvazioni</button>

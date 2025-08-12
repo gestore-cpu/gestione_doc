@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}📋 Report AI Documenti - Dashboard Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h2><i class="fas fa-file-alt text-primary"></i> Report AI Documenti</h2>
+                            <p class="text-muted mb-0">Report completo dell'analisi AI sui documenti e reparti</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{{ url_for('docs.export_analisi_ai_report') }}" class="btn btn-success">
+                                <i class="fas fa-download"></i> Export Report
+                            </a>
+                            <a href="{{ url_for('docs.admin_analisi_ai_documenti') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Torna all'Analisi AI
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report AI -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-robot"></i> Report Analisi AI Documenti</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> Informazioni sul Report</h6>
+                        <p class="mb-0">
+                            Questo report è stato generato automaticamente dal sistema AI di analisi documenti. 
+                            Contiene insights dettagliati su compliance, anomalie e raccomandazioni per migliorare 
+                            la gestione documentale aziendale.
+                        </p>
+                    </div>
+                    
+                    <div class="report-content">
+                        <pre style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 1rem; font-family: 'Courier New', monospace; font-size: 0.875rem; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; max-height: 600px; overflow-y: auto;">{{ report_ai }}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Azioni Rapide -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-bolt"></i> Azioni Rapide</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <a href="{{ url_for('docs.admin_analisi_documenti') }}" class="btn btn-outline-primary w-100 mb-2">
+                                <i class="fas fa-chart-bar"></i> Dashboard Analisi
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('docs.admin_analisi_ai_documenti') }}" class="btn btn-outline-info w-100 mb-2">
+                                <i class="fas fa-robot"></i> Analisi AI
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('docs.admin_registro_invii') }}" class="btn btn-outline-warning w-100 mb-2">
+                                <i class="fas fa-list"></i> Registro Invii
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('docs.admin_firme_documenti') }}" class="btn btn-outline-success w-100 mb-2">
+                                <i class="fas fa-signature"></i> Firme Documenti
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Funzione per stampare il report
+    function printReport() {
+        window.print();
+    }
+    
+    // Funzione per copiare il report negli appunti
+    function copyReport() {
+        const reportText = document.querySelector('.report-content pre').textContent;
+        navigator.clipboard.writeText(reportText).then(function() {
+            alert('Report copiato negli appunti!');
+        }).catch(function(err) {
+            console.error('Errore nella copia: ', err);
+            alert('Errore nella copia del report');
+        });
+    }
+    
+    // Aggiungi pulsanti per azioni rapide
+    document.addEventListener('DOMContentLoaded', function() {
+        const headerActions = document.querySelector('.col-md-4.text-end');
+        if (headerActions) {
+            const printBtn = document.createElement('button');
+            printBtn.className = 'btn btn-outline-primary me-2';
+            printBtn.innerHTML = '<i class="fas fa-print"></i> Stampa';
+            printBtn.onclick = printReport;
+            
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'btn btn-outline-secondary me-2';
+            copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copia';
+            copyBtn.onclick = copyReport;
+            
+            headerActions.insertBefore(copyBtn, headerActions.firstChild);
+            headerActions.insertBefore(printBtn, headerActions.firstChild);
+        }
+    });
+</script>
+{% endblock %}

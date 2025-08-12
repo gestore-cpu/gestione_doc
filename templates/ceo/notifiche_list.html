@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}🔔 Notifiche CEO - Mercury{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    🔔 Notifiche CEO
+                    {% if notifiche_non_lette > 0 %}
+                        <span class="badge bg-danger">{{ notifiche_non_lette }}</span>
+                    {% endif %}
+                </h1>
+                <div>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="marcaTutteLette()">
+                        ✅ Marca tutte come lette
+                    </button>
+                    <a href="{{ url_for('ceo_notifications.notifiche_statistiche') }}" class="btn btn-outline-info btn-sm">
+                        📊 Statistiche
+                    </a>
+                </div>
+            </div>
+
+            {% if notifiche %}
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Lista Notifiche</h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Stato</th>
+                                                <th>Tipo</th>
+                                                <th>Titolo</th>
+                                                <th>Mittente</th>
+                                                <th>Destinatario</th>
+                                                <th>Data</th>
+                                                <th>Azioni</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for notifica in notifiche %}
+                                            <tr class="{% if notifica.is_nuovo %}table-warning{% endif %}">
+                                                <td>
+                                                    <span class="badge {{ notifica.stato_badge_class }}">
+                                                        {{ notifica.stato_display }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="text-muted">{{ notifica.tipo_display }}</span>
+                                                </td>
+                                                <td>
+                                                    <strong>{{ notifica.titolo }}</strong>
+                                                    {% if notifica.nome_utente_guest %}
+                                                        <br><small class="text-muted">{{ notifica.nome_utente_guest }}</small>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <small class="text-muted">{{ notifica.email_mittente }}</small>
+                                                </td>
+                                                <td>
+                                                    <small class="text-muted">{{ notifica.email_destinatario }}</small>
+                                                </td>
+                                                <td>
+                                                    <small class="text-muted">{{ notifica.data_creazione_formatted }}</small>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <a href="{{ url_for('ceo_notifications.notifica_dettagli', notifica_id=notifica.id) }}" 
+                                                           class="btn btn-outline-primary btn-sm">
+                                                            👁️ Dettagli
+                                                        </a>
+                                                        {% if notifica.is_nuovo %}
+                                                        <button class="btn btn-outline-success btn-sm" 
+                                                                onclick="marcaLetta({{ notifica.id }})">
+                                                            ✅ Letta
+                                                        </button>
+                                                        {% endif %}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body text-center py-5">
+                                <h4 class="text-muted">📭 Nessuna notifica</h4>
+                                <p class="text-muted">Non ci sono notifiche da visualizzare.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function marcaLetta(notificaId) {
+    fetch(`/ceo/notifiche/${notificaId}/marca_letta`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() if csrf_token else "" }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante l\'operazione');
+    });
+}
+
+function marcaTutteLette() {
+    if (!confirm('Sei sicuro di voler marcare tutte le notifiche come lette?')) {
+        return;
+    }
+    
+    fetch('/ceo/notifiche/api/marca_tutte_lette', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() if csrf_token else "" }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante l\'operazione');
+    });
+}
+</script>
+{% endblock %}

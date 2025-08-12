@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}📝 Diario CEO - Mercury{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3 mb-0">
+                    📝 Diario CEO
+                </h1>
+                <a href="{{ url_for('ceo.nuovo_diario_entry') }}" class="btn btn-primary">
+                    ✏️ Nuova Entrata
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert e Statistiche -->
+    <div class="row mb-4">
+        <div class="col-12">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+
+    <!-- Principi Attivi -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        🎯 Principi Attivi
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if principi_attivi %}
+                        <div class="row">
+                            {% for principio in principi_attivi %}
+                                <div class="col-md-4 mb-3">
+                                    <div class="card border-{{ principio.colore }}">
+                                        <div class="card-body">
+                                            <h6 class="card-title">{{ principio.titolo }}</h6>
+                                            <p class="card-text small">{{ principio.descrizione[:100] }}{% if principio.descrizione|length > 100 %}...{% endif %}</p>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="badge bg-{{ principio.colore }}">{{ principio.categoria or 'Generale' }}</span>
+                                                <small class="text-muted">{{ principio.priority_display }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">Nessun principio attivo. <a href="{{ url_for('ceo.nuovo_principio') }}">Crea il primo principio</a></p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Entrate Diario -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        📅 Entrate Diario
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if diario_entries %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Titolo</th>
+                                        <th>Umore</th>
+                                        <th>Energia</th>
+                                        <th>Principi</th>
+                                        <th>Task</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in diario_entries %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ entry.data_formatted }}</strong>
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('ceo.visualizza_diario_entry', entry_id=entry.id) }}" class="text-decoration-none">
+                                                    {{ entry.titolo }}
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-{{ 'success' if entry.umore >= 7 else 'warning' if entry.umore >= 4 else 'danger' }}">
+                                                    {{ entry.umore_display }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-{{ 'success' if entry.energia >= 7 else 'warning' if entry.energia >= 4 else 'danger' }}">
+                                                    {{ entry.energia_display }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if entry.principi_collegati_list %}
+                                                    <span class="badge bg-info">{{ entry.principi_collegati_list|length }} principi</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if entry.task_generati_list %}
+                                                    <span class="badge bg-success">{{ entry.task_generati_list|length }} task</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <a href="{{ url_for('ceo.visualizza_diario_entry', entry_id=entry.id) }}" 
+                                                       class="btn btn-outline-primary btn-sm">
+                                                        👁️ Visualizza
+                                                    </a>
+                                                    <button type="button" 
+                                                            class="btn btn-outline-success btn-sm"
+                                                            onclick="generaTaskAI({{ entry.id }})">
+                                                        🤖 Analizza AI
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <p class="text-muted mb-3">Nessuna entrata diario presente.</p>
+                            <a href="{{ url_for('ceo.nuovo_diario_entry') }}" class="btn btn-primary">
+                                ✏️ Crea Prima Entrata
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per Analisi AI -->
+<div class="modal fade" id="analisiAIModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🤖 Analisi AI</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="analisiAIContent">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Analizzando...</span>
+                    </div>
+                    <p class="mt-2">Analizzando il contenuto del diario...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function generaTaskAI(diarioId) {
+    // Mostra modal
+    const modal = new bootstrap.Modal(document.getElementById('analisiAIModal'));
+    modal.show();
+    
+    // Chiamata API
+    fetch(`/ceo/api/diario/${diarioId}/genera_task`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() if csrf_token else "" }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mostra risultati
+            let content = '<div class="row">';
+            
+            // Principi rilevanti
+            if (data.analisi.principi_rilevanti && data.analisi.principi_rilevanti.length > 0) {
+                content += `
+                    <div class="col-md-6">
+                        <h6>🎯 Principi Rilevanti</h6>
+                        <ul class="list-group list-group-flush">
+                `;
+                for (let principioId of data.analisi.principi_rilevanti) {
+                    content += `<li class="list-group-item">Principio ID: ${principioId}</li>`;
+                }
+                content += '</ul></div>';
+            }
+            
+            // Task suggeriti
+            if (data.analisi.task_suggeriti && data.analisi.task_suggeriti.length > 0) {
+                content += `
+                    <div class="col-md-6">
+                        <h6>📋 Task Suggeriti</h6>
+                        <div class="list-group">
+                `;
+                for (let task of data.analisi.task_suggeriti) {
+                    content += `
+                        <div class="list-group-item">
+                            <h6 class="mb-1">${task.titolo}</h6>
+                            <p class="mb-1">${task.descrizione}</p>
+                            <small class="text-muted">Priorità: ${task.priorita}</small>
+                            <button class="btn btn-sm btn-success float-end" onclick="creaTask('${task.titolo}', '${task.descrizione}', '${task.priorita}')">
+                                ➕ Aggiungi
+                            </button>
+                        </div>
+                    `;
+                }
+                content += '</div></div>';
+            }
+            
+            // Insights
+            if (data.analisi.insights && data.analisi.insights.length > 0) {
+                content += `
+                    <div class="col-12 mt-3">
+                        <h6>💡 Insights</h6>
+                        <div class="alert alert-info">
+                `;
+                for (let insight of data.analisi.insights) {
+                    content += `<p class="mb-1">${insight}</p>`;
+                }
+                content += '</div></div>';
+            }
+            
+            content += '</div>';
+            
+            if (data.analisi.principi_rilevanti.length === 0 && data.analisi.task_suggeriti.length === 0) {
+                content = '<div class="alert alert-info">Nessuna analisi specifica generata per questa entrata.</div>';
+            }
+            
+            document.getElementById('analisiAIContent').innerHTML = content;
+        } else {
+            document.getElementById('analisiAIContent').innerHTML = `
+                <div class="alert alert-danger">
+                    Errore durante l'analisi: ${data.error}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        document.getElementById('analisiAIContent').innerHTML = `
+            <div class="alert alert-danger">
+                Errore di connessione: ${error}
+            </div>
+        `;
+    });
+}
+
+function creaTask(titolo, descrizione, priorita) {
+    fetch('/ceo/api/task/crea_da_diario', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() if csrf_token else "" }}'
+        },
+        body: JSON.stringify({
+            titolo: titolo,
+            descrizione: descrizione,
+            priorita: priorita
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mostra successo
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show';
+            alert.innerHTML = `
+                ✅ Task creato con successo!
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.getElementById('analisiAIContent').prepend(alert);
+        } else {
+            // Mostra errore
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-danger alert-dismissible fade show';
+            alert.innerHTML = `
+                ❌ Errore: ${data.error}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.getElementById('analisiAIContent').prepend(alert);
+        }
+    })
+    .catch(error => {
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-danger alert-dismissible fade show';
+        alert.innerHTML = `
+            ❌ Errore di connessione: ${error}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.getElementById('analisiAIContent').prepend(alert);
+    });
+}
+</script>
+{% endblock %}

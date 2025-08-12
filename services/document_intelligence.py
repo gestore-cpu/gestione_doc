@@ -25,7 +25,7 @@ try:
 except ImportError:
     SentenceTransformer = None
 
-from models import db, Document, Task, User
+from models import db, Document, Task, User, Company, Department, Company, Department
 from utils.audit_logger import log_event
 
 logger = logging.getLogger(__name__)
@@ -1181,9 +1181,9 @@ def auto_verifica_documento(document_id: int) -> Dict:
     try:
         from models import Document, DocumentAIFlag
         from sqlalchemy.orm import Session
-        from database import get_db
+        from extensions import db
         
-        db = get_db()
+        db = db()
         
         # Recupera documento
         document = db.query(Document).filter(Document.id == document_id).first()
@@ -1563,9 +1563,9 @@ def generate_ai_access_response(request_id: int, override_motivazione: str = Non
     try:
         from models import AccessRequest, User, Document
         from sqlalchemy.orm import Session
-        from database import get_db
+        from extensions import db
         
-        db = get_db()
+        db = db()
         
         # Recupera la richiesta di accesso
         access_request = db.query(AccessRequest).filter(AccessRequest.id == request_id).first()
@@ -1905,9 +1905,9 @@ def suggerisci_cartella_archiviazione(document_id: int) -> Dict:
     try:
         from models import Document, User, Company, Department, AIArchiveSuggestion
         from sqlalchemy.orm import Session
-        from database import get_db
+        from extensions import db
         
-        db = get_db()
+        db = db()
         
         # Recupera documento
         document = db.query(Document).filter(Document.id == document_id).first()

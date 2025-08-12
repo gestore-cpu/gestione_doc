@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Statistiche Richieste di Accesso
+                    </h1>
+                    <p class="text-muted mb-0">Analisi e trend delle richieste di accesso ai documenti</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('admin.all_access_requests') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Torna alla Lista
+                    </a>
+                    <a href="{{ url_for('admin.ai_access_requests_analysis') }}" class="btn btn-outline-warning">
+                        <i class="fas fa-brain me-1"></i>
+                        🧠 Analisi AI
+                    </a>
+                    <a href="{{ url_for('admin.manage_ai_policies') }}" class="btn btn-outline-info">
+                        <i class="fas fa-robot me-1"></i>
+                        🤖 Auto-Policies
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-filter me-2"></i>
+                Filtri Analisi
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label for="period" class="form-label">Periodo Analisi</label>
+                    <select class="form-select" id="period" name="period">
+                        <option value="3" {% if filters.period == '3' %}selected{% endif %}>Ultimi 3 mesi</option>
+                        <option value="6" {% if filters.period == '6' %}selected{% endif %}>Ultimi 6 mesi</option>
+                        <option value="12" {% if filters.period == '12' %}selected{% endif %}>Ultimi 12 mesi</option>
+                        <option value="24" {% if filters.period == '24' %}selected{% endif %}>Ultimi 24 mesi</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="user_id" class="form-label">Filtra per Utente</label>
+                    <select class="form-select" id="user_id" name="user_id">
+                        <option value="">Tutti gli utenti</option>
+                        {% for u in users %}
+                            <option value="{{ u.id }}" {% if filters.user_id == u.id|string %}selected{% endif %}>
+                                {{ u.first_name or '' }} {{ u.last_name or '' }} ({{ u.email }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="file_id" class="form-label">Filtra per File</label>
+                    <select class="form-select" id="file_id" name="file_id">
+                        <option value="">Tutti i file</option>
+                        {% for f in documents %}
+                            <option value="{{ f.id }}" {% if filters.file_id == f.id|string %}selected{% endif %}>
+                                {{ f.title or f.original_filename }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search me-1"></i>
+                            Applica Filtri
+                        </button>
+                        <a href="{{ url_for('admin.all_access_requests_stats') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>
+                            Pulisci
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Statistiche Generali -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.total_requests }}</h4>
+                            <p class="mb-0">Totale Richieste</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-list fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.pending_requests }}</h4>
+                            <p class="mb-0">In Attesa ({{ stats.pending_percent }}%)</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.approved_requests }}</h4>
+                            <p class="mb-0">Approvate ({{ stats.approved_percent }}%)</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.denied_requests }}</h4>
+                            <p class="mb-0">Negate ({{ stats.denied_percent }}%)</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-times fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grafici -->
+    <div class="row">
+        <!-- Distribuzione per Stato -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>
+                        Distribuzione per Stato
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="statusChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trend Temporale -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Trend Richieste per Mese
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="monthlyChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top 10 Utenti -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-users me-2"></i>
+                        Top 10 Utenti per Richieste
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="usersChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top 10 File -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-file me-2"></i>
+                        Top 10 File più Richiesti
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="filesChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informazioni Aggiuntive -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h6><i class="fas fa-info-circle me-2"></i>Informazioni sulle Statistiche</h6>
+                <ul class="mb-0">
+                    <li><strong>Periodo Analisi:</strong> {{ stats.period_days }} giorni ({{ filters.period }} mesi)</li>
+                    <li><strong>Filtri Applicati:</strong> 
+                        {% if filters.user_id %}Utente specifico{% else %}Tutti gli utenti{% endif %}, 
+                        {% if filters.file_id %}File specifico{% else %}Tutti i file{% endif %}
+                    </li>
+                    <li><strong>Aggiornamento:</strong> I dati vengono aggiornati in tempo reale</li>
+                    <li><strong>Esportazione:</strong> I grafici possono essere esportati cliccando con il tasto destro</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Configurazione globale Chart.js
+Chart.defaults.font.family = 'Arial, sans-serif';
+Chart.defaults.font.size = 12;
+
+// Grafico Distribuzione per Stato (Doughnut)
+const statusCtx = document.getElementById('statusChart').getContext('2d');
+const statusChart = new Chart(statusCtx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ chart_data.status.labels | tojson }},
+        datasets: [{
+            data: {{ chart_data.status.data | tojson }},
+            backgroundColor: {{ chart_data.status.colors | tojson }},
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((context.parsed / total) * 100).toFixed(1);
+                        return `${context.label}: ${context.parsed} (${percentage}%)`;
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Grafico Trend Temporale (Line)
+const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+const monthlyChart = new Chart(monthlyCtx, {
+    type: 'line',
+    data: {
+        labels: {{ chart_data.monthly.labels | tojson }},
+        datasets: [{
+            label: 'Richieste',
+            data: {{ chart_data.monthly.data | tojson }},
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        }
+    }
+});
+
+// Grafico Top Utenti (Bar)
+const usersCtx = document.getElementById('usersChart').getContext('2d');
+const usersChart = new Chart(usersCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ chart_data.users.labels | tojson }},
+        datasets: [{
+            label: 'Richieste',
+            data: {{ chart_data.users.data | tojson }},
+            backgroundColor: 'rgba(40, 167, 69, 0.8)',
+            borderColor: '#28a745',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        }
+    }
+});
+
+// Grafico Top File (Bar)
+const filesCtx = document.getElementById('filesChart').getContext('2d');
+const filesChart = new Chart(filesCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ chart_data.files.labels | tojson }},
+        datasets: [{
+            label: 'Richieste',
+            data: {{ chart_data.files.data | tojson }},
+            backgroundColor: 'rgba(220, 53, 69, 0.8)',
+            borderColor: '#dc3545',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        }
+    }
+});
+
+// Auto-refresh ogni 5 minuti
+setInterval(() => {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %} 

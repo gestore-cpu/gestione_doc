@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        📊 Report Revisione AI Policy
+                    </h2>
+                    <p class="text-muted mb-0">Analisi periodica automatica delle policy automatiche</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" onclick="triggerManualReview()">
+                        <i class="fas fa-magic me-1"></i>
+                        Revisione Manuale
+                    </button>
+                    <a href="{{ url_for('admin.manage_ai_policies') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Torna alle Policy
+                    </a>
+                </div>
+            </div>
+
+            <!-- Statistiche -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ stats.total }}</h4>
+                            <small>Report Totali</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ stats.pending }}</h4>
+                            <small>In Attesa</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ stats.reviewed }}</h4>
+                            <small>Revisionati</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ stats.applied }}</h4>
+                            <small>Applicati</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista Report -->
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Report di Revisione
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if reviews.items %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Data Creazione</th>
+                                        <th>Stato</th>
+                                        <th>Suggerimenti</th>
+                                        <th>Riassunto</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for review in reviews.items %}
+                                    <tr>
+                                        <td>
+                                            <strong>#{{ review.id }}</strong>
+                                        </td>
+                                        <td>
+                                            <small>{{ review.created_at.strftime('%d/%m/%Y %H:%M') if review.created_at else 'N/A' }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ 'warning' if review.status == 'pending' else 'success' if review.status == 'reviewed' else 'info' }}">
+                                                {{ review.get_status_display() }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ review.get_suggestions_count() }}</span>
+                                            {% if review.get_applied_suggestions_count() > 0 %}
+                                                <span class="badge bg-success">{{ review.get_applied_suggestions_count() }} applicati</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <small>{{ review.get_report_summary() }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{{ url_for('admin.view_policy_review', review_id=review.id) }}" class="btn btn-sm btn-info">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% if review.status == 'pending' %}
+                                                    <button class="btn btn-sm btn-success" onclick="markAsReviewed({{ review.id }})">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Paginazione -->
+                        {% if reviews.has_prev or reviews.has_next %}
+                        <nav aria-label="Paginazione report">
+                            <ul class="pagination justify-content-center">
+                                {% if reviews.has_prev %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('admin.policy_reviews_list', page=reviews.prev_num) }}">Precedente</a>
+                                    </li>
+                                {% endif %}
+                                
+                                {% for page_num in reviews.iter_pages() %}
+                                    {% if page_num %}
+                                        <li class="page-item {{ 'active' if page_num == reviews.page else '' }}">
+                                            <a class="page-link" href="{{ url_for('admin.policy_reviews_list', page=page_num) }}">{{ page_num }}</a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if reviews.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('admin.policy_reviews_list', page=reviews.next_num) }}">Successiva</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-info-circle text-muted fa-3x mb-3"></i>
+                            <p class="text-muted">Nessun report di revisione disponibile</p>
+                            <button class="btn btn-primary" onclick="triggerManualReview()">
+                                <i class="fas fa-magic me-1"></i>
+                                Genera Primo Report
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informazioni Sistema -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Informazioni Sistema
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>🔄 Revisione Automatica</h6>
+                            <ul class="list-unstyled">
+                                <li><small>• Eseguita il primo giorno del mese alle 3:00</small></li>
+                                <li><small>• Analizza richieste degli ultimi 30 giorni</small></li>
+                                <li><small>• Valuta efficacia policy attive</small></li>
+                                <li><small>• Genera suggerimenti automatici</small></li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>📧 Notifiche</h6>
+                            <ul class="list-unstyled">
+                                <li><small>• Email automatica agli admin</small></li>
+                                <li><small>• Link diretto al report</small></li>
+                                <li><small>• Statistiche periodo analizzato</small></li>
+                                <li><small>• Numero suggerimenti generati</small></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function triggerManualReview() {
+    if (confirm('Attivare una revisione AI manuale? Questo processo analizzerà le richieste degli ultimi 30 giorni e le policy attive.')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("admin.trigger_manual_review") }}';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function markAsReviewed(reviewId) {
+    if (confirm('Marcare questo report come revisionato?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/policy_reviews/${reviewId}/mark_reviewed`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Auto-refresh ogni 5 minuti
+setTimeout(() => {
+    if (confirm('Aggiornare la lista dei report con i dati più recenti?')) {
+        location.reload();
+    }
+}, 300000);
+</script>
+
+<style>
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.table th {
+    background-color: #f8f9fa;
+    border-top: none;
+}
+
+.badge {
+    font-size: 0.8em;
+}
+</style>
+{% endblock %} 

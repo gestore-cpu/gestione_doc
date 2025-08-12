@@ -1,0 +1,304 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Log Invii PDF - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-envelope"></i> 📨 Log Invii PDF
+                </h2>
+                <a href="{{ url_for('admin.ai_dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+                </a>
+            </div>
+            
+            <!-- Statistiche -->
+            <div class="row mb-4">
+                <div class="col-md-2">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ totali.totale }}</h4>
+                            <small>Totale Invii</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ totali.successi }}</h4>
+                            <small>Successi</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ totali.errori }}</h4>
+                            <small>Errori</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ totali.utenti }}</h4>
+                            <small>Utenti</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ totali.guest }}</h4>
+                            <small>Guest</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-secondary text-white">
+                        <div class="card-body text-center">
+                            <h4>{{ "%.1f"|format((totali.successi / totali.totale * 100) if totali.totale > 0 else 0) }}%</h4>
+                            <small>Success Rate</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filtri -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-filter"></i> Filtri
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-2">
+                            <label class="form-label">Data Inizio</label>
+                            <input type="date" class="form-control" name="data_inizio" 
+                                   value="{{ filtri.data_inizio.strftime('%Y-%m-%d') if filtri.data_inizio else '' }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Data Fine</label>
+                            <input type="date" class="form-control" name="data_fine" 
+                                   value="{{ filtri.data_fine.strftime('%Y-%m-%d') if filtri.data_fine else '' }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Mittente</label>
+                            <input type="text" class="form-control" name="mittente" 
+                                   value="{{ filtri.mittente or '' }}" placeholder="Email mittente">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Destinatario</label>
+                            <input type="text" class="form-control" name="destinatario" 
+                                   value="{{ filtri.destinatario or '' }}" placeholder="Email destinatario">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Tipo</label>
+                            <select class="form-select" name="tipo">
+                                <option value="">Tutti</option>
+                                <option value="user" {{ 'selected' if filtri.tipo == 'user' else '' }}>Utente</option>
+                                <option value="guest" {{ 'selected' if filtri.tipo == 'guest' else '' }}>Guest</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Stato</label>
+                            <select class="form-select" name="stato">
+                                <option value="">Tutti</option>
+                                <option value="successo" {{ 'selected' if filtri.stato == 'successo' else '' }}>Successo</option>
+                                <option value="errore" {{ 'selected' if filtri.stato == 'errore' else '' }}>Errore</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Filtra
+                            </button>
+                            <a href="{{ url_for('admin.invii_pdf') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Reset
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Tabella Invii -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> Storico Invii PDF
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Utente/Guest</th>
+                                    <th>Tipo</th>
+                                    <th>Inviato a</th>
+                                    <th>Da</th>
+                                    <th>Data/Ora</th>
+                                    <th>Stato</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for invio in invii %}
+                                <tr>
+                                    <td>{{ invio.id }}</td>
+                                    <td>
+                                        <strong>{{ invio.nome_utente_guest }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-{{ 'info' if invio.tipo == 'user' else 'warning' }}">
+                                            {{ invio.tipo_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ invio.inviato_a }}</td>
+                                    <td>{{ invio.inviato_da }}</td>
+                                    <td>{{ invio.timestamp_formatted }}</td>
+                                    <td>
+                                        <span class="badge {{ invio.esito_badge_class }}">
+                                            {{ invio.esito_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                onclick="mostraDettagliInvio({{ invio.id }})"
+                                                title="Dettagli Email">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% if invio.is_errore %}
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="mostraErrore({{ invio.id }})"
+                                                title="Visualizza Errore">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted">
+                                        <i class="fas fa-inbox"></i> Nessun invio PDF trovato
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginazione -->
+                    {% if paginazione.pages > 1 %}
+                    <nav aria-label="Paginazione invii PDF">
+                        <ul class="pagination justify-content-center">
+                            {% if paginazione.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.invii_pdf', page=paginazione.prev_num, **request.args) }}">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page_num in paginazione.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num != paginazione.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('admin.invii_pdf', page=page_num, **request.args) }}">
+                                            {{ page_num }}
+                                        </a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if paginazione.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.invii_pdf', page=paginazione.next_num, **request.args) }}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per dettagli invio PDF -->
+<div class="modal fade" id="dettagliInvioModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-envelope"></i> Dettagli Invio PDF
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="dettagliInvioContent">
+                <!-- Contenuto caricato via AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per dettagli errore -->
+<div class="modal fade" id="erroreModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i> Dettagli Errore
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="erroreContent">
+                <!-- Contenuto caricato via AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function mostraDettagliInvio(invioId) {
+    // TODO: Implementa chiamata AJAX per caricare dettagli
+    alert('Funzionalità in sviluppo - ID invio: ' + invioId);
+}
+
+function mostraErrore(invioId) {
+    // TODO: Implementa chiamata AJAX per caricare dettagli errore
+    alert('Funzionalità in sviluppo - ID errore: ' + invioId);
+}
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.table th {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+</style>
+{% endblock %}

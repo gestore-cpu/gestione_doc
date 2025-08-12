@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends, Form, Query, HTTPException, status
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
-from app.dependencies import is_superadmin, get_db
+from app.dependencies import is_superadmin, db
 from app.models.ai_analysis import DocumentoAnalizzato
 from app.models.analisi_lean import AnalisiLean
 from app.models.notifiche import NotificaAI, BulkNotificheModel
@@ -22,7 +22,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 @router.get("/ceo/dashboard", response_class=HTMLResponse)
-async def ceo_dashboard(request: Request, user = Depends(is_superadmin), db: Session = Depends(get_db)):
+async def ceo_dashboard(request: Request, user = Depends(is_superadmin), db: Session = Depends(db)):
     documenti = db.query(DocumentoAnalizzato).order_by(DocumentoAnalizzato.created_at.desc()).limit(50).all()
     non_sync = db.query(DocumentoAnalizzato).filter_by(synced=False).count()
     lean_issues = db.query(AnalisiLean).filter(AnalisiLean.violazione == True).count()
@@ -49,12 +49,12 @@ async def ceo_dashboard(request: Request, user = Depends(is_superadmin), db: Ses
     })
 
 @router.post("/ceo/analisi-retroattiva")
-async def trigger_batch(user = Depends(is_superadmin), db: Session = Depends(get_db), from_date: str = Form(None), to_date: str = Form(None)):
+async def trigger_batch(user = Depends(is_superadmin), db: Session = Depends(db), from_date: str = Form(None), to_date: str = Form(None)):
     report_path = await analizza_documenti_non_analizzati(db, from_date, to_date)
     return {"status": "ok", "msg": "Analisi batch completata", "csv": report_path}
 
 @router.get("/ceo/notifiche", response_class=HTMLResponse)
-async def notifiche_ceo(request: Request, user=Depends(is_superadmin), db: Session = Depends(get_db), start: str = Query(None), end: str = Query(None), canale: str = Query(None)):
+async def notifiche_ceo(request: Request, user=Depends(is_superadmin), db: Session = Depends(db), start: str = Query(None), end: str = Query(None), canale: str = Query(None)):
     q = db.query(NotificaAI)
     if start:
         q = q.filter(NotificaAI.data_invio >= datetime.strptime(start, "%Y-%m-%d"))
@@ -69,7 +69,7 @@ async def notifiche_ceo(request: Request, user=Depends(is_superadmin), db: Sessi
     })
 
 @router.get("/ceo/notifiche/export", response_class=StreamingResponse)
-async def esporta_notifiche_csv(user=Depends(is_superadmin), db: Session = Depends(get_db), start: str = Query(None), end: str = Query(None), canale: str = Query(None)):
+async def esporta_notifiche_csv(user=Depends(is_superadmin), db: Session = Depends(db), start: str = Query(None), end: str = Query(None), canale: str = Query(None)):
     q = db.query(NotificaAI)
     if start:
         q = q.filter(NotificaAI.data_invio >= datetime.strptime(start, "%Y-%m-%d"))
@@ -89,7 +89,7 @@ async def esporta_notifiche_csv(user=Depends(is_superadmin), db: Session = Depen
     })
 
 @router.patch("/ceo/notifiche/{id}/letta")
-async def segna_notifica_letta(id: int, user=Depends(is_superadmin), db: Session = Depends(get_db)):
+async def segna_notifica_letta(id: int, user=Depends(is_superadmin), db: Session = Depends(db)):
     notifica = db.query(NotificaAI).filter_by(id=id).first()
     if not notifica:
         raise HTTPException(404)
@@ -98,7 +98,7 @@ async def segna_notifica_letta(id: int, user=Depends(is_superadmin), db: Session
     return {"ok": True}
 
 @router.patch("/ceo/notifiche/bulk")
-async def azioni_bulk_notifiche(bulk: BulkNotificheModel = Body(...), user=Depends(is_superadmin), db: Session = Depends(get_db)):
+async def azioni_bulk_notifiche(bulk: BulkNotificheModel = Body(...), user=Depends(is_superadmin), db: Session = Depends(db)):
     """Esegue azioni bulk sulle notifiche AI (segna lette, elimina, archivia)."""
     results = {"updated": 0, "deleted": 0, "archived": 0}
     for id in bulk.ids:
@@ -122,7 +122,7 @@ async def azioni_bulk_notifiche(bulk: BulkNotificheModel = Body(...), user=Depen
 async def bulk_azioni_notifiche(
     request: Request,
     user=Depends(is_superadmin),
-    db: Session = Depends(get_db)
+    db: Session = Depends(db)
 ):
     data = await request.json()
     action = data.get("action")
@@ -154,14 +154,14 @@ async def bulk_azioni_notifiche(
         raise HTTPException(400, detail="Azione o parametri non validi")
 
 @router.delete("/ceo/notifiche/old")
-async def cancella_vecchie_notifiche(user=Depends(is_superadmin), db: Session = Depends(get_db)):
+async def cancella_vecchie_notifiche(user=Depends(is_superadmin), db: Session = Depends(db)):
     cutoff = datetime.utcnow() - timedelta(days=30)
     db.query(NotificaAI).filter(NotificaAI.timestamp < cutoff).delete()
     db.commit()
     return {"ok": True}
 
 @router.get("/ceo/documenti/{id}", response_class=HTMLResponse)
-async def dettaglio_documento(id: int, request: Request, db: Session = Depends(get_db), user=Depends(is_superadmin)):
+async def dettaglio_documento(id: int, request: Request, db: Session = Depends(db), user=Depends(is_superadmin)):
     document = db.query(Document).get(id)
     if not document:
         raise HTTPException(status_code=404, detail="Documento non trovato")
@@ -185,7 +185,7 @@ async def dettaglio_documento(id: int, request: Request, db: Session = Depends(g
     })
 
 @router.patch("/ceo/analisi_ai_versioni/{id}/attiva", response_class=JSONResponse)
-async def attiva_versione_ai(id: int, db: Session = Depends(get_db), user=Depends(is_superadmin)):
+async def attiva_versione_ai(id: int, db: Session = Depends(db), user=Depends(is_superadmin)):
     v = db.query(VersioneAnalisiAI).get(id)
     if not v:
         return JSONResponse(content={"error": "Versione non trovata"}, status_code=404)
@@ -196,7 +196,7 @@ async def attiva_versione_ai(id: int, db: Session = Depends(get_db), user=Depend
     return {"success": True}
 
 @router.delete("/ceo/analisi_ai_versioni/{id}", response_class=JSONResponse)
-async def elimina_versione_ai(id: int, db: Session = Depends(get_db), user=Depends(is_superadmin)):
+async def elimina_versione_ai(id: int, db: Session = Depends(db), user=Depends(is_superadmin)):
     v = db.query(VersioneAnalisiAI).get(id)
     if not v:
         return JSONResponse(content={"error": "Versione non trovata"}, status_code=404)
@@ -205,7 +205,7 @@ async def elimina_versione_ai(id: int, db: Session = Depends(get_db), user=Depen
     return {"success": True}
 
 @router.get("/ceo/documenti/{id}/timeline", response_class=JSONResponse)
-async def timeline_documento_json(id: int, db: Session = Depends(get_db), user=Depends(is_superadmin)):
+async def timeline_documento_json(id: int, db: Session = Depends(db), user=Depends(is_superadmin)):
     eventi = get_timeline_eventi_documento(id, db)
     # Serializza i datetime in stringa ISO
     for e in eventi:
@@ -214,7 +214,7 @@ async def timeline_documento_json(id: int, db: Session = Depends(get_db), user=D
     return JSONResponse(content=eventi)
 
 @router.get("/ceo/documenti/{id}/analisi_ai_versioni", response_class=JSONResponse)
-async def versioni_analisi_ai_json(id: int, db: Session = Depends(get_db), user=Depends(is_superadmin)):
+async def versioni_analisi_ai_json(id: int, db: Session = Depends(db), user=Depends(is_superadmin)):
     versioni = db.query(VersioneAnalisiAI).filter_by(documento_id=id).order_by(VersioneAnalisiAI.data_creazione.desc()).all()
     out = []
     for v in versioni:
@@ -241,7 +241,7 @@ class VersioneAnalisiAICreate(BaseModel):
 @router.post("/ceo/documenti/{id}/analisi_ai_versioni", response_class=JSONResponse, status_code=status.HTTP_201_CREATED)
 async def crea_versione_analisi_ai(
     id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(is_superadmin),
     payload: VersioneAnalisiAICreate = Body(...)
 ):
@@ -278,7 +278,7 @@ class VersioneAnalisiAIUpdate(BaseModel):
 @router.patch("/ceo/analisi_ai_versioni/{id}", response_class=JSONResponse)
 async def modifica_versione_ai(
     id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(is_superadmin),
     payload: VersioneAnalisiAIUpdate = Body(...)
 ):
@@ -297,7 +297,7 @@ async def modifica_versione_ai(
 @router.get("/ceo/documenti/{id}/export/pdf")
 async def esporta_documento_pdf(
     id: int, 
-    db: Session = Depends(get_db), 
+    db: Session = Depends(db), 
     user=Depends(is_superadmin),
     include_versions: bool = Query(False, description="Includi tutte le versioni AI")
 ):
@@ -330,7 +330,7 @@ async def esporta_documento_pdf(
 @router.get("/ceo/documenti/{id}/export/csv")
 async def esporta_documento_csv(
     id: int, 
-    db: Session = Depends(get_db), 
+    db: Session = Depends(db), 
     user=Depends(is_superadmin)
 ):
     """

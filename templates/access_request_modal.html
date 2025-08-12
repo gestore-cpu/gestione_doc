@@ -1,0 +1,169 @@
+<!-- Modale per richiesta accesso -->
+<div class="modal fade" id="accessRequestModal" tabindex="-1" aria-labelledby="accessRequestModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="accessRequestModalLabel">
+          <i class="fas fa-lock"></i> Richiedi accesso
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="accessRequestForm">
+          <input type="hidden" id="requestFileId" name="file_id">
+          
+          <div class="mb-3">
+            <label for="requestReason" class="form-label">
+              <i class="fas fa-comment"></i> Motivo della richiesta
+            </label>
+            <textarea 
+              class="form-control" 
+              id="requestReason" 
+              name="reason" 
+              rows="4" 
+              maxlength="500"
+              placeholder="Spiega brevemente perché hai bisogno di accedere a questo documento..."
+            ></textarea>
+            <div class="form-text">
+              <span id="charCount">0</span>/500 caratteri
+            </div>
+          </div>
+          
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <strong>Nota:</strong> La tua richiesta verrà esaminata da un amministratore. 
+            Riceverai una notifica via email una volta che sarà stata presa una decisione.
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="fas fa-times"></i> Annulla
+        </button>
+        <button type="button" class="btn btn-primary" id="submitRequestBtn" onclick="submitAccessRequest()">
+          <i class="fas fa-paper-plane"></i> Invia richiesta
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast per notifiche -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="accessRequestToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header">
+      <i class="fas fa-bell me-2"></i>
+      <strong class="me-auto">Notifica</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body" id="toastMessage">
+      <!-- Messaggio dinamico -->
+    </div>
+  </div>
+</div>
+
+<script>
+// Contatore caratteri
+document.getElementById('requestReason').addEventListener('input', function() {
+  const charCount = this.value.length;
+  document.getElementById('charCount').textContent = charCount;
+  
+  // Cambia colore se supera il limite
+  if (charCount > 450) {
+    document.getElementById('charCount').style.color = 'orange';
+  } else {
+    document.getElementById('charCount').style.color = '';
+  }
+  
+  if (charCount > 500) {
+    document.getElementById('charCount').style.color = 'red';
+  }
+});
+
+// Funzione per aprire il modale
+function openAccessRequestModal(fileId, fileName) {
+  document.getElementById('requestFileId').value = fileId;
+  document.getElementById('accessRequestModalLabel').innerHTML = 
+    `<i class="fas fa-lock"></i> Richiedi accesso - ${fileName}`;
+  
+  // Reset form
+  document.getElementById('accessRequestForm').reset();
+  document.getElementById('charCount').textContent = '0';
+  document.getElementById('charCount').style.color = '';
+  
+  // Abilita bottone
+  document.getElementById('submitRequestBtn').disabled = false;
+  document.getElementById('submitRequestBtn').innerHTML = 
+    '<i class="fas fa-paper-plane"></i> Invia richiesta';
+  
+  // Mostra modale
+  const modal = new bootstrap.Modal(document.getElementById('accessRequestModal'));
+  modal.show();
+}
+
+// Funzione per inviare la richiesta
+function submitAccessRequest() {
+  const submitBtn = document.getElementById('submitRequestBtn');
+  const form = document.getElementById('accessRequestForm');
+  
+  // Disabilita bottone e mostra loading
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Invio...';
+  
+  // Raccogli dati form
+  const formData = new FormData(form);
+  
+  // Rate limiting client-side (3 secondi)
+  setTimeout(() => {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Invia richiesta';
+  }, 3000);
+  
+  // Invia richiesta
+  fetch('/access-requests/', {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    // Mostra toast
+    const toast = new bootstrap.Toast(document.getElementById('accessRequestToast'));
+    const toastMessage = document.getElementById('toastMessage');
+    
+    if (data.ok) {
+      toastMessage.innerHTML = `<i class="fas fa-check-circle text-success"></i> ${data.message}`;
+      document.getElementById('accessRequestToast').classList.remove('bg-danger', 'text-white');
+      document.getElementById('accessRequestToast').classList.add('bg-success', 'text-white');
+      
+      // Chiudi modale
+      const modal = bootstrap.Modal.getInstance(document.getElementById('accessRequestModal'));
+      modal.hide();
+    } else {
+      toastMessage.innerHTML = `<i class="fas fa-exclamation-circle text-danger"></i> ${data.message}`;
+      document.getElementById('accessRequestToast').classList.remove('bg-success', 'text-white');
+      document.getElementById('accessRequestToast').classList.add('bg-danger', 'text-white');
+    }
+    
+    toast.show();
+  })
+  .catch(error => {
+    console.error('Errore:', error);
+    
+    // Mostra errore generico
+    const toast = new bootstrap.Toast(document.getElementById('accessRequestToast'));
+    const toastMessage = document.getElementById('toastMessage');
+    toastMessage.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i> Errore durante l\'invio della richiesta';
+    document.getElementById('accessRequestToast').classList.remove('bg-success', 'text-white');
+    document.getElementById('accessRequestToast').classList.add('bg-danger', 'text-white');
+    toast.show();
+  });
+}
+
+// Funzione per mostrare il modale quando il download è bloccato
+function showAccessRequestForBlockedDownload(fileId, fileName) {
+  openAccessRequestModal(fileId, fileName);
+}
+</script>

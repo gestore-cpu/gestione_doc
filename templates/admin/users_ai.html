@@ -1,0 +1,437 @@
+{% extends "base_docs.html" %}
+
+{% block title %}Gestione Utenti - Monitoraggio AI{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-users"></i> Gestione Utenti - Monitoraggio AI</h2>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-primary" onclick="refreshData()">
+                        <i class="fas fa-sync-alt"></i> Aggiorna
+                    </button>
+                    <button type="button" class="btn btn-outline-info" onclick="showStats()">
+                        <i class="fas fa-chart-bar"></i> Statistiche
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtri -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="filterSelect" class="form-label">Filtro Stato</label>
+                            <select class="form-select" id="filterSelect" onchange="applyFilters()">
+                                <option value="all">Tutti gli utenti</option>
+                                <option value="nuovo_import">Nuovo Import</option>
+                                <option value="monitorato">Monitorato</option>
+                                <option value="stabile">Stabile</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="searchInput" class="form-label">Ricerca</label>
+                            <input type="text" class="form-control" id="searchInput" 
+                                   placeholder="Cerca per nome, email, username..." 
+                                   onkeyup="applyFilters()">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+                                    <i class="fas fa-times"></i> Pulisci Filtri
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabella Utenti -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-table"></i> Lista Utenti
+                        <span id="userCount" class="badge bg-primary ms-2">0</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Utente</th>
+                                    <th>Email</th>
+                                    <th>Ruolo</th>
+                                    <th>Stato AI</th>
+                                    <th>Alert</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <!-- I dati verranno caricati via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginazione -->
+                    <nav aria-label="Paginazione utenti">
+                        <ul class="pagination justify-content-center" id="pagination">
+                            <!-- La paginazione verrà generata via JavaScript -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Statistiche -->
+<div class="modal fade" id="statsModal" tabindex="-1" aria-labelledby="statsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statsModalLabel">
+                    <i class="fas fa-chart-bar"></i> Statistiche Monitoraggio AI
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="statsModalBody">
+                <!-- Le statistiche verranno caricate via JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Alert AI -->
+<div class="modal fade" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="alertModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> Alert AI
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="alertModalBody">
+                <!-- Gli alert verranno caricati via JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+let currentFilter = 'all';
+let currentSearch = '';
+
+// Carica i dati all'avvio
+document.addEventListener('DOMContentLoaded', function() {
+    loadUsers();
+});
+
+function loadUsers(page = 1) {
+    currentPage = page;
+    
+    const params = new URLSearchParams({
+        page: page,
+        filter: currentFilter,
+        search: currentSearch
+    });
+    
+    fetch(`/admin/ai/users/activity?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayUsers(data.users);
+                displayPagination(data.pagination);
+                document.getElementById('userCount').textContent = data.pagination.total;
+            } else {
+                showError('Errore nel caricamento degli utenti: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Errore:', error);
+            showError('Errore di connessione');
+        });
+}
+
+function displayUsers(users) {
+    const tbody = document.getElementById('usersTableBody');
+    tbody.innerHTML = '';
+    
+    if (users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted">
+                    <i class="fas fa-info-circle"></i> Nessun utente trovato
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    users.forEach(user => {
+        const row = document.createElement('tr');
+        
+        // Badge per nuovo import
+        let statoBadge = '';
+        if (user.nuovo_import) {
+            statoBadge = `<span class="badge ${user.badge_class}">${user.display_text}</span>`;
+        }
+        
+        // Icona alert
+        let alertIcon = '';
+        if (user.has_alerts) {
+            alertIcon = `<i class="fas fa-exclamation-triangle text-danger blink"></i>`;
+        }
+        
+        // Nome utente con alert
+        const userName = `${user.first_name} ${user.last_name}`.trim() || user.username;
+        const displayName = alertIcon ? `${userName} ${alertIcon}` : userName;
+        
+        row.innerHTML = `
+            <td>
+                <strong>${displayName}</strong>
+                ${statoBadge}
+            </td>
+            <td>${user.email}</td>
+            <td><span class="badge bg-secondary">${user.role}</span></td>
+            <td>
+                ${user.stato_ai ? `<span class="badge bg-info">${user.stato_ai}</span>` : '<span class="text-muted">N/A</span>'}
+                ${user.giorni_da_import ? `<br><small class="text-muted">${user.giorni_da_import} giorni fa</small>` : ''}
+            </td>
+            <td>
+                ${user.alert_count > 0 ? 
+                    `<span class="badge bg-danger">${user.alert_count} alert</span>` : 
+                    '<span class="text-muted">Nessuno</span>'
+                }
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-primary" 
+                            onclick="checkUserAI(${user.id})" title="Controlla AI">
+                        <i class="fas fa-robot"></i>
+                    </button>
+                    ${user.has_alerts ? 
+                        `<button type="button" class="btn btn-outline-warning" 
+                                onclick="viewUserAlerts(${user.id})" title="Visualizza Alert">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </button>` : ''
+                    }
+                </div>
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+}
+
+function displayPagination(pagination) {
+    const paginationEl = document.getElementById('pagination');
+    paginationEl.innerHTML = '';
+    
+    if (pagination.pages <= 1) return;
+    
+    // Pagina precedente
+    if (pagination.page > 1) {
+        const prevLi = document.createElement('li');
+        prevLi.className = 'page-item';
+        prevLi.innerHTML = `<a class="page-link" href="#" onclick="loadUsers(${pagination.page - 1})">Precedente</a>`;
+        paginationEl.appendChild(prevLi);
+    }
+    
+    // Pagine numerate
+    for (let i = 1; i <= pagination.pages; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === pagination.page ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="loadUsers(${i})">${i}</a>`;
+        paginationEl.appendChild(li);
+    }
+    
+    // Pagina successiva
+    if (pagination.page < pagination.pages) {
+        const nextLi = document.createElement('li');
+        nextLi.className = 'page-item';
+        nextLi.innerHTML = `<a class="page-link" href="#" onclick="loadUsers(${pagination.page + 1})">Successiva</a>`;
+        paginationEl.appendChild(nextLi);
+    }
+}
+
+function applyFilters() {
+    currentFilter = document.getElementById('filterSelect').value;
+    currentSearch = document.getElementById('searchInput').value;
+    loadUsers(1);
+}
+
+function clearFilters() {
+    document.getElementById('filterSelect').value = 'all';
+    document.getElementById('searchInput').value = '';
+    currentFilter = 'all';
+    currentSearch = '';
+    loadUsers(1);
+}
+
+function refreshData() {
+    loadUsers(currentPage);
+}
+
+function checkUserAI(userId) {
+    fetch(`/admin/ai/check/${userId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            current_ip: '192.168.1.100' // Placeholder
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess(`Controlli AI completati. Generati ${data.alerts_generated} alert.`);
+            loadUsers(currentPage); // Ricarica per mostrare eventuali nuovi alert
+        } else {
+            showError('Errore nei controlli AI: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        showError('Errore di connessione');
+    });
+}
+
+function viewUserAlerts(userId) {
+    // Implementa la visualizzazione degli alert per l'utente
+    showInfo('Funzionalità in sviluppo');
+}
+
+function showStats() {
+    fetch('/admin/ai/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayStats(data.statistics);
+                new bootstrap.Modal(document.getElementById('statsModal')).show();
+            } else {
+                showError('Errore nel caricamento delle statistiche: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Errore:', error);
+            showError('Errore di connessione');
+        });
+}
+
+function displayStats(stats) {
+    const modalBody = document.getElementById('statsModalBody');
+    
+    modalBody.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6><i class="fas fa-users"></i> Attività AI</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Totale</span>
+                        <span class="badge bg-primary">${stats.attivita_ai.total}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Nuovo Import</span>
+                        <span class="badge bg-danger">${stats.attivita_ai.nuovo_import}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Monitorato</span>
+                        <span class="badge bg-warning">${stats.attivita_ai.monitorato}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Stabile</span>
+                        <span class="badge bg-success">${stats.attivita_ai.stabile}</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6><i class="fas fa-exclamation-triangle"></i> Alert AI</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Totale</span>
+                        <span class="badge bg-primary">${stats.alert_ai.total}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Nuovi</span>
+                        <span class="badge bg-danger">${stats.alert_ai.nuovi}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>In Revisione</span>
+                        <span class="badge bg-warning">${stats.alert_ai.in_revisione}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Chiusi</span>
+                        <span class="badge bg-success">${stats.alert_ai.chiusi}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6><i class="fas fa-chart-pie"></i> Alert per Tipo</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Tipo Alert</th>
+                                <th>Conteggio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stats.alert_types.map(type => `
+                                <tr>
+                                    <td>${type.tipo}</td>
+                                    <td><span class="badge bg-info">${type.count}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Funzioni di utilità per le notifiche
+function showSuccess(message) {
+    // Implementa notifica di successo
+    console.log('Success:', message);
+}
+
+function showError(message) {
+    // Implementa notifica di errore
+    console.error('Error:', message);
+}
+
+function showInfo(message) {
+    // Implementa notifica informativa
+    console.log('Info:', message);
+}
+</script>
+
+<style>
+.blink {
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+</style>
+{% endblock %} 

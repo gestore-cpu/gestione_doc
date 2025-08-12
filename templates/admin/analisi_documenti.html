@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}📊 Analisi Documenti - Dashboard Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h2><i class="fas fa-chart-bar text-primary"></i> Analisi Aggregata Documenti</h2>
+                            <p class="text-muted mb-0">Analisi completa di download, letture e firme per reparto</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{{ url_for('docs.export_analisi_documenti_csv') }}" class="btn btn-success">
+                                <i class="fas fa-download"></i> Export CSV
+                            </a>
+                            <a href="{{ url_for('docs.dashboard_docs') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Torna ai Documenti
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche Generali -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ statistiche_generali.total_documenti }}</h4>
+                    <p class="mb-0">📄 Documenti</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4>{{ statistiche_generali.documenti_compliant }}</h4>
+                    <p class="mb-0">✅ Compliant</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4>{{ statistiche_generali.documenti_in_attesa }}</h4>
+                    <p class="mb-0">⚠️ In Attesa</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h4>{{ statistiche_generali.documenti_non_utilizzati }}</h4>
+                    <p class="mb-0">❌ Non Utilizzati</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4>{{ statistiche_generali.anomalie_totali }}</h4>
+                    <p class="mb-0">🚨 Anomalie</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ statistiche_generali.total_reparti }}</h4>
+                    <p class="mb-0">🏢 Reparti</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-filter"></i> Filtri Analisi</h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="{{ url_for('docs.admin_analisi_documenti') }}" class="row">
+                        <div class="col-md-3">
+                            <label for="reparto" class="form-label">Reparto</label>
+                            <select name="reparto" id="reparto" class="form-select">
+                                <option value="">Tutti i reparti</option>
+                                {% for reparto_name in analisi_per_reparto.keys() %}
+                                <option value="{{ reparto_name }}" {% if filtro_reparto == reparto_name %}selected{% endif %}>{{ reparto_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="stato" class="form-label">Stato Compliance</label>
+                            <select name="stato" id="stato" class="form-select">
+                                <option value="">Tutti gli stati</option>
+                                <option value="✅ Compliant" {% if filtro_stato == '✅ Compliant' %}selected{% endif %}>✅ Compliant</option>
+                                <option value="⚠️ In Attesa Firma" {% if filtro_stato == '⚠️ In Attesa Firma' %}selected{% endif %}>⚠️ In Attesa Firma</option>
+                                <option value="📄 Scaricato" {% if filtro_stato == '📄 Scaricato' %}selected{% endif %}>📄 Scaricato</option>
+                                <option value="❌ Non Utilizzato" {% if filtro_stato == '❌ Non Utilizzato' %}selected{% endif %}>❌ Non Utilizzato</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="anomalie" class="form-label">Solo Anomalie</label>
+                            <select name="anomalie" id="anomalie" class="form-select">
+                                <option value="false" {% if not solo_anomalie %}selected{% endif %}>Tutti i documenti</option>
+                                <option value="true" {% if solo_anomalie %}selected{% endif %}>Solo con anomalie</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Filtra
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabella Analisi -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-table"></i> Analisi Documenti per Reparto</h5>
+                </div>
+                <div class="card-body">
+                    {% if analisi_data %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th><i class="fas fa-file-pdf"></i> Documento</th>
+                                        <th><i class="fas fa-building"></i> Reparto</th>
+                                        <th><i class="fas fa-download"></i> Download</th>
+                                        <th><i class="fas fa-eye"></i> Letture</th>
+                                        <th><i class="fas fa-signature"></i> Firme</th>
+                                        <th><i class="fas fa-percentage"></i> % Lettura</th>
+                                        <th><i class="fas fa-percentage"></i> % Firma</th>
+                                        <th><i class="fas fa-check-circle"></i> Stato</th>
+                                        <th><i class="fas fa-exclamation-triangle"></i> Anomalie</th>
+                                        <th><i class="fas fa-cogs"></i> Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in analisi_data %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-file-pdf text-danger me-2"></i>
+                                                <div>
+                                                    <strong>{{ item.documento }}</strong><br>
+                                                    <small class="text-muted">{{ item.uploader }}</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ item.reparto }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ item.download }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-primary">{{ item.letture }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">{{ item.firme }}</span>
+                                            {% if item.firme_rifiutate > 0 %}
+                                                <br><small class="text-danger">❌ {{ item.firme_rifiutate }} rifiutate</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-primary" 
+                                                     role="progressbar" 
+                                                     style="width: {{ item.percentuale_lettura }}%"
+                                                     aria-valuenow="{{ item.percentuale_lettura }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                    {{ item.percentuale_lettura }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-success" 
+                                                     role="progressbar" 
+                                                     style="width: {{ item.percentuale_firma }}%"
+                                                     aria-valuenow="{{ item.percentuale_firma }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                    {{ item.percentuale_firma }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge 
+                                                {% if item.stato_compliance == '✅ Compliant' %}bg-success
+                                                {% elif item.stato_compliance == '⚠️ In Attesa Firma' %}bg-warning
+                                                {% elif item.stato_compliance == '📄 Scaricato' %}bg-info
+                                                {% else %}bg-danger{% endif %}">
+                                                {{ item.stato_compliance }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if item.anomalie %}
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-danger dropdown-toggle" 
+                                                            type="button" 
+                                                            data-bs-toggle="dropdown">
+                                                        🚨 {{ item.anomalie_count }}
+                                                    </button>
+                                                    <ul class="dropdown-menu">
+                                                        {% for anomalia in item.anomalie %}
+                                                        <li><span class="dropdown-item-text">{{ anomalia }}</span></li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            {% else %}
+                                                <span class="badge bg-success">✅ OK</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{{ url_for('docs.view_pdf_tracciato', id=item.document_id) }}" 
+                                                   class="btn btn-sm btn-outline-primary"
+                                                   data-bs-toggle="tooltip" title="Visualizza PDF">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{{ url_for('docs.firma_documento', id=item.document_id) }}" 
+                                                   class="btn btn-sm btn-outline-success"
+                                                   data-bs-toggle="tooltip" title="Pagina Firma">
+                                                    <i class="fas fa-signature"></i>
+                                                </a>
+                                                <a href="{{ url_for('docs.analisi_documenti_reparto', reparto_id=item.reparto_id) }}" 
+                                                   class="btn btn-sm btn-outline-info"
+                                                   data-bs-toggle="tooltip" title="Analisi Reparto">
+                                                    <i class="fas fa-chart-bar"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">Nessun documento trovato</h4>
+                            <p class="text-muted">
+                                {% if filtro_reparto or filtro_stato or solo_anomalie %}
+                                    Nessun documento corrisponde ai filtri applicati.
+                                {% else %}
+                                    Non ci sono ancora documenti nel sistema.
+                                {% endif %}
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analisi per Reparto -->
+    {% if analisi_per_reparto %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-pie"></i> Analisi per Reparto</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for reparto_name, reparto_data in analisi_per_reparto.items() %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">{{ reparto_name }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-4">
+                                            <h4 class="text-success">{{ reparto_data.statistiche.documenti_compliant }}</h4>
+                                            <small>Compliant</small>
+                                        </div>
+                                        <div class="col-4">
+                                            <h4 class="text-warning">{{ reparto_data.statistiche.documenti_in_attesa }}</h4>
+                                            <small>In Attesa</small>
+                                        </div>
+                                        <div class="col-4">
+                                            <h4 class="text-danger">{{ reparto_data.statistiche.documenti_non_utilizzati }}</h4>
+                                            <small>Non Utilizzati</small>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <div class="progress mb-2">
+                                            <div class="progress-bar bg-success" 
+                                                 style="width: {{ reparto_data.statistiche.percentuale_compliant }}%">
+                                                {{ reparto_data.statistiche.percentuale_compliant }}%
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">Compliance Rate</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Inizializza tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+
+    // Auto-refresh ogni 60 secondi per aggiornamenti in tempo reale
+    setInterval(function() {
+        console.log('Aggiornamento automatico analisi documenti...');
+    }, 60000);
+</script>
+{% endblock %}

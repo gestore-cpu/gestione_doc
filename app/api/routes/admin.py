@@ -7,7 +7,7 @@ from app.models.richiesta_sblocco import RichiestaSblocco
 from app.models import User
 from fastapi import Depends
 from sqlalchemy.orm import Session
-from app.dependencies import get_current_user, get_db
+from app.dependencies import get_current_user, db
 from sqlalchemy import func, String
 from datetime import datetime
 from fastapi.responses import StreamingResponse
@@ -18,7 +18,7 @@ from typing import Optional
 templates = Jinja2Templates(directory="templates")
 
 @router.get("/richieste-sblocco")
-def richieste_sblocco_admin(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def richieste_sblocco_admin(request: Request, db: Session = Depends(db), user: User = Depends(get_current_user)):
     if not getattr(user, 'is_admin', False):
         raise HTTPException(403)
     richieste = db.query(RichiestaSblocco).order_by(RichiestaSblocco.timestamp.desc()).all()
@@ -28,7 +28,7 @@ def richieste_sblocco_admin(request: Request, db: Session = Depends(get_db), use
     })
 
 @router.get("/richieste-sblocco/stats")
-def dashboard_richieste_sblocco(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def dashboard_richieste_sblocco(request: Request, db: Session = Depends(db), user: User = Depends(get_current_user)):
     if not getattr(user, 'is_admin', False):
         raise HTTPException(403)
     totali = db.query(func.count(RichiestaSblocco.id)).scalar()
@@ -51,7 +51,7 @@ def dashboard_richieste_sblocco(request: Request, db: Session = Depends(get_db),
     })
 
 @router.get("/richieste-sblocco/export")
-def export_richieste_sblocco_csv(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def export_richieste_sblocco_csv(db: Session = Depends(db), user: User = Depends(get_current_user)):
     if not getattr(user, 'is_admin', False):
         raise HTTPException(403)
     output = io.StringIO()
@@ -79,7 +79,7 @@ def lista_richieste_sblocco(
     search: Optional[str] = Query(None),
     da: Optional[str] = Query(None),
     a: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(db),
     user: User = Depends(get_current_user)
 ):
     if not getattr(user, 'is_admin', False):
@@ -139,7 +139,7 @@ Team Documenti
     }, user=user))
 
 @router.post("/richieste-sblocco/{id}/rispondi")
-def rispondi_richiesta_sblocco(id: int, azione: str = Form(...), risposta_admin: str = Form(""), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def rispondi_richiesta_sblocco(id: int, azione: str = Form(...), risposta_admin: str = Form(""), db: Session = Depends(db), user: User = Depends(get_current_user)):
     if not getattr(user, 'is_admin', False):
         raise HTTPException(403)
     richiesta = db.query(RichiestaSblocco).get(id)
@@ -152,7 +152,7 @@ def rispondi_richiesta_sblocco(id: int, azione: str = Form(...), risposta_admin:
     return RedirectResponse("/admin/richieste-sblocco", status_code=303)
 
 @router.get("/le-mie-richieste")
-def le_mie_richieste(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def le_mie_richieste(request: Request, db: Session = Depends(db), user: User = Depends(get_current_user)):
     richieste = db.query(RichiestaSblocco).filter_by(user_email=user.email).order_by(RichiestaSblocco.timestamp.desc()).all()
     return templates.TemplateResponse("user/le_mie_richieste.html", {
         "request": request,

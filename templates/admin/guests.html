@@ -1,0 +1,621 @@
+{% extends "base.html" %}
+
+{% block title %}Gestione Guest - Mercury DOCS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-user-clock me-2"></i>Gestione Guest Mercury</h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGuestModal">
+                    <i class="fas fa-plus me-2"></i>Nuovo Guest
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filtri</h5>
+                </div>
+                <div class="card-body">
+                    <form id="filterForm" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="filterCompany" class="form-label">Azienda</label>
+                            <select class="form-select" id="filterCompany">
+                                <option value="">Tutte le aziende</option>
+                                <option value="Margherita Srl">Margherita Srl</option>
+                                <option value="Mercury Tech">Mercury Tech</option>
+                                <option value="DOCS Solutions">DOCS Solutions</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="filterStatus" class="form-label">Stato</label>
+                            <select class="form-select" id="filterStatus">
+                                <option value="">Tutti gli stati</option>
+                                <option value="active">Attivo</option>
+                                <option value="expired">Scaduto</option>
+                                <option value="revoked">Revocato</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="filterExpiry" class="form-label">Scadenza</label>
+                            <select class="form-select" id="filterExpiry">
+                                <option value="">Tutte</option>
+                                <option value="today">Scade oggi</option>
+                                <option value="week">Scade questa settimana</option>
+                                <option value="month">Scade questo mese</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filterSearch" class="form-label">Ricerca</label>
+                            <input type="text" class="form-control" id="filterSearch" 
+                                   placeholder="Nome, email...">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabella Guest -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-table me-2"></i>Guest (<span id="guestCount">0</span>)
+                    </h5>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="exportGuests()">
+                            <i class="fas fa-download me-1"></i>Export
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="refreshGuests()">
+                            <i class="fas fa-sync-alt me-1"></i>Aggiorna
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="guestsTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Email</th>
+                                    <th>Documenti Assegnati</th>
+                                    <th>Data Creazione</th>
+                                    <th>Scadenza Accesso</th>
+                                    <th>Stato</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="guestsTableBody">
+                                <!-- Dati caricati dinamicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="noGuestsMessage" class="text-center py-5" style="display: none;">
+                        <i class="fas fa-user-clock fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nessun guest trovato</h5>
+                        <p class="text-muted">Prova a modificare i filtri di ricerca</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modale Creazione Guest -->
+<div class="modal fade" id="createGuestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form id="createGuestForm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-user-plus me-2"></i>Nuovo Guest
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="createFirstName" class="form-label">Nome *</label>
+                            <input type="text" class="form-control" id="createFirstName" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="createLastName" class="form-label">Cognome *</label>
+                            <input type="text" class="form-control" id="createLastName" required>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="createEmail" class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="createEmail" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="createCompany" class="form-label">Azienda</label>
+                            <select class="form-select" id="createCompany">
+                                <option value="">Seleziona azienda</option>
+                                <option value="Margherita Srl">Margherita Srl</option>
+                                <option value="Mercury Tech">Mercury Tech</option>
+                                <option value="DOCS Solutions">DOCS Solutions</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="createExpiry" class="form-label">Scadenza Accesso *</label>
+                            <input type="date" class="form-control" id="createExpiry" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="createDocuments" class="form-label">Documenti Assegnati</label>
+                            <select class="form-select" id="createDocuments" multiple>
+                                <option value="1">Manuale Sicurezza 2024.pdf</option>
+                                <option value="2">Procedure Operative.docx</option>
+                                <option value="3">Contratto Fornitore.pdf</option>
+                                <option value="4">Report Mensile.xlsx</option>
+                                <option value="5">Policy Aziendale.pdf</option>
+                            </select>
+                            <small class="form-text text-muted">Tieni premuto Ctrl per selezionare più documenti</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Salva Guest
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modale Proroga Guest -->
+<div class="modal fade" id="prorogaGuestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="prorogaGuestForm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-calendar-plus me-2"></i>Proroga Accesso Guest
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Proroga accesso per il guest <strong id="prorogaGuestName"></strong></p>
+                    <input type="hidden" id="prorogaGuestId">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="newExpiry" class="form-label">Nuova Scadenza *</label>
+                            <input type="date" class="form-control" id="newExpiry" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="prorogaReason" class="form-label">Motivazione</label>
+                            <textarea class="form-control" id="prorogaReason" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-calendar-plus me-2"></i>Proroga
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modale Conferma Eliminazione -->
+<div class="modal fade" id="deleteGuestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Conferma Eliminazione
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Sei sicuro di voler eliminare il guest <strong id="deleteGuestName"></strong>?</p>
+                <p class="text-danger"><small>Questa azione non può essere annullata.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteGuest">
+                    <i class="fas fa-trash me-2"></i>Elimina
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    <!-- Toast verranno aggiunti dinamicamente -->
+</div>
+
+<script>
+// ===== MOCK DATA =====
+const mockGuests = [
+    {
+        id: 1,
+        first_name: "Marco",
+        last_name: "Esposito",
+        email: "marco.esposito@fornitore.it",
+        company: "Fornitore ABC",
+        assigned_documents: [
+            {id: 1, title: "Manuale Sicurezza 2024.pdf"},
+            {id: 2, title: "Procedure Operative.docx"}
+        ],
+        created_at: "2024-01-10",
+        access_expiration: "2024-02-15",
+        status: "active"
+    },
+    {
+        id: 2,
+        first_name: "Sofia",
+        last_name: "Martini",
+        email: "sofia.martini@consulente.com",
+        company: "Consulenza XYZ",
+        assigned_documents: [
+            {id: 3, title: "Contratto Fornitore.pdf"},
+            {id: 4, title: "Report Mensile.xlsx"}
+        ],
+        created_at: "2024-01-05",
+        access_expiration: "2024-01-20",
+        status: "active"
+    },
+    {
+        id: 3,
+        first_name: "Luca",
+        last_name: "Ferrari",
+        email: "luca.ferrari@partner.net",
+        company: "Partner Solutions",
+        assigned_documents: [
+            {id: 5, title: "Policy Aziendale.pdf"}
+        ],
+        created_at: "2023-12-20",
+        access_expiration: "2024-01-15",
+        status: "expired"
+    },
+    {
+        id: 4,
+        first_name: "Elena",
+        last_name: "Russo",
+        email: "elena.russo@collaboratore.it",
+        company: "Collaborazione Srl",
+        assigned_documents: [
+            {id: 1, title: "Manuale Sicurezza 2024.pdf"},
+            {id: 3, title: "Contratto Fornitore.pdf"}
+        ],
+        created_at: "2024-01-12",
+        access_expiration: "2024-01-25",
+        status: "active"
+    }
+];
+
+// ===== UTILITY FUNCTIONS =====
+function showToast(message, type = 'success') {
+    const toastContainer = document.querySelector('.toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    toastContainer.appendChild(toast);
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    toast.addEventListener('hidden.bs.toast', () => {
+        toast.remove();
+    });
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('it-IT');
+}
+
+function getExpiryBadge(expiryDate) {
+    if (!expiryDate) return '<span class="text-muted">N/A</span>';
+    
+    const expiry = new Date(expiryDate);
+    const now = new Date();
+    const daysUntilExpiry = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+    
+    let badgeClass = 'success';
+    let badgeText = expiry.toLocaleDateString('it-IT');
+    
+    if (daysUntilExpiry < 0) {
+        badgeClass = 'danger';
+        badgeText += ' (Scaduto)';
+    } else if (daysUntilExpiry <= 7) {
+        badgeClass = 'warning';
+        badgeText += ` (${daysUntilExpiry} giorni)`;
+    } else {
+        badgeText += ` (${daysUntilExpiry} giorni)`;
+    }
+    
+    return `<span class="badge bg-${badgeClass}">${badgeText}</span>`;
+}
+
+function getStatusBadge(status) {
+    const colors = {
+        'active': 'success',
+        'expired': 'danger',
+        'revoked': 'warning'
+    };
+    const labels = {
+        'active': 'Attivo',
+        'expired': 'Scaduto',
+        'revoked': 'Revocato'
+    };
+    return `<span class="badge bg-${colors[status] || 'secondary'}">${labels[status] || status}</span>`;
+}
+
+function getDocumentsList(documents) {
+    if (!documents || documents.length === 0) {
+        return '<span class="text-muted">Nessun documento</span>';
+    }
+    
+    const docList = documents.map(doc => doc.title).join(', ');
+    return `<span class="badge bg-info">${documents.length} documenti</span><br><small class="text-muted">${docList}</small>`;
+}
+
+// ===== GUEST MANAGEMENT =====
+function loadGuests() {
+    // Simula chiamata API
+    setTimeout(() => {
+        renderGuests(mockGuests);
+        showToast('Guest caricati con successo', 'success');
+    }, 500);
+}
+
+function renderGuests(guests) {
+    const tbody = document.getElementById('guestsTableBody');
+    const countSpan = document.getElementById('guestCount');
+    const noGuestsMessage = document.getElementById('noGuestsMessage');
+    
+    countSpan.textContent = guests.length;
+    
+    if (guests.length === 0) {
+        tbody.innerHTML = '';
+        noGuestsMessage.style.display = 'block';
+        return;
+    }
+    
+    noGuestsMessage.style.display = 'none';
+    tbody.innerHTML = guests.map(guest => `
+        <tr data-guest-id="${guest.id}">
+            <td>
+                <strong>${guest.first_name} ${guest.last_name}</strong>
+                <br><small class="text-muted">${guest.company || 'N/A'}</small>
+            </td>
+            <td>${guest.email}</td>
+            <td>${getDocumentsList(guest.assigned_documents)}</td>
+            <td>${formatDate(guest.created_at)}</td>
+            <td>${getExpiryBadge(guest.access_expiration)}</td>
+            <td>${getStatusBadge(guest.status)}</td>
+            <td>
+                <div class="btn-group" role="group">
+                    <a href="/admin/guest/${guest.id}" class="btn btn-sm btn-outline-info" title="Dettaglio">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    <button class="btn btn-sm btn-outline-primary" 
+                            onclick="prorogaGuest(${guest.id}, '${guest.first_name} ${guest.last_name}')" 
+                            title="Proroga Accesso">
+                        <i class="fas fa-calendar-plus"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning" 
+                            onclick="revokeGuest(${guest.id}, '${guest.first_name} ${guest.last_name}')" 
+                            title="Revoca Accesso">
+                        <i class="fas fa-ban"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" 
+                            onclick="deleteGuest(${guest.id}, '${guest.first_name} ${guest.last_name}')" 
+                            title="Elimina">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterGuests() {
+    const company = document.getElementById('filterCompany').value;
+    const status = document.getElementById('filterStatus').value;
+    const expiry = document.getElementById('filterExpiry').value;
+    const search = document.getElementById('filterSearch').value.toLowerCase();
+    
+    let filteredGuests = mockGuests.filter(guest => {
+        const matchesCompany = !company || guest.company === company;
+        const matchesStatus = !status || guest.status === status;
+        const matchesSearch = !search || 
+            guest.first_name.toLowerCase().includes(search) ||
+            guest.last_name.toLowerCase().includes(search) ||
+            guest.email.toLowerCase().includes(search);
+        
+        let matchesExpiry = true;
+        if (expiry) {
+            const now = new Date();
+            const expiryDate = new Date(guest.access_expiration);
+            const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+            
+            switch (expiry) {
+                case 'today':
+                    matchesExpiry = daysUntilExpiry === 0;
+                    break;
+                case 'week':
+                    matchesExpiry = daysUntilExpiry >= 0 && daysUntilExpiry <= 7;
+                    break;
+                case 'month':
+                    matchesExpiry = daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+                    break;
+            }
+        }
+        
+        return matchesCompany && matchesStatus && matchesExpiry && matchesSearch;
+    });
+    
+    renderGuests(filteredGuests);
+}
+
+function prorogaGuest(guestId, guestName) {
+    const guest = mockGuests.find(g => g.id === guestId);
+    if (!guest) return;
+    
+    // Popola il modale
+    document.getElementById('prorogaGuestId').value = guestId;
+    document.getElementById('prorogaGuestName').textContent = guestName;
+    
+    // Imposta la data minima a oggi
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('newExpiry').min = today;
+    document.getElementById('newExpiry').value = '';
+    document.getElementById('prorogaReason').value = '';
+    
+    // Mostra il modale
+    new bootstrap.Modal(document.getElementById('prorogaGuestModal')).show();
+}
+
+function revokeGuest(guestId, guestName) {
+    if (confirm(`Sei sicuro di voler revocare l'accesso del guest ${guestName}?`)) {
+        // Simula revoca
+        setTimeout(() => {
+            const guest = mockGuests.find(g => g.id === guestId);
+            if (guest) {
+                guest.status = 'revoked';
+                renderGuests(mockGuests);
+                showToast('Accesso guest revocato con successo', 'warning');
+            }
+        }, 500);
+    }
+}
+
+function deleteGuest(guestId, guestName) {
+    document.getElementById('deleteGuestName').textContent = guestName;
+    document.getElementById('confirmDeleteGuest').onclick = () => confirmDeleteGuest(guestId);
+    new bootstrap.Modal(document.getElementById('deleteGuestModal')).show();
+}
+
+function confirmDeleteGuest(guestId) {
+    // Simula eliminazione
+    setTimeout(() => {
+        const index = mockGuests.findIndex(g => g.id === guestId);
+        if (index > -1) {
+            mockGuests.splice(index, 1);
+            renderGuests(mockGuests);
+            showToast('Guest eliminato con successo', 'success');
+        }
+        bootstrap.Modal.getInstance(document.getElementById('deleteGuestModal')).hide();
+    }, 500);
+}
+
+function exportGuests() {
+    // Simula export
+    setTimeout(() => {
+        showToast('Export guest completato', 'success');
+    }, 1000);
+}
+
+function refreshGuests() {
+    showToast('Aggiornamento in corso...', 'info');
+    setTimeout(() => {
+        loadGuests();
+    }, 500);
+}
+
+// ===== EVENT LISTENERS =====
+document.addEventListener('DOMContentLoaded', function() {
+    // Carica guest all'avvio
+    loadGuests();
+    
+    // Filtri
+    document.getElementById('filterForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        filterGuests();
+    });
+    
+    // Input ricerca in tempo reale
+    document.getElementById('filterSearch').addEventListener('input', function() {
+        filterGuests();
+    });
+    
+    // Creazione guest
+    document.getElementById('createGuestForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const selectedDocs = Array.from(document.getElementById('createDocuments').selectedOptions)
+            .map(option => ({
+                id: parseInt(option.value),
+                title: option.text
+            }));
+        
+        const newGuest = {
+            id: mockGuests.length + 1,
+            first_name: document.getElementById('createFirstName').value,
+            last_name: document.getElementById('createLastName').value,
+            email: document.getElementById('createEmail').value,
+            company: document.getElementById('createCompany').value,
+            assigned_documents: selectedDocs,
+            created_at: new Date().toISOString().split('T')[0],
+            access_expiration: document.getElementById('createExpiry').value,
+            status: 'active'
+        };
+        
+        // Simula creazione
+        setTimeout(() => {
+            mockGuests.push(newGuest);
+            renderGuests(mockGuests);
+            showToast('Guest creato con successo', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('createGuestModal')).hide();
+            document.getElementById('createGuestForm').reset();
+        }, 500);
+    });
+    
+    // Proroga guest
+    document.getElementById('prorogaGuestForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const guestId = parseInt(document.getElementById('prorogaGuestId').value);
+        const newExpiry = document.getElementById('newExpiry').value;
+        const reason = document.getElementById('prorogaReason').value;
+        
+        const guest = mockGuests.find(g => g.id === guestId);
+        if (guest) {
+            guest.access_expiration = newExpiry;
+            guest.status = 'active';
+            
+            // Simula aggiornamento
+            setTimeout(() => {
+                renderGuests(mockGuests);
+                showToast('Scadenza guest prorogata con successo', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('prorogaGuestModal')).hide();
+            }, 500);
+        }
+    });
+});
+</script>
+{% endblock %} 

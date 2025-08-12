@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-chart-line me-2"></i>
+            📊 Report AI Impatto Policy
+        </h2>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" onclick="showManualGenerationModal()">
+                <i class="fas fa-plus me-1"></i>
+                Genera Report
+            </button>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>
+                Torna alla Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistiche Generali -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-file-alt me-2"></i>
+                        Totale Report
+                    </h5>
+                    <h3>{{ stats.total_reports }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-check me-2"></i>
+                        Revisionati
+                    </h5>
+                    <h3>{{ stats.reviewed_reports }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-clock me-2"></i>
+                        In Attesa
+                    </h5>
+                    <h3>{{ stats.pending_reports }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-percentage me-2"></i>
+                        Success Rate Medio
+                    </h5>
+                    <h3>{{ "%.1f"|format(stats.avg_success_rate) }}%</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-filter me-2"></i>
+                Filtri
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">Tutti</option>
+                        <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>In Attesa</option>
+                        <option value="reviewed" {% if filters.status == 'reviewed' %}selected{% endif %}>Revisionati</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="date_from" class="form-label">Data da</label>
+                    <input type="date" class="form-control" id="date_from" name="date_from" 
+                           value="{{ filters.date_from }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="date_to" class="form-label">Data a</label>
+                    <input type="date" class="form-control" id="date_to" name="date_to" 
+                           value="{{ filters.date_to }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search me-1"></i>
+                            Filtra
+                        </button>
+                        <a href="{{ url_for('admin.policy_impact_reports_list') }}" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i>
+                            Reset
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista Report -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-list me-2"></i>
+                Report di Impatto ({{ pagination.total }})
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if reports %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Data Creazione</th>
+                            <th>Periodo Analizzato</th>
+                            <th>Richieste Processate</th>
+                            <th>Success Rate</th>
+                            <th>Status</th>
+                            <th>Tempo Elaborazione</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for report in reports %}
+                        <tr>
+                            <td>
+                                <strong>#{{ report.id }}</strong>
+                            </td>
+                            <td>
+                                <i class="fas fa-calendar me-1"></i>
+                                {{ report.created_at.strftime('%d/%m/%Y %H:%M') }}
+                            </td>
+                            <td>
+                                <small>{{ report.get_period_display() }}</small>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-primary me-2">{{ report.total_auto_processed }}</span>
+                                    <small class="text-muted">
+                                        ({{ report.approve_count }} ✅ / {{ report.deny_count }} ❌)
+                                    </small>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar {% if report.success_rate >= 80 %}bg-success{% elif report.success_rate >= 60 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                         style="width: {{ report.success_rate }}%">
+                                        {{ report.get_success_rate_display() }}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if report.reviewed %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check me-1"></i>
+                                    Revisionato
+                                </span>
+                                {% else %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-clock me-1"></i>
+                                    In Attesa
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ report.get_processing_time_display() }}</small>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('admin.view_policy_impact_report', report_id=report.id) }}" 
+                                       class="btn btn-outline-primary" title="Visualizza Report">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if not report.reviewed %}
+                                    <button class="btn btn-outline-success" onclick="showMarkReviewedModal({{ report.id }})" 
+                                            title="Marca come Revisionato">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginazione -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="Paginazione report">
+                <ul class="pagination justify-content-center">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.policy_impact_reports_list', page=pagination.prev_num, **request.args) }}">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.policy_impact_reports_list', page=page_num, **request.args) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.policy_impact_reports_list', page=pagination.next_num, **request.args) }}">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nessun report di impatto trovato</h5>
+                <p class="text-muted">I report vengono generati automaticamente ogni mese o manualmente dagli admin.</p>
+                <button class="btn btn-primary" onclick="showManualGenerationModal()">
+                    <i class="fas fa-plus me-1"></i>
+                    Genera Primo Report
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Generazione Manuale -->
+<div class="modal fade" id="manualGenerationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-chart-line me-2"></i>
+                    📊 Genera Report Impatto
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin.trigger_manual_impact_report') }}">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle me-2"></i>Generazione Report</h6>
+                        <p class="mb-0">
+                            Verrà generato un report AI che analizza l'impatto delle policy attive 
+                            negli ultimi 30 giorni, includendo statistiche e raccomandazioni.
+                        </p>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Attenzione</h6>
+                        <p class="mb-0">
+                            La generazione del report può richiedere alcuni minuti. 
+                            Verrai reindirizzato automaticamente al report una volta completato.
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-chart-line me-1"></i>
+                        Genera Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Marca Revisionato -->
+<div class="modal fade" id="markReviewedModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-check me-2"></i>
+                    📋 Marca come Revisionato
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="markReviewedForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="adminNotes" class="form-label">Note Admin (opzionale)</label>
+                        <textarea class="form-control" id="adminNotes" name="admin_notes" rows="3" 
+                                  placeholder="Inserisci eventuali note o commenti sul report..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check me-1"></i>
+                        Marca Revisionato
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function showManualGenerationModal() {
+    const modal = new bootstrap.Modal(document.getElementById('manualGenerationModal'));
+    modal.show();
+}
+
+function showMarkReviewedModal(reportId) {
+    const modal = new bootstrap.Modal(document.getElementById('markReviewedModal'));
+    const form = document.getElementById('markReviewedForm');
+    form.action = `{{ url_for('admin.mark_impact_report_reviewed', report_id=0) }}`.replace('0', reportId);
+    modal.show();
+}
+</script>
+{% endblock %} 

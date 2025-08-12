@@ -1,0 +1,30 @@
+import traceback
+from sqlalchemy import func
+from models import GuestActivity, Company, Department, User, Document, AdminLog, AccessRequest, AuthorizedAccess, DocumentActivityLog, DocumentVersion, DocumentReadLog, DownloadDeniedLog, DocumentApprovalLog, ApprovalStep, AIAnalysisLog, FirmaDocumento, LogInvioDocumento, QMSStandardRequirement, QMSRequirementMapping
+from auto_policy import AutoPolicy
+from utils.logging import log_request_approved, log_request_denied
+from datetime import datetime, timedelta
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_from_directory, Response, send_file, jsonify, abort
+from flask_login import login_required, current_user
+from extensions import db, bcrypt
+from sqlalchemy.exc import IntegrityError
+from itsdangerous import URLSafeTimedSerializer
+from decorators import admin_required, ceo_or_admin_required
+from flask_mail import Message
+from extensions import mail
+from flask import render_template
+from sqlalchemy.orm import joinedload
+import os
+import requests
+from collections import OrderedDict
+import csv
+from io import StringIO, BytesIO
+from weasyprint import HTML
+from collections import defaultdict
+from collections import Counter
+from flask import make_response
+# from flask_login import roles_required  # Non esiste in flask_login
+
+
+# === Blueprint Admin ===
+admin_bp = Blueprint('admin', __name__, url_prefix='/admin')

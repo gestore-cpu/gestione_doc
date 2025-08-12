@@ -21,5 +21,11 @@ class Config:
     SESSION_COOKIE_SAMESITE = 'Lax'
 
     # ATTENZIONE: Non usare valori hardcoded in produzione! Usa sempre variabili d'ambiente per SECRET_KEY e MAIL_PASSWORD.
+    
+    # Email CEO per notifiche automatiche
+    CEO_EMAIL = 'ceo@mercurysurgelati.org'  # Configurare con l'email del CEO
+    
+    # Abilita invio email report CEO mensile
+    ENABLE_CEO_EMAIL_REPORTS = True  # Impostare a False per disabilitare
 
 

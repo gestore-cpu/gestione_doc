@@ -1,0 +1,162 @@
+<!-- Tab Copertura (Manus) -->
+<div class="tab-pane fade" id="manus-coverage" role="tabpanel">
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-chart-pie"></i> Copertura Formazione Manus
+            </h5>
+        </div>
+        <div class="card-body">
+            <!-- Statistiche -->
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <h4 class="text-success" id="completi-count">0</h4>
+                        <small class="text-muted">Completi</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <h4 class="text-warning" id="mancanti-count">0</h4>
+                        <small class="text-muted">Mancanti</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <h4 class="text-info" id="mappings-count">0</h4>
+                        <small class="text-muted">Mapping</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <h4 class="text-primary" id="percentuale">0%</h4>
+                        <small class="text-muted">Copertura</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Azioni -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <button class="btn btn-primary" onclick="loadMappings()">
+                        <i class="fas fa-sync"></i> Carica Mapping
+                    </button>
+                    <button class="btn btn-success" onclick="rebuildAllCoverage()">
+                        <i class="fas fa-calculator"></i> Ricalcola Tutti
+                    </button>
+                </div>
+                <div class="col-md-6 text-right">
+                    <button class="btn btn-outline-secondary" onclick="exportCoverage()">
+                        <i class="fas fa-download"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabella Mapping -->
+            <div class="table-responsive">
+                <table class="table table-striped" id="mappings-table">
+                    <thead>
+                        <tr>
+                            <th>ID Manus</th>
+                            <th>Email</th>
+                            <th>Utente SYNTHIA</th>
+                            <th>Status</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mappings-tbody">
+                        <!-- Popolato via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Carica lista mapping
+function loadMappings() {
+    fetch('/admin/manus/mapping/list')
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.getElementById('mappings-tbody');
+            tbody.innerHTML = '';
+            
+            data.forEach(mapping => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${mapping.manus_user_id}</td>
+                    <td>${mapping.email || '-'}</td>
+                    <td>${mapping.syn_user_id || 'Non mappato'}</td>
+                    <td>
+                        <span class="badge badge-${mapping.active ? 'success' : 'danger'}">
+                            ${mapping.active ? 'Attivo' : 'Inattivo'}
+                        </span>
+                    </td>
+                    <td>
+                        ${mapping.syn_user_id ? 
+                            `<button class="btn btn-sm btn-info" onclick="rebuildCoverage(${mapping.syn_user_id})">
+                                Ricalcola
+                            </button>` : 
+                            '<span class="text-muted">-</span>'
+                        }
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            // Aggiorna contatori
+            document.getElementById('mappings-count').textContent = data.length;
+            const attivi = data.filter(m => m.active).length;
+            document.getElementById('percentuale').textContent = 
+                data.length > 0 ? Math.round((attivi / data.length) * 100) + '%' : '0%';
+        })
+        .catch(error => {
+            console.error('Errore caricamento mapping:', error);
+            alert('Errore nel caricamento dei mapping');
+        });
+}
+
+// Ricalcola coverage per utente specifico
+function rebuildCoverage(userId) {
+    fetch(`/admin/manus/coverage/rebuild/${userId}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.ok) {
+            alert(`Coverage aggiornato: ${data.updated} record`);
+        } else {
+            alert('Errore nell\'aggiornamento: ' + (data.error || ''));
+        }
+    })
+    .catch(error => {
+        console.error('Errore rebuild coverage:', error);
+        alert('Errore nel ricalcolo coverage');
+    });
+}
+
+// Ricalcola coverage per tutti gli utenti
+function rebuildAllCoverage() {
+    if (!confirm('Ricalcolare coverage per tutti gli utenti? Questa operazione potrebbe richiedere tempo.')) {
+        return;
+    }
+    
+    // TODO: implementare endpoint per rebuild globale
+    alert('Funzionalità in sviluppo');
+}
+
+// Export coverage
+function exportCoverage() {
+    // TODO: implementare export CSV
+    alert('Funzionalità in sviluppo');
+}
+
+// Carica mapping all'apertura della tab
+document.addEventListener('DOMContentLoaded', function() {
+    // Carica mapping quando si clicca sulla tab
+    $('a[data-toggle="tab"][href="#manus-coverage"]').on('shown.bs.tab', function (e) {
+        loadMappings();
+    });
+});
+</script>

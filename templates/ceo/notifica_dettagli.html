@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}🔔 {{ notifica.titolo }} - Mercury{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    🔔 Dettagli Notifica
+                </h1>
+                <div>
+                    <a href="{{ url_for('ceo_notifications.notifiche_list') }}" class="btn btn-outline-secondary btn-sm">
+                        ← Torna alla lista
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">{{ notifica.titolo }}</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>📋 Informazioni Generali</h6>
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td><strong>Tipo:</strong></td>
+                                            <td>{{ notifica.tipo_display }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Stato:</strong></td>
+                                            <td>
+                                                <span class="badge {{ notifica.stato_badge_class }}">
+                                                    {{ notifica.stato_display }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Data Creazione:</strong></td>
+                                            <td>{{ notifica.data_creazione_formatted }}</td>
+                                        </tr>
+                                        {% if notifica.data_lettura %}
+                                        <tr>
+                                            <td><strong>Data Lettura:</strong></td>
+                                            <td>{{ notifica.data_lettura_formatted }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>📧 Dettagli Email</h6>
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td><strong>Mittente:</strong></td>
+                                            <td>{{ notifica.email_mittente }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Destinatario:</strong></td>
+                                            <td>{{ notifica.email_destinatario }}</td>
+                                        </tr>
+                                        {% if notifica.nome_utente_guest %}
+                                        <tr>
+                                            <td><strong>Utente/Guest:</strong></td>
+                                            <td>{{ notifica.nome_utente_guest }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    </table>
+                                </div>
+                            </div>
+
+                            {% if notifica.descrizione %}
+                            <div class="mt-4">
+                                <h6>📝 Descrizione</h6>
+                                <div class="alert alert-info">
+                                    {{ notifica.descrizione|nl2br|safe }}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if notifica.log_invio %}
+                            <div class="mt-4">
+                                <h6>📊 Dettagli Log Invio</h6>
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td><strong>Oggetto Email:</strong></td>
+                                        <td>{{ notifica.log_invio.oggetto_email }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Esito:</strong></td>
+                                        <td>
+                                            <span class="badge {{ notifica.log_invio.esito_badge_class }}">
+                                                {{ notifica.log_invio.esito_display }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Timestamp:</strong></td>
+                                        <td>{{ notifica.log_invio.timestamp_formatted }}</td>
+                                    </tr>
+                                    {% if notifica.log_invio.errore %}
+                                    <tr>
+                                        <td><strong>Errore:</strong></td>
+                                        <td class="text-danger">{{ notifica.log_invio.errore }}</td>
+                                    </tr>
+                                    {% endif %}
+                                </table>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">⚡ Azioni Rapide</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                {% if notifica.is_nuovo %}
+                                <button class="btn btn-success" onclick="marcaLetta({{ notifica.id }})">
+                                    ✅ Marca come letta
+                                </button>
+                                {% else %}
+                                <button class="btn btn-secondary" disabled>
+                                    ✅ Già letta
+                                </button>
+                                {% endif %}
+                                
+                                <a href="{{ url_for('ceo_notifications.notifiche_list') }}" class="btn btn-outline-primary">
+                                    📋 Torna alla lista
+                                </a>
+                                
+                                {% if notifica.log_invio %}
+                                <a href="{{ url_for('admin.invii_pdf') }}" class="btn btn-outline-info">
+                                    📊 Log Invii PDF
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">ℹ️ Informazioni</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-muted">
+                                Questa notifica è stata generata automaticamente dal sistema 
+                                quando un admin ha inviato un PDF sensibile che soddisfa i criteri 
+                                di notifica al CEO.
+                            </p>
+                            <p class="small text-muted">
+                                <strong>Criteri di notifica:</strong><br>
+                                • Email destinatario esterna (non aziendale)<br>
+                                • Guest con scadenza < 3 giorni<br>
+                                • Utente con alert AI livello alto/critico
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function marcaLetta(notificaId) {
+    fetch(`/ceo/notifiche/${notificaId}/marca_letta`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() if csrf_token else "" }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante l\'operazione');
+    });
+}
+</script>
+{% endblock %}

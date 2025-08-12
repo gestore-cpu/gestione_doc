@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}🤖 Analisi AI Documenti - Dashboard Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h2><i class="fas fa-robot text-primary"></i> Analisi AI Documenti</h2>
+                            <p class="text-muted mb-0">Analisi intelligente di compliance e comportamenti per reparto</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{{ url_for('docs.admin_analisi_ai_report') }}" class="btn btn-info">
+                                <i class="fas fa-file-alt"></i> Report Completo
+                            </a>
+                            <a href="{{ url_for('docs.export_analisi_ai_report') }}" class="btn btn-success">
+                                <i class="fas fa-download"></i> Export Report
+                            </a>
+                            <a href="{{ url_for('docs.admin_analisi_documenti') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Torna all'Analisi
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche AI -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ risultato_ai.documenti_analizzati }}</h4>
+                    <p class="mb-0">📄 Analizzati</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h4>{{ risultato_ai.analisi_automatica.alert_critici|length }}</h4>
+                    <p class="mb-0">🚨 Alert Critici</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4>{{ risultato_ai.analisi_automatica.reparti_virtuosi|length }}</h4>
+                    <p class="mb-0">🏆 Virtuosi</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4>{{ risultato_ai.analisi_automatica.reparti_problematici|length }}</h4>
+                    <p class="mb-0">⚠️ Problematici</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4>{{ risultato_ai.analisi_automatica.documenti_prioritari|length }}</h4>
+                    <p class="mb-0">📋 Prioritari</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ risultato_ai.statistiche_ai.compliance_rate_generale }}%</h4>
+                    <p class="mb-0">📈 Compliance</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Critici -->
+    {% if risultato_ai.analisi_automatica.alert_critici %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5><i class="fas fa-exclamation-triangle"></i> Alert Critici ({{ risultato_ai.analisi_automatica.alert_critici|length }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for alert in risultato_ai.analisi_automatica.alert_critici %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <span class="badge bg-danger">{{ alert.severita }}</span>
+                                        {{ alert.tipo }}
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Documento:</strong> {{ alert.documento }}</p>
+                                    <p><strong>Reparto:</strong> {{ alert.reparto }}</p>
+                                    <p><strong>Azione richiesta:</strong> {{ alert.azione }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Reparti Virtuosi -->
+    {% if risultato_ai.analisi_automatica.reparti_virtuosi %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5><i class="fas fa-trophy"></i> Reparti Virtuosi ({{ risultato_ai.analisi_automatica.reparti_virtuosi|length }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for reparto in risultato_ai.analisi_automatica.reparti_virtuosi %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h4 class="text-success">{{ reparto.reparto }}</h4>
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar bg-success" 
+                                             style="width: {{ reparto.compliance_rate }}%">
+                                            {{ reparto.compliance_rate }}%
+                                        </div>
+                                    </div>
+                                    <p class="mb-0">Compliance Rate</p>
+                                    <small class="text-muted">{{ reparto.documenti }} documenti gestiti</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Reparti Problematici -->
+    {% if risultato_ai.analisi_automatica.reparti_problematici %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-white">
+                    <h5><i class="fas fa-exclamation-circle"></i> Reparti Problematici ({{ risultato_ai.analisi_automatica.reparti_problematici|length }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for reparto in risultato_ai.analisi_automatica.reparti_problematici %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">{{ reparto.reparto }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar bg-warning" 
+                                             style="width: {{ reparto.compliance_rate }}%">
+                                            {{ reparto.compliance_rate }}%
+                                        </div>
+                                    </div>
+                                    <p><strong>Compliance Rate:</strong> {{ reparto.compliance_rate }}%</p>
+                                    <p><strong>Anomalie:</strong> {{ reparto.anomalie }}</p>
+                                    <p><strong>Azione:</strong> {{ reparto.azione }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Documenti Prioritari -->
+    {% if risultato_ai.analisi_automatica.documenti_prioritari %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5><i class="fas fa-flag"></i> Documenti Prioritari ({{ risultato_ai.analisi_automatica.documenti_prioritari|length }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Documento</th>
+                                    <th>Reparto</th>
+                                    <th>Priorità</th>
+                                    <th>Anomalie</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in risultato_ai.analisi_automatica.documenti_prioritari %}
+                                <tr>
+                                    <td><strong>{{ doc.documento }}</strong></td>
+                                    <td><span class="badge bg-info">{{ doc.reparto }}</span></td>
+                                    <td>
+                                        <span class="badge {% if doc.priorita == 'ALTA' %}bg-danger{% else %}bg-warning{% endif %}">
+                                            {{ doc.priorita }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% for anomalia in doc.anomalie %}
+                                        <span class="badge bg-secondary me-1">{{ anomalia }}</span>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Raccomandazioni -->
+    {% if risultato_ai.analisi_automatica.raccomandazioni %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5><i class="fas fa-lightbulb"></i> Raccomandazioni ({{ risultato_ai.analisi_automatica.raccomandazioni|length }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for racc in risultato_ai.analisi_automatica.raccomandazioni %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <span class="badge {% if racc.tipo == 'CRITICO' %}bg-danger{% else %}bg-warning{% endif %}">
+                                            {{ racc.tipo }}
+                                        </span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Descrizione:</strong> {{ racc.descrizione }}</p>
+                                    <p><strong>Azione suggerita:</strong> {{ racc.azione }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Statistiche Dettagliate -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar"></i> Statistiche Dettagliate per Reparto</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Reparto</th>
+                                    <th>Documenti</th>
+                                    <th>Compliance Rate</th>
+                                    <th>Engagement Rate</th>
+                                    <th>Download</th>
+                                    <th>Letture</th>
+                                    <th>Firme</th>
+                                    <th>Anomalie</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reparto, stats in risultato_ai.statistiche_ai.reparti_stats.items() %}
+                                <tr>
+                                    <td><strong>{{ reparto }}</strong></td>
+                                    <td>{{ stats.documenti }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar {% if stats.compliance_rate >= 80 %}bg-success{% elif stats.compliance_rate >= 50 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                                 style="width: {{ stats.compliance_rate }}%">
+                                                {{ stats.compliance_rate }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar bg-info" 
+                                                 style="width: {{ stats.engagement_rate }}%">
+                                                {{ stats.engagement_rate }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge bg-secondary">{{ stats.download_totali }}</span></td>
+                                    <td><span class="badge bg-primary">{{ stats.letture_totali }}</span></td>
+                                    <td><span class="badge bg-success">{{ stats.firme_totali }}</span></td>
+                                    <td>
+                                        {% if stats.anomalie > 0 %}
+                                        <span class="badge bg-danger">{{ stats.anomalie }}</span>
+                                        {% else %}
+                                        <span class="badge bg-success">0</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prompt AI -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-robot"></i> Prompt AI Generato</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6>Prompt utilizzato per l'analisi AI:</h6>
+                        <pre class="mb-0" style="max-height: 200px; overflow-y: auto;">{{ risultato_ai.prompt_ai }}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Inizializza tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+
+    // Auto-refresh ogni 5 minuti per aggiornamenti AI
+    setInterval(function() {
+        console.log('Aggiornamento automatico analisi AI...');
+        location.reload();
+    }, 300000);
+</script>
+{% endblock %}

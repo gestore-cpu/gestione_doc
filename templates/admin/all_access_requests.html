@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>📋 Storico richieste di accesso</h2>
+
+  <form class="row g-2 mb-4" method="get">
+    <div class="col-md-3">
+      <select name="user_id" class="form-select">
+        <option value="">🔍 Utente</option>
+        {% for u in users %}
+          <option value="{{ u.id }}" {% if request.args.get('user_id') == u.id|string %}selected{% endif %}>
+            {{ u.first_name or '' }} {{ u.last_name or '' }} ({{ u.email }})
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="file_id" class="form-select">
+        <option value="">📄 File</option>
+        {% for f in files %}
+          <option value="{{ f.id }}" {% if request.args.get('file_id') == f.id|string %}selected{% endif %}>
+            {{ f.title or f.original_filename }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="status" class="form-select">
+        <option value="">⚙️ Stato</option>
+        <option value="pending" {% if request.args.get('status') == 'pending' %}selected{% endif %}>In attesa</option>
+        <option value="approved" {% if request.args.get('status') == 'approved' %}selected{% endif %}>Approvata</option>
+        <option value="denied" {% if request.args.get('status') == 'denied' %}selected{% endif %}>Negata</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <button type="submit" class="btn btn-primary w-100">🔎 Filtra</button>
+    </div>
+  </form>
+
+  <!-- Pulsanti Esportazione -->
+  <div class="mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <a href="{{ url_for('admin.export_all_access_requests_csv', **request.args) }}" class="btn btn-outline-primary me-2">
+          <i class="fas fa-file-csv me-1"></i>
+          📤 Esporta CSV
+        </a>
+        <a href="{{ url_for('admin.export_all_access_requests_pdf', **request.args) }}" class="btn btn-outline-danger me-2">
+          <i class="fas fa-file-pdf me-1"></i>
+          📄 Esporta PDF
+        </a>
+      </div>
+      <div class="text-muted">
+        <small>
+          <i class="fas fa-info-circle me-1"></i>
+          Esporta {{ requests|length }} richieste con i filtri applicati
+        </small>
+      </div>
+      <div>
+        <a href="{{ url_for('admin.all_access_requests_stats') }}" class="btn btn-outline-info">
+          <i class="fas fa-chart-bar me-1"></i>
+          📊 Statistiche Avanzate
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h5 class="card-title mb-0">
+        <i class="fas fa-table me-2"></i>
+        Richieste di Accesso ({{ requests|length }} risultati)
+      </h5>
+    </div>
+    <div class="card-body p-0">
+      {% if requests %}
+      <div class="table-responsive">
+        <table class="table table-bordered table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Utente</th>
+              <th>File</th>
+              <th>Azienda</th>
+              <th>Reparto</th>
+              <th>Motivazione</th>
+              <th>Stato</th>
+              <th>Risposta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in requests %}
+            <tr>
+              <td>
+                <small class="text-muted">{{ r.created_at.strftime('%d/%m/%Y') }}</small><br>
+                <small class="text-muted">{{ r.created_at.strftime('%H:%M') }}</small>
+                {% if r.resolved_at %}
+                <br><small class="text-success">Risolta: {{ r.resolved_at.strftime('%d/%m/%Y') }}</small>
+                {% endif %}
+              </td>
+              <td>
+                <strong>{{ r.user.first_name or '' }} {{ r.user.last_name or '' }}</strong><br>
+                <small class="text-muted">{{ r.user.email }}</small>
+              </td>
+              <td>
+                <strong>{{ r.document.title or r.document.original_filename }}</strong>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark">{{ r.document.company.name if r.document.company else 'N/A' }}</span>
+              </td>
+              <td>
+                <small class="text-muted">{{ r.document.department.name if r.document.department else 'N/A' }}</small>
+              </td>
+              <td>
+                <div class="text-truncate" style="max-width: 200px;" title="{{ r.note or 'Nessuna motivazione' }}">
+                  {{ r.note or 'Nessuna motivazione' }}
+                </div>
+              </td>
+              <td>
+                {% if r.status == 'pending' %}
+                  <span class="badge bg-warning text-dark">
+                    <i class="fas fa-clock me-1"></i> In attesa
+                  </span>
+                {% elif r.status == 'approved' %}
+                  <span class="badge bg-success">
+                    <i class="fas fa-check me-1"></i> Approvata
+                  </span>
+                {% elif r.status == 'denied' %}
+                  <span class="badge bg-danger">
+                    <i class="fas fa-times me-1"></i> Negata
+                  </span>
+                {% endif %}
+              </td>
+              <td>
+                {% if r.risposta_ai %}
+                  <div class="text-truncate" style="max-width: 150px;" title="{{ r.risposta_ai }}">
+                    <i class="fas fa-comment-dots text-info me-1"></i>
+                    {{ r.risposta_ai }}
+                  </div>
+                {% else %}
+                  <span class="text-muted">
+                    {% if r.status == 'pending' %}
+                      <i class="fas fa-clock text-warning me-1"></i>
+                      In attesa di risposta
+                    {% elif r.status == 'approved' %}
+                      <i class="fas fa-check text-success me-1"></i>
+                      Approvata senza commenti
+                    {% else %}
+                      <i class="fas fa-minus text-muted me-1"></i>
+                      Nessuna risposta
+                    {% endif %}
+                  </span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5">
+        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+        <h4 class="text-muted">Nessuna richiesta di accesso trovata</h4>
+        <p class="text-muted">Non ci sono richieste di accesso che corrispondono ai filtri applicati.</p>
+        <a href="{{ url_for('admin.all_access_requests') }}" class="btn btn-outline-secondary">
+          <i class="fas fa-times me-1"></i>
+          Pulisci Filtri
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Statistiche -->
+  <div class="row mt-4">
+    <div class="col-md-3">
+      <div class="card bg-primary text-white">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="fas fa-list me-2"></i>
+            Totale Richieste
+          </h5>
+          <h3 class="mb-0">{{ requests|length }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-warning text-dark">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="fas fa-clock me-2"></i>
+            In Attesa
+          </h5>
+          <h3 class="mb-0">{{ requests|selectattr('status', 'equalto', 'pending')|list|length }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-success text-white">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="fas fa-check me-2"></i>
+            Approvate
+          </h5>
+          <h3 class="mb-0">{{ requests|selectattr('status', 'equalto', 'approved')|list|length }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-danger text-white">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="fas fa-times me-2"></i>
+            Negate
+          </h5>
+          <h3 class="mb-0">{{ requests|selectattr('status', 'equalto', 'denied')|list|length }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Informazioni Aggiuntive -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="alert alert-info">
+        <h6><i class="fas fa-info-circle me-2"></i>Informazioni sulle Richieste</h6>
+        <ul class="mb-0">
+          <li><strong>In Attesa:</strong> Richieste ricevute e in attesa di valutazione</li>
+          <li><strong>Approvate:</strong> Richieste approvate con accesso concesso</li>
+          <li><strong>Negate:</strong> Richieste respinte con motivazione</li>
+          <li><strong>Risposta:</strong> Messaggio dell'amministratore in caso di diniego o chiarimenti</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Inizializza tooltip Bootstrap
+  var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'))
+  var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl)
+  })
+  
+  // Auto-refresh ogni 60 secondi se ci sono richieste pendenti
+  {% if requests|selectattr('status', 'equalto', 'pending')|list|length > 0 %}
+  setInterval(() => {
+    location.reload();
+  }, 60000);
+  {% endif %}
+</script>
+{% endblock %} 

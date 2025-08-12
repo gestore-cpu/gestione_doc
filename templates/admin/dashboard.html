@@ -98,6 +98,505 @@
                       💡 Suggerimenti AI
                     </a>
                     <a href="{{ url_for('admin.ai_analysis_dashboard') }}" class="btn btn-outline-info btn-sm">
+                    <a href="{{ url_for('ai_analisi.ai_report_attivita_page') }}" class="btn btn-outline-success btn-sm">
+                      🧠 Report AI Attività
+                    </a>
+
+<!-- === SEZIONE LETTURE PDF === -->
+<div class="pdf-readings-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-primary mb-0">📄 Tracciamento Letture PDF</h3>
+    <a href="{{ url_for('docs.admin_letture_pdf') }}" class="btn btn-outline-primary btn-sm">
+      📊 Dashboard Letture
+    </a>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-4">
+      <div class="card bg-primary text-white">
+        <div class="card-body text-center">
+          <h4 id="pdf-readings-total">-</h4>
+          <p class="mb-0">👁️ Letture Totali</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-success text-white">
+        <div class="card-body text-center">
+          <h4 id="pdf-readings-today">-</h4>
+          <p class="mb-0">📅 Letture Oggi</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4 id="pdf-readings-docs">-</h4>
+          <p class="mb-0">📋 Documenti Visualizzati</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-3">
+    <div class="col-12">
+      <div class="card bg-light">
+        <div class="card-body">
+          <h5 class="card-title">📈 Statistiche Letture PDF</h5>
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <p class="mb-2">
+                <i class="fas fa-eye"></i> <strong>Tracciamento attivo:</strong> 
+                Ogni visualizzazione PDF viene automaticamente registrata con IP, dispositivo e timestamp.
+              </p>
+              <p class="mb-0">
+                <i class="fas fa-chart-line"></i> <strong>Monitoraggio completo:</strong> 
+                Dashboard dedicata per analizzare pattern di lettura e comportamento utenti.
+              </p>
+            </div>
+            <div class="text-end">
+              <a href="{{ url_for('docs.admin_letture_pdf') }}" class="btn btn-primary">
+                <i class="fas fa-chart-bar"></i> Visualizza Dashboard
+              </a>
+              <a href="{{ url_for('docs.export_letture_pdf_csv') }}" class="btn btn-outline-success">
+                <i class="fas fa-download"></i> Export CSV
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === SEZIONE FIRME DOCUMENTI === -->
+<div class="document-signatures-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-success mb-0">🖋️ Firme Digitali Documenti</h3>
+    <a href="{{ url_for('docs.admin_firme_documenti') }}" class="btn btn-outline-success btn-sm">
+      📊 Dashboard Firme
+    </a>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-3">
+      <div class="card bg-success text-white">
+        <div class="card-body text-center">
+          <h4 id="document-signatures-total">-</h4>
+          <p class="mb-0">🖋️ Firme Totali</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-primary text-white">
+        <div class="card-body text-center">
+          <h4 id="document-signatures-signed">-</h4>
+          <p class="mb-0">✅ Firmate</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-danger text-white">
+        <div class="card-body text-center">
+          <h4 id="document-signatures-rejected">-</h4>
+          <p class="mb-0">❌ Rifiutate</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4 id="document-signatures-today">-</h4>
+          <p class="mb-0">📅 Firme Oggi</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-3">
+    <div class="col-12">
+      <div class="card bg-light">
+        <div class="card-body">
+          <h5 class="card-title">📈 Statistiche Firme Digitali</h5>
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <p class="mb-2">
+                <i class="fas fa-signature"></i> <strong>Firma digitale:</strong> 
+                Sistema di firma semplice per conferma presa visione e compliance normativa.
+              </p>
+              <p class="mb-0">
+                <i class="fas fa-gavel"></i> <strong>Valore legale:</strong> 
+                Tracciamento completo con IP, timestamp e user agent per audit ISO/HACCP/GDPR.
+              </p>
+            </div>
+            <div class="text-end">
+              <a href="{{ url_for('docs.admin_firme_documenti') }}" class="btn btn-success">
+                <i class="fas fa-chart-bar"></i> Visualizza Dashboard
+              </a>
+              <a href="{{ url_for('docs.export_firme_documenti_csv') }}" class="btn btn-outline-success">
+                <i class="fas fa-download"></i> Export CSV
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === SEZIONE REGISTRO INVII PDF === -->
+<div class="registro-invii-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-info mb-0">📊 Registro Invii PDF</h3>
+    <a href="{{ url_for('docs.admin_registro_invii') }}" class="btn btn-outline-info btn-sm">
+      📊 Dashboard Registro
+    </a>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-2">
+      <div class="card bg-primary text-white">
+        <div class="card-body text-center">
+          <h4 id="registro-invii-total">-</h4>
+          <p class="mb-0">📋 Totali</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-success text-white">
+        <div class="card-body text-center">
+          <h4 id="registro-invii-completati">-</h4>
+          <p class="mb-0">✅ Completati</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-warning text-white">
+        <div class="card-body text-center">
+          <h4 id="registro-invii-attesa">-</h4>
+          <p class="mb-0">⏳ In Attesa</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-danger text-white">
+        <div class="card-body text-center">
+          <h4 id="registro-invii-rifiutati">-</h4>
+          <p class="mb-0">❌ Rifiutati</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4 id="registro-invii-firmati">-</h4>
+          <p class="mb-0">🖋️ Firmati</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-secondary text-white">
+        <div class="card-body text-center">
+          <h4 id="registro-invii-progresso">-</h4>
+          <p class="mb-0">📈 Progresso</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-3">
+    <div class="col-12">
+      <div class="card bg-light">
+        <div class="card-body">
+          <h5 class="card-title">📈 Statistiche Registro Invii PDF</h5>
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <p class="mb-2">
+                <i class="fas fa-chart-line"></i> <strong>Registro completo:</strong> 
+                Vista consolidata di invii, letture e firme con stato di avanzamento.
+              </p>
+              <p class="mb-0">
+                <i class="fas fa-tasks"></i> <strong>Monitoraggio processi:</strong> 
+                Tracciamento completo del flusso invio → lettura → firma per audit e compliance.
+              </p>
+            </div>
+            <div class="text-end">
+              <a href="{{ url_for('docs.admin_registro_invii') }}" class="btn btn-info">
+                <i class="fas fa-chart-bar"></i> Visualizza Dashboard
+              </a>
+              <a href="{{ url_for('docs.export_registro_invii_csv') }}" class="btn btn-outline-info">
+                <i class="fas fa-download"></i> Export CSV
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === SEZIONE REMINDER PDF === -->
+<div class="reminder-pdf-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-warning mb-0">📧 Reminder PDF Automatici</h3>
+    <div>
+      <button onclick="testReminderPDF()" class="btn btn-outline-warning btn-sm">
+        🧪 Test Reminder
+      </button>
+      <a href="{{ url_for('docs.admin_registro_invii') }}" class="btn btn-outline-warning btn-sm">
+        📊 Dashboard Registro
+      </a>
+    </div>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-3">
+      <div class="card bg-warning text-white">
+        <div class="card-body text-center">
+          <h4 id="reminder-pdf-total">-</h4>
+          <p class="mb-0">📋 Invii Totali</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-danger text-white">
+        <div class="card-body text-center">
+          <h4 id="reminder-pdf-lettura">-</h4>
+          <p class="mb-0">📄 Non Letti</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4 id="reminder-pdf-firma">-</h4>
+          <p class="mb-0">🖋️ Non Firmati</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-success text-white">
+        <div class="card-body text-center">
+          <h4 id="reminder-pdf-config">-</h4>
+          <p class="mb-0">⚙️ Configurazione</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-3">
+    <div class="col-12">
+      <div class="card bg-light">
+        <div class="card-body">
+          <h5 class="card-title">📧 Sistema Reminder PDF Automatici</h5>
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <p class="mb-2">
+                <i class="fas fa-bell"></i> <strong>Reminder automatici:</strong> 
+                Controllo giornaliero alle 8:00 per documenti non letti (3 giorni) o non firmati (5 giorni).
+              </p>
+              <p class="mb-0">
+                <i class="fas fa-envelope"></i> <strong>Email automatiche:</strong> 
+                Invio promemoria con link diretto per leggere/firmare i documenti in sospeso.
+              </p>
+            </div>
+            <div class="text-end">
+              <button onclick="testReminderPDF()" class="btn btn-warning">
+                <i class="fas fa-play"></i> Test Manuale
+              </button>
+              <button onclick="loadReminderPDFStats()" class="btn btn-outline-warning">
+                <i class="fas fa-sync"></i> Aggiorna Stats
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === SEZIONE ANALISI DOCUMENTI === -->
+<div class="analisi-documenti-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-primary mb-0">📊 Analisi Aggregata Documenti</h3>
+    <div>
+      <a href="{{ url_for('docs.admin_analisi_documenti') }}" class="btn btn-outline-primary btn-sm">
+        📊 Dashboard Analisi
+      </a>
+      <a href="{{ url_for('docs.export_analisi_documenti_csv') }}" class="btn btn-outline-primary btn-sm">
+        📥 Export CSV
+      </a>
+    </div>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-2">
+      <div class="card bg-primary text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-documenti-total">-</h4>
+          <p class="mb-0">📄 Documenti</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-success text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-documenti-compliant">-</h4>
+          <p class="mb-0">✅ Compliant</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-warning text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-documenti-attesa">-</h4>
+          <p class="mb-0">⚠️ In Attesa</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-danger text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-documenti-non-utilizzati">-</h4>
+          <p class="mb-0">❌ Non Utilizzati</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-documenti-anomalie">-</h4>
+          <p class="mb-0">🚨 Anomalie</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-secondary text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-documenti-reparti">-</h4>
+          <p class="mb-0">🏢 Reparti</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-3">
+    <div class="col-12">
+      <div class="card bg-light">
+        <div class="card-body">
+          <h5 class="card-title">📊 Sistema Analisi Aggregata Documenti</h5>
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <p class="mb-2">
+                <i class="fas fa-chart-bar"></i> <strong>Analisi completa:</strong> 
+                Aggregazione di download, letture e firme per documento e reparto con rilevamento anomalie.
+              </p>
+              <p class="mb-0">
+                <i class="fas fa-chart-pie"></i> <strong>Compliance tracking:</strong> 
+                Monitoraggio stati compliance (Compliant, In Attesa, Non Utilizzati) con percentuali e statistiche.
+              </p>
+            </div>
+            <div class="text-end">
+              <a href="{{ url_for('docs.admin_analisi_documenti') }}" class="btn btn-primary">
+                <i class="fas fa-chart-bar"></i> Visualizza Analisi
+              </a>
+              <button onclick="loadAnalisiDocumentiStats()" class="btn btn-outline-primary">
+                <i class="fas fa-sync"></i> Aggiorna Stats
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === SEZIONE ANALISI AI DOCUMENTI === -->
+<div class="analisi-ai-documenti-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-info mb-0">🤖 Analisi AI Documenti</h3>
+    <div>
+      <a href="{{ url_for('docs.admin_analisi_ai') }}" class="btn btn-outline-primary btn-sm">
+        🧠 Analisi AI Avanzata
+      </a>
+      <a href="{{ url_for('docs.admin_analisi_ai_documenti') }}" class="btn btn-outline-info btn-sm">
+        🤖 Dashboard AI
+      </a>
+      <a href="{{ url_for('docs.admin_analisi_ai_report') }}" class="btn btn-outline-info btn-sm">
+        📋 Report AI
+      </a>
+    </div>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-2">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-ai-documenti">-</h4>
+          <p class="mb-0">📄 Analizzati</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-danger text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-ai-alert">-</h4>
+          <p class="mb-0">🚨 Alert Critici</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-success text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-ai-virtuosi">-</h4>
+          <p class="mb-0">🏆 Virtuosi</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-warning text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-ai-problematici">-</h4>
+          <p class="mb-0">⚠️ Problematici</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-primary text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-ai-prioritari">-</h4>
+          <p class="mb-0">📋 Prioritari</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card bg-secondary text-white">
+        <div class="card-body text-center">
+          <h4 id="analisi-ai-compliance">-</h4>
+          <p class="mb-0">📈 Compliance</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-3">
+    <div class="col-12">
+      <div class="card bg-light">
+        <div class="card-body">
+          <h5 class="card-title">🤖 Sistema Analisi AI Documenti</h5>
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <p class="mb-2">
+                <i class="fas fa-robot"></i> <strong>Analisi intelligente:</strong> 
+                Rilevamento automatico di anomalie, reparti problematici e suggerimenti per migliorare la compliance.
+              </p>
+              <p class="mb-0">
+                <i class="fas fa-lightbulb"></i> <strong>Insights automatici:</strong> 
+                Alert critici, raccomandazioni formative e identificazione di documenti prioritari per azioni correttive.
+              </p>
+            </div>
+            <div class="text-end">
+              <a href="{{ url_for('docs.admin_analisi_ai_documenti') }}" class="btn btn-info">
+                <i class="fas fa-robot"></i> Visualizza Analisi AI
+              </a>
+              <button onclick="loadAnalisiAIStats()" class="btn btn-outline-info">
+                <i class="fas fa-sync"></i> Aggiorna Stats
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
                     <a href="{{ url_for('admin.documenti_inviati') }}" class="btn btn-outline-success btn-sm">
                       📧 Documenti Inviati
                     </a>
@@ -109,10 +608,75 @@
                     <a href="{{ url_for('admin.ai_alerts') }}" class="btn btn-outline-danger btn-sm">
                       🚨 Alert AI Sicurezza
                     </a>
-                    <a href="{{ url_for('admin.download_logs') }}" class="btn btn-outline-primary btn-sm">
-                      📥 Log Download
+                                        <a href="{{ url_for('admin.download_logs') }}" class="btn btn-outline-primary btn-sm">
+                        📥 Log Download
+                    </a>
+                    <a href="{{ url_for('admin.download_alerts') }}" class="btn btn-outline-danger btn-sm">
+                        🚨 Alert Download
+                    </a>
+                    <a href="{{ url_for('admin.downloads_dashboard') }}" class="btn btn-outline-info btn-sm">
+                        📥 Log Download
+                    </a>
+                    <a href="{{ url_for('admin.access_requests_dashboard') }}" class="btn btn-outline-warning btn-sm">
+                        🔐 Richieste Accesso
+                    </a>
+                    <a href="{{ url_for('admin.access_request_alerts') }}" class="btn btn-outline-danger btn-sm">
+                        🚨 Alert Richieste
                     </a>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === SEZIONE GESTIONE UTENTI E GUEST MERCURY === -->
+<div class="user-management-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-primary mb-0">👥 Gestione Utenti & Guest Mercury</h3>
+    <div>
+      <a href="{{ url_for('admin.mercury_users') }}" class="btn btn-outline-primary btn-sm me-2">
+        👤 Gestione Utenti
+      </a>
+      <a href="{{ url_for('admin.mercury_guests') }}" class="btn btn-outline-warning btn-sm">
+        🕐 Gestione Guest
+      </a>
+    </div>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-3">
+      <div class="card bg-primary text-white">
+        <div class="card-body text-center">
+          <h4>👤 Utenti</h4>
+          <p class="mb-0">Gestione completa utenti Mercury</p>
+          <small>Admin, User, Guest</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-warning text-dark">
+        <div class="card-body text-center">
+          <h4>🕐 Guest</h4>
+          <p class="mb-0">Accessi temporanei</p>
+          <small>Scadenze e proroghe</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-success text-white">
+        <div class="card-body text-center">
+          <h4>🔐 Permessi</h4>
+          <p class="mb-0">Controllo accessi</p>
+          <small>Ruoli e autorizzazioni</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4>📊 Attività</h4>
+          <p class="mb-0">Monitoraggio accessi</p>
+          <small>Log e statistiche</small>
         </div>
       </div>
     </div>
@@ -264,6 +828,12 @@
   document.addEventListener('DOMContentLoaded', function() {
     loadDeniedStatsDashboard();
     loadAIInsightsSummary();
+    loadPDFReadingsStats();
+    loadDocumentSignaturesStats();
+    loadRegistroInviiStats();
+    loadReminderPDFStats();
+    loadAnalisiDocumentiStats();
+    loadAnalisiAIStats();
   });
   
   // Funzione per caricare riepilogo insight AI
@@ -331,5 +901,273 @@
       button.disabled = false;
     });
   }
+  
+  // Funzione per caricare statistiche letture PDF
+  function loadPDFReadingsStats() {
+    fetch('/docs/admin/letture-pdf/stats')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('pdf-readings-total').textContent = data.total_letture || 0;
+        document.getElementById('pdf-readings-today').textContent = data.letture_oggi || 0;
+        document.getElementById('pdf-readings-docs').textContent = data.documenti_letture || 0;
+      })
+      .catch(error => {
+        console.error('Errore caricamento statistiche letture PDF:', error);
+        document.getElementById('pdf-readings-total').textContent = 'Errore';
+        document.getElementById('pdf-readings-today').textContent = 'Errore';
+        document.getElementById('pdf-readings-docs').textContent = 'Errore';
+      });
+  }
+  
+  // Funzione per caricare statistiche firme documenti
+  function loadDocumentSignaturesStats() {
+    fetch('/docs/admin/firme-documenti/stats')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('document-signatures-total').textContent = data.total_firme || 0;
+        document.getElementById('document-signatures-signed').textContent = data.firme_firmate || 0;
+        document.getElementById('document-signatures-rejected').textContent = data.firme_rifiutate || 0;
+        document.getElementById('document-signatures-today').textContent = data.firme_oggi || 0;
+      })
+      .catch(error => {
+        console.error('Errore caricamento statistiche firme documenti:', error);
+        document.getElementById('document-signatures-total').textContent = 'Errore';
+        document.getElementById('document-signatures-signed').textContent = 'Errore';
+        document.getElementById('document-signatures-rejected').textContent = 'Errore';
+        document.getElementById('document-signatures-today').textContent = 'Errore';
+      });
+  }
+  
+  // Funzione per caricare statistiche registro invii
+  function loadRegistroInviiStats() {
+    fetch('/docs/admin/registro-invii/stats')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('registro-invii-total').textContent = data.totali || 0;
+        document.getElementById('registro-invii-completati').textContent = data.completati || 0;
+        document.getElementById('registro-invii-attesa').textContent = data.in_attesa || 0;
+        document.getElementById('registro-invii-rifiutati').textContent = data.rifiutati || 0;
+        document.getElementById('registro-invii-firmati').textContent = data.firmati || 0;
+        document.getElementById('registro-invii-progresso').textContent = (data.percentuale_completamento || 0) + '%';
+      })
+      .catch(error => {
+        console.error('Errore caricamento statistiche registro invii:', error);
+        document.getElementById('registro-invii-total').textContent = 'Errore';
+        document.getElementById('registro-invii-completati').textContent = 'Errore';
+        document.getElementById('registro-invii-attesa').textContent = 'Errore';
+        document.getElementById('registro-invii-rifiutati').textContent = 'Errore';
+        document.getElementById('registro-invii-firmati').textContent = 'Errore';
+        document.getElementById('registro-invii-progresso').textContent = 'Errore';
+      });
+  }
+  
+  // Funzione per caricare statistiche reminder PDF
+  function loadReminderPDFStats() {
+    fetch('/docs/admin/reminder-pdf/stats')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('reminder-pdf-total').textContent = data.invii_totali || 0;
+        document.getElementById('reminder-pdf-lettura').textContent = data.potenziali_reminder_lettura || 0;
+        document.getElementById('reminder-pdf-firma').textContent = data.potenziali_reminder_firma || 0;
+        document.getElementById('reminder-pdf-config').textContent = `${data.giorni_lettura}d/${data.giorni_firma}d`;
+      })
+      .catch(error => {
+        console.error('Errore caricamento statistiche reminder PDF:', error);
+        document.getElementById('reminder-pdf-total').textContent = 'Errore';
+        document.getElementById('reminder-pdf-lettura').textContent = 'Errore';
+        document.getElementById('reminder-pdf-firma').textContent = 'Errore';
+        document.getElementById('reminder-pdf-config').textContent = 'Errore';
+      });
+  }
+  
+  // Funzione per testare i reminder PDF
+  function testReminderPDF() {
+    if (confirm('Eseguire il test manuale dei reminder PDF? Questo invierà email di promemoria se necessario.')) {
+      fetch('/docs/admin/test-reminder-pdf')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert(`✅ Test completato!\n\nReminder inviati: ${data.reminder_inviati}\nErrori: ${data.errori}`);
+          } else {
+            alert(`❌ Errore nel test: ${data.error || 'Errore sconosciuto'}`);
+          }
+        })
+        .catch(error => {
+          console.error('Errore nel test reminder PDF:', error);
+          alert('❌ Errore nella comunicazione con il server');
+        });
+    }
+  }
+  
+  // Funzione per caricare statistiche analisi documenti
+  function loadAnalisiDocumentiStats() {
+    fetch('/docs/admin/analisi-documenti/stats')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('analisi-documenti-total').textContent = data.total_documenti || 0;
+        document.getElementById('analisi-documenti-compliant').textContent = data.documenti_compliant || 0;
+        document.getElementById('analisi-documenti-attesa').textContent = data.documenti_in_attesa || 0;
+        document.getElementById('analisi-documenti-non-utilizzati').textContent = data.documenti_non_utilizzati || 0;
+        document.getElementById('analisi-documenti-anomalie').textContent = data.anomalie_totali || 0;
+        document.getElementById('analisi-documenti-reparti').textContent = data.total_reparti || 0;
+      })
+      .catch(error => {
+        console.error('Errore caricamento statistiche analisi documenti:', error);
+        document.getElementById('analisi-documenti-total').textContent = 'Errore';
+        document.getElementById('analisi-documenti-compliant').textContent = 'Errore';
+        document.getElementById('analisi-documenti-attesa').textContent = 'Errore';
+        document.getElementById('analisi-documenti-non-utilizzati').textContent = 'Errore';
+        document.getElementById('analisi-documenti-anomalie').textContent = 'Errore';
+        document.getElementById('analisi-documenti-reparti').textContent = 'Errore';
+      });
+  }
+  
+  // Funzione per caricare statistiche analisi AI
+  function loadAnalisiAIStats() {
+    fetch('/docs/admin/analisi-ai-documenti/stats')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('analisi-ai-documenti').textContent = data.documenti_analizzati || 0;
+        document.getElementById('analisi-ai-alert').textContent = data.alert_critici || 0;
+        document.getElementById('analisi-ai-virtuosi').textContent = data.reparti_virtuosi || 0;
+        document.getElementById('analisi-ai-problematici').textContent = data.reparti_problematici || 0;
+        document.getElementById('analisi-ai-prioritari').textContent = data.documenti_prioritari || 0;
+        document.getElementById('analisi-ai-compliance').textContent = (data.compliance_rate || 0) + '%';
+      })
+      .catch(error => {
+        console.error('Errore caricamento statistiche analisi AI:', error);
+        document.getElementById('analisi-ai-documenti').textContent = 'Errore';
+        document.getElementById('analisi-ai-alert').textContent = 'Errore';
+        document.getElementById('analisi-ai-virtuosi').textContent = 'Errore';
+        document.getElementById('analisi-ai-problematici').textContent = 'Errore';
+        document.getElementById('analisi-ai-prioritari').textContent = 'Errore';
+        document.getElementById('analisi-ai-compliance').textContent = 'Errore';
+      });
+  }
+  
+  // Funzione per caricare statistiche formazione Manus
+  function loadManusFormazioneStats() {
+    fetch('/admin/manus/mapping/list')
+      .then(response => response.json())
+      .then(data => {
+        const total = data.length;
+        const attivi = data.filter(m => m.active).length;
+        const mappati = data.filter(m => m.syn_user_id).length;
+        
+        document.getElementById('manus-mappings-total').textContent = total;
+        document.getElementById('manus-mappings-attivi').textContent = attivi;
+        document.getElementById('manus-mappings-mappati').textContent = mappati;
+        document.getElementById('manus-mappings-percentuale').textContent = 
+          total > 0 ? Math.round((mappati / total) * 100) + '%' : '0%';
+      })
+      .catch(error => {
+        console.error('Errore caricamento statistiche formazione Manus:', error);
+        document.getElementById('manus-mappings-total').textContent = 'Errore';
+        document.getElementById('manus-mappings-attivi').textContent = 'Errore';
+        document.getElementById('manus-mappings-mappati').textContent = 'Errore';
+        document.getElementById('manus-mappings-percentuale').textContent = 'Errore';
+      });
+  }
+</script>
+
+<!-- === SEZIONE FORMAZIONE MANUS === -->
+<div class="manus-formazione-section mb-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="text-success mb-0">🎓 Formazione Manus</h3>
+    <button class="btn btn-outline-success btn-sm" onclick="loadManusFormazioneStats()">
+      🔄 Aggiorna Statistiche
+    </button>
+  </div>
+  <div class="row mt-2">
+    <div class="col-md-3">
+      <div class="card bg-success text-white">
+        <div class="card-body text-center">
+          <h4 id="manus-mappings-total">-</h4>
+          <p class="mb-0">Mapping Totali</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-info text-white">
+        <div class="card-body text-center">
+          <h4 id="manus-mappings-attivi">-</h4>
+          <p class="mb-0">Mapping Attivi</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-warning text-dark">
+        <div class="card-body text-center">
+          <h4 id="manus-mappings-mappati">-</h4>
+          <p class="mb-0">Utenti Mappati</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-primary text-white">
+        <div class="card-body text-center">
+          <h4 id="manus-mappings-percentuale">-</h4>
+          <p class="mb-0">Copertura</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-3">
+    <div class="col-12">
+      <div class="card bg-light">
+        <div class="card-body">
+          <h5 class="card-title">📊 Gestione Mapping Utenti</h5>
+          <p class="card-text">Gestisci il mapping tra utenti Manus e utenti SYNTHIA per la copertura formazione.</p>
+          <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm" onclick="window.open('/admin/manus/mapping', '_blank')">
+              <i class="fas fa-users"></i> Dashboard Mapping
+            </button>
+            <button class="btn btn-info btn-sm" onclick="window.open('/admin/manus/coverage', '_blank')">
+              <i class="fas fa-chart-pie"></i> Dashboard Coverage
+            </button>
+            <button class="btn btn-warning btn-sm" onclick="testManusWebhook()">
+              <i class="fas fa-webhook"></i> Test Webhook
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Test webhook Manus
+function testManusWebhook() {
+  if (confirm('Eseguire test webhook Manus? Questo invierà un evento di test.')) {
+    const testData = {
+      course_id: "TEST_COURSE_123",
+      manus_user_id: "u_test123",
+      email: "test@example.com"
+    };
+    
+    fetch('/webhooks/manus/hooks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Manus-Event': 'COURSE_COMPLETED',
+        'X-Manus-Signature': 'test_signature'
+      },
+      body: JSON.stringify(testData)
+    })
+    .then(response => response.json())
+    .then(data => {
+      alert(`✅ Test webhook completato!\n\nRisposta: ${JSON.stringify(data, null, 2)}`);
+    })
+    .catch(error => {
+      console.error('Errore test webhook:', error);
+      alert('❌ Errore nel test webhook');
+    });
+  }
+}
+
+// Carica statistiche formazione Manus all'avvio
+document.addEventListener('DOMContentLoaded', function() {
+  loadManusFormazioneStats();
+});
 </script>
 {% endblock %}

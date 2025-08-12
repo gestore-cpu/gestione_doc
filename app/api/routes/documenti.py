@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, Form
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from app.database import get_db
+from app.database import db
 from app.models import User
 from app.services.permissions import filter_documents_for_user
 from app.models.ai_analysis import DocumentoAnalizzato
@@ -24,7 +24,7 @@ def log_tentativo_download(email, document_id):
 
 @router.get("/")
 def get_documenti_filtrati(
-    db: Session = Depends(get_db),
+    db: Session = Depends(db),
     user: User = Depends(get_current_user)
 ):
     # Estrai aziende e reparti dell’utente
@@ -57,7 +57,7 @@ def get_documenti_filtrati(
     return {"documenti": [d.filename for d in documenti_visibili]}
 
 @router.get("/{document_id}")
-def view_documento(document_id: int, request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def view_documento(document_id: int, request: Request, db: Session = Depends(db), user: User = Depends(get_current_user)):
     doc = db.query(DocumentoAnalizzato).filter_by(id=document_id).first()
     if not doc:
         raise HTTPException(404, "Documento non trovato")
@@ -85,7 +85,7 @@ def view_documento(document_id: int, request: Request, db: Session = Depends(get
 @router.get("/{document_id}/download")
 def download_document(
     document_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(db),
     user: User = Depends(get_current_user)
 ):
     doc = db.query(DocumentoAnalizzato).filter_by(id=document_id).first()
@@ -120,7 +120,7 @@ def download_document(
 async def richiedi_sblocco_documento(
     document_id: int,
     motivo: str = Form(...),
-    db: Session = Depends(get_db),
+    db: Session = Depends(db),
     user: User = Depends(get_current_user)
 ):
     doc = db.query(DocumentoAnalizzato).filter_by(id=document_id).first()

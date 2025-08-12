@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alert Critico Download</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #dc3545;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+        .alert-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .details {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .detail-value {
+            color: #6c757d;
+        }
+        .button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            color: #6c757d;
+            font-size: 12px;
+        }
+        .critical {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .warning {
+            color: #ffc107;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚨 Alert Critico Download</h1>
+        <p>Sistema di Sicurezza Documenti</p>
+    </div>
+    
+    <div class="content">
+        <div class="alert-box">
+            <h2>⚠️ Attenzione!</h2>
+            <p>È stato rilevato un <strong class="critical">comportamento sospetto</strong> nel sistema di download dei documenti che richiede la tua attenzione immediata.</p>
+        </div>
+        
+        <div class="details">
+            <h3>📋 Dettagli Alert</h3>
+            
+            <div class="detail-row">
+                <span class="detail-label">Regola Attivata:</span>
+                <span class="detail-value">{{ alert.rule }}</span>
+            </div>
+            
+            <div class="detail-row">
+                <span class="detail-label">Severità:</span>
+                <span class="detail-value critical">{{ alert.severity_display }}</span>
+            </div>
+            
+            <div class="detail-row">
+                <span class="detail-label">Utente Coinvolto:</span>
+                <span class="detail-value">{{ alert.user.username if alert.user else 'N/A' }}</span>
+            </div>
+            
+            <div class="detail-row">
+                <span class="detail-label">Indirizzo IP:</span>
+                <span class="detail-value">{{ alert.ip_address or 'N/A' }}</span>
+            </div>
+            
+            <div class="detail-row">
+                <span class="detail-label">File Coinvolto:</span>
+                <span class="detail-value">{{ alert.file.title if alert.file else 'N/A' }}</span>
+            </div>
+            
+            <div class="detail-row">
+                <span class="detail-label">Finestra Temporale:</span>
+                <span class="detail-value">
+                    {{ alert.window_from.strftime('%d/%m/%Y %H:%M') if alert.window_from else 'N/A' }} - 
+                    {{ alert.window_to.strftime('%d/%m/%Y %H:%M') if alert.window_to else 'N/A' }}
+                </span>
+            </div>
+            
+            <div class="detail-row">
+                <span class="detail-label">Data Rilevamento:</span>
+                <span class="detail-value">{{ alert.created_at.strftime('%d/%m/%Y %H:%M') if alert.created_at else 'N/A' }}</span>
+            </div>
+        </div>
+        
+        {% if alert.details and alert.details.description %}
+        <div class="details">
+            <h3>📊 Descrizione Dettagliata</h3>
+            <p>{{ alert.details.description }}</p>
+            
+            {% if alert.details.download_count %}
+            <div class="detail-row">
+                <span class="detail-label">Numero Download:</span>
+                <span class="detail-value">{{ alert.details.download_count }}</span>
+            </div>
+            {% endif %}
+            
+            {% if alert.details.timeframe_minutes %}
+            <div class="detail-row">
+                <span class="detail-label">Finestra Analisi:</span>
+                <span class="detail-value">{{ alert.details.timeframe_minutes }} minuti</span>
+            </div>
+            {% endif %}
+            
+            {% if alert.details.threshold %}
+            <div class="detail-row">
+                <span class="detail-label">Soglia Superata:</span>
+                <span class="detail-value">{{ alert.details.threshold }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div class="alert-box">
+            <h3>🔍 Azioni Raccomandate</h3>
+            <ul>
+                <li>Verifica l'identità dell'utente coinvolto</li>
+                <li>Controlla i permessi di accesso ai documenti</li>
+                <li>Analizza i pattern di download per anomalie</li>
+                <li>Considera l'implementazione di restrizioni temporanee se necessario</li>
+            </ul>
+        </div>
+        
+        <div style="text-align: center;">
+            <a href="{{ url_for('admin.download_alerts_dashboard', _external=True) }}" class="button">
+                🔗 Gestisci Alert
+            </a>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Questo è un alert automatico del sistema di sicurezza.</strong></p>
+            <p>Non rispondere a questa email. Per supporto tecnico, contatta l'amministratore di sistema.</p>
+            <p>Generato il {{ alert.created_at.strftime('%d/%m/%Y alle %H:%M') if alert.created_at else 'N/A' }}</p>
+        </div>
+    </div>
+</body>
+</html>

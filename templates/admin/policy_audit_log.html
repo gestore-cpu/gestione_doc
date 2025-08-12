@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-history me-2"></i>
+                        📋 Audit Log Regole AI
+                    </h2>
+                    <p class="text-muted mb-0">Tracciamento delle modifiche alle regole automatiche</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('admin.manage_ai_policies') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Torna alla Gestione
+                    </a>
+                    <button class="btn btn-outline-success" onclick="exportAuditLog()">
+                        <i class="fas fa-download me-1"></i>
+                        Esporta CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtri -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-filter me-2"></i>
+                        Filtri
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="actionFilter" class="form-label">Azione</label>
+                            <select class="form-select" id="actionFilter">
+                                <option value="">Tutte le azioni</option>
+                                <option value="policy_created">Creazione</option>
+                                <option value="policy_activated">Attivazione</option>
+                                <option value="policy_deactivated">Disattivazione</option>
+                                <option value="policy_deleted">Eliminazione</option>
+                                <option value="policy_edited">Modifica</option>
+                                <option value="policy_toggled">Toggle</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="userFilter" class="form-label">Utente</label>
+                            <select class="form-select" id="userFilter">
+                                <option value="">Tutti gli utenti</option>
+                                <!-- Popolato dinamicamente -->
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="dateFrom" class="form-label">Data da</label>
+                            <input type="date" class="form-control" id="dateFrom">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="dateTo" class="form-label">Data a</label>
+                            <input type="date" class="form-control" id="dateTo">
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <button class="btn btn-primary" onclick="applyFilters()">
+                                <i class="fas fa-search me-1"></i>
+                                Applica Filtri
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="clearFilters()">
+                                <i class="fas fa-times me-1"></i>
+                                Pulisci
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audit Log -->
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Log Eventi Regole AI
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if audit_logs %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Data/Ora</th>
+                                        <th>Utente</th>
+                                        <th>Azione</th>
+                                        <th>Regola</th>
+                                        <th>Dettagli</th>
+                                        <th>IP</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for log in audit_logs %}
+                                    <tr>
+                                        <td>
+                                            <small>{{ log.timestamp.strftime('%d/%m/%Y %H:%M:%S') if log.timestamp else 'N/A' }}</small>
+                                        </td>
+                                        <td>
+                                            <strong>{{ log.user.username if log.user else 'Sistema' }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ log.user.email if log.user else 'N/A' }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ get_action_color(log.action) }}">
+                                                <i class="fas fa-{{ get_action_icon(log.action) }} me-1"></i>
+                                                {{ get_action_display(log.action) }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if log.extra_info and log.extra_info.policy_name %}
+                                                <strong>{{ log.extra_info.policy_name }}</strong>
+                                                <br>
+                                                <small class="text-muted">ID: {{ log.extra_info.policy_id if log.extra_info.policy_id else 'N/A' }}</small>
+                                            {% else %}
+                                                <span class="text-muted">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-info" onclick="showDetails({{ loop.index0 }})">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">{{ log.ip_address if log.ip_address else 'N/A' }}</small>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Paginazione -->
+                        {% if audit_logs.has_prev or audit_logs.has_next %}
+                        <nav aria-label="Paginazione audit log">
+                            <ul class="pagination justify-content-center">
+                                {% if audit_logs.has_prev %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('admin.policy_audit_log', page=audit_logs.prev_num) }}">Precedente</a>
+                                    </li>
+                                {% endif %}
+                                
+                                {% for page_num in audit_logs.iter_pages() %}
+                                    {% if page_num %}
+                                        <li class="page-item {{ 'active' if page_num == audit_logs.page else '' }}">
+                                            <a class="page-link" href="{{ url_for('admin.policy_audit_log', page=page_num) }}">{{ page_num }}</a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if audit_logs.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('admin.policy_audit_log', page=audit_logs.next_num) }}">Successiva</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-info-circle text-muted fa-3x mb-3"></i>
+                            <p class="text-muted">Nessun evento di audit trovato</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Modal Dettagli -->
+            <div class="modal fade" id="detailsModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Dettagli Evento
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="event-details">
+                                <!-- I dettagli dell'evento verranno inseriti qui -->
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const auditLogs = {{ audit_logs|tojson if audit_logs else '[]' }};
+
+function showDetails(index) {
+    const log = auditLogs[index];
+    const modal = document.getElementById('detailsModal');
+    const content = document.getElementById('event-details');
+    
+    let detailsHtml = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Informazioni Evento</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Data/Ora:</strong> ${log.timestamp || 'N/A'}</li>
+                    <li><strong>Utente:</strong> ${log.user ? log.user.username : 'Sistema'}</li>
+                    <li><strong>Azione:</strong> ${log.action}</li>
+                    <li><strong>IP:</strong> ${log.ip_address || 'N/A'}</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Dettagli Regola</h6>
+                <ul class="list-unstyled">
+                    <li><strong>ID Regola:</strong> ${log.extra_info ? log.extra_info.policy_id : 'N/A'}</li>
+                    <li><strong>Nome Regola:</strong> ${log.extra_info ? log.extra_info.policy_name : 'N/A'}</li>
+                    <li><strong>Azione Regola:</strong> ${log.extra_info ? log.extra_info.policy_action : 'N/A'}</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    if (log.extra_info) {
+        detailsHtml += `
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h6>Dettagli Aggiuntivi</h6>
+                    <pre class="bg-light p-2 rounded"><code>${JSON.stringify(log.extra_info, null, 2)}</code></pre>
+                </div>
+            </div>
+        `;
+    }
+    
+    content.innerHTML = detailsHtml;
+    new bootstrap.Modal(modal).show();
+}
+
+function applyFilters() {
+    const actionFilter = document.getElementById('actionFilter').value;
+    const userFilter = document.getElementById('userFilter').value;
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    
+    // Costruisci URL con parametri
+    let url = '{{ url_for("admin.policy_audit_log") }}?';
+    const params = new URLSearchParams();
+    
+    if (actionFilter) params.append('action', actionFilter);
+    if (userFilter) params.append('user', userFilter);
+    if (dateFrom) params.append('date_from', dateFrom);
+    if (dateTo) params.append('date_to', dateTo);
+    
+    window.location.href = url + params.toString();
+}
+
+function clearFilters() {
+    document.getElementById('actionFilter').value = '';
+    document.getElementById('userFilter').value = '';
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+    
+    window.location.href = '{{ url_for("admin.policy_audit_log") }}';
+}
+
+function exportAuditLog() {
+    const actionFilter = document.getElementById('actionFilter').value;
+    const userFilter = document.getElementById('userFilter').value;
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    
+    let url = '{{ url_for("admin.export_policies") }}?export_audit=1';
+    const params = new URLSearchParams();
+    
+    if (actionFilter) params.append('action', actionFilter);
+    if (userFilter) params.append('user', userFilter);
+    if (dateFrom) params.append('date_from', dateFrom);
+    if (dateTo) params.append('date_to', dateTo);
+    
+    window.location.href = url + '&' + params.toString();
+}
+
+// Auto-refresh ogni 30 secondi
+setTimeout(() => {
+    if (confirm('Aggiornare l\'audit log con i dati più recenti?')) {
+        location.reload();
+    }
+}, 30000);
+</script>
+
+<style>
+.table th {
+    background-color: #f8f9fa;
+    border-top: none;
+}
+
+.badge {
+    font-size: 0.8em;
+}
+
+.modal-body pre {
+    max-height: 300px;
+    overflow-y: auto;
+}
+</style>
+{% endblock %} 

@@ -733,16 +733,1030 @@ def visualizza_documento(id):
         template: Template del documento
     """
     try:
-        from utils.read_tracker import track_document_read
+        from models import LetturaPDF
         
         document = Document.query.get_or_404(id)
         
-        # Tracciamento lettura automatico
+        # Verifica permessi
+        if not current_user.is_admin and not current_user.is_ceo:
+            if document.company_id != current_user.company_id:
+                flash("❌ Permessi insufficienti per visualizzare questo documento", "danger")
+                return redirect(url_for("docs.dashboard_docs"))
+        
+        # Tracciamento lettura automatico con nuovo modello LetturaPDF
         if current_user.is_authenticated:
-            track_document_read(document, current_user)
+            lettura = LetturaPDF(
+                user_id=current_user.id,
+                document_id=document.id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            db.session.add(lettura)
+            db.session.commit()
         
         return render_template("documenti/view_document.html", document=document)
         
     except Exception as e:
+        db.session.rollback()
         flash(f"❌ Errore durante la visualizzazione: {str(e)}", "danger")
-        return redirect(url_for("docs.dashboard_docs")) 
+        return redirect(url_for("docs.dashboard_docs"))
+
+
+@docs_bp.route("/documenti/<int:id>/view/pdf")
+@login_required
+def view_pdf_tracciato(id):
+    """
+    Visualizza un PDF con tracciamento della lettura.
+    
+    Args:
+        id (int): ID del documento PDF
+        
+    Returns:
+        template: Template per visualizzazione PDF
+    """
+    try:
+        from models import LetturaPDF
+        
+        document = Document.query.get_or_404(id)
+        
+        # Verifica permessi
+        if not current_user.is_admin and not current_user.is_ceo:
+            if document.company_id != current_user.company_id:
+                flash("❌ Permessi insufficienti per visualizzare questo documento", "danger")
+                return redirect(url_for("docs.dashboard_docs"))
+        
+        # Tracciamento lettura automatico
+        if current_user.is_authenticated:
+            lettura = LetturaPDF(
+                user_id=current_user.id,
+                document_id=document.id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            db.session.add(lettura)
+            db.session.commit()
+        
+        return render_template("documenti/view_pdf.html", document=document)
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"❌ Errore durante la visualizzazione PDF: {str(e)}", "danger")
+        return redirect(url_for("docs.dashboard_docs"))
+
+
+@docs_bp.route("/admin/letture-pdf")
+@login_required
+@admin_required
+def admin_letture_pdf():
+    """
+    Dashboard admin per visualizzare tutte le letture PDF.
+    
+    Returns:
+        template: Template con lista letture PDF
+    """
+    try:
+        from models import LetturaPDF
+        
+        # Ottieni tutte le letture ordinate per data (più recenti prima)
+        letture = LetturaPDF.query.order_by(LetturaPDF.timestamp.desc()).all()
+        
+        # Statistiche
+        total_letture = len(letture)
+        oggi = datetime.now().date()
+        letture_oggi = len([l for l in letture if l.timestamp.date() == oggi])
+        
+        # Raggruppa per documento
+        documenti_letture = {}
+        for lettura in letture:
+            if lettura.document_id not in documenti_letture:
+                documenti_letture[lettura.document_id] = []
+            documenti_letture[lettura.document_id].append(lettura)
+        
+        return render_template(
+            "admin/letture_pdf.html",
+            letture=letture,
+            total_letture=total_letture,
+            letture_oggi=letture_oggi,
+            documenti_letture=documenti_letture
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore nel caricamento delle letture PDF: {str(e)}", "danger")
+        return redirect(url_for("docs.dashboard_docs"))
+
+
+@docs_bp.route("/admin/letture-pdf/export/csv")
+@login_required
+@admin_required
+def export_letture_pdf_csv():
+    """
+    Export CSV di tutte le letture PDF.
+    
+    Returns:
+        CSV: File CSV con tutte le letture
+    """
+    try:
+        from models import LetturaPDF
+        import csv
+        from io import StringIO
+        
+        # Ottieni tutte le letture
+        letture = LetturaPDF.query.order_by(LetturaPDF.timestamp.desc()).all()
+        
+        # Crea il CSV in memoria
+        si = StringIO()
+        writer = csv.writer(si)
+        
+        # Header
+        writer.writerow([
+            "ID Lettura",
+            "Utente",
+            "Email Utente", 
+            "Documento",
+            "Data/Ora Lettura",
+            "IP Address",
+            "User Agent"
+        ])
+        
+        # Dati
+        for lettura in letture:
+            writer.writerow([
+                lettura.id,
+                lettura.user_display,
+                lettura.user.email if lettura.user else "N/A",
+                lettura.document_display,
+                lettura.timestamp_formatted,
+                lettura.ip_address or "N/A",
+                lettura.user_agent or "N/A"
+            ])
+        
+        # Prepara la risposta
+        output = si.getvalue()
+        si.close()
+        
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment;filename=letture_pdf_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore durante l'export: {str(e)}", "danger")
+        return redirect(url_for("docs.admin_letture_pdf"))
+
+
+@docs_bp.route("/admin/letture-pdf/stats")
+@login_required
+@admin_required
+def api_letture_pdf_stats():
+    """
+    API per ottenere statistiche delle letture PDF.
+    
+    Returns:
+        JSON: Statistiche delle letture PDF
+    """
+    try:
+        from models import LetturaPDF
+        
+        # Ottieni tutte le letture
+        letture = LetturaPDF.query.all()
+        
+        # Calcola statistiche
+        total_letture = len(letture)
+        oggi = datetime.now().date()
+        letture_oggi = len([l for l in letture if l.timestamp.date() == oggi])
+        
+        # Raggruppa per documento
+        documenti_letture = set()
+        for lettura in letture:
+            documenti_letture.add(lettura.document_id)
+        
+        return jsonify({
+            "total_letture": total_letture,
+            "letture_oggi": letture_oggi,
+            "documenti_letture": len(documenti_letture)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "error": f"Errore nel caricamento statistiche: {str(e)}"
+        }), 500
+
+
+@docs_bp.route("/admin/firme-documenti")
+@login_required
+@admin_required
+def admin_firme_documenti():
+    """
+    Dashboard admin per visualizzare tutte le firme dei documenti.
+    
+    Returns:
+        template: Template con lista firme documenti
+    """
+    try:
+        from models import FirmaDocumento
+        
+        # Ottieni tutte le firme ordinate per data (più recenti prima)
+        firme = FirmaDocumento.query.order_by(FirmaDocumento.timestamp.desc()).all()
+        
+        # Statistiche
+        total_firme = len(firme)
+        firme_oggi = len([f for f in firme if f.timestamp.date() == datetime.now().date()])
+        firme_firmate = len([f for f in firme if f.stato == 'firmato'])
+        firme_rifiutate = len([f for f in firme if f.stato == 'rifiutato'])
+        
+        # Raggruppa per documento
+        documenti_firme = {}
+        for firma in firme:
+            if firma.document_id not in documenti_firme:
+                documenti_firme[firma.document_id] = []
+            documenti_firme[firma.document_id].append(firma)
+        
+        return render_template(
+            "admin/firme_documenti.html",
+            firme=firme,
+            total_firme=total_firme,
+            firme_oggi=firme_oggi,
+            firme_firmate=firme_firmate,
+            firme_rifiutate=firme_rifiutate,
+            documenti_firme=documenti_firme
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore nel caricamento delle firme documenti: {str(e)}", "danger")
+        return redirect(url_for("docs.dashboard_docs"))
+
+
+@docs_bp.route("/admin/firme-documenti/export/csv")
+@login_required
+@admin_required
+def export_firme_documenti_csv():
+    """
+    Export CSV di tutte le firme dei documenti.
+    
+    Returns:
+        CSV: File CSV con tutte le firme
+    """
+    try:
+        from models import FirmaDocumento
+        import csv
+        from io import StringIO
+        
+        # Ottieni tutte le firme
+        firme = FirmaDocumento.query.order_by(FirmaDocumento.timestamp.desc()).all()
+        
+        # Crea il CSV in memoria
+        si = StringIO()
+        writer = csv.writer(si)
+        
+        # Header
+        writer.writerow([
+            "ID Firma",
+            "Utente",
+            "Email Utente", 
+            "Documento",
+            "Stato Firma",
+            "Data/Ora Firma",
+            "IP Address",
+            "Commento"
+        ])
+        
+        # Dati
+        for firma in firme:
+            writer.writerow([
+                firma.id,
+                firma.user_display,
+                firma.user.email if firma.user else "N/A",
+                firma.document_display,
+                firma.stato_display,
+                firma.timestamp_formatted,
+                firma.ip_address or "N/A",
+                firma.commento or "N/A"
+            ])
+        
+        # Prepara la risposta
+        output = si.getvalue()
+        si.close()
+        
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment;filename=firme_documenti_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore durante l'export: {str(e)}", "danger")
+        return redirect(url_for("docs.admin_firme_documenti"))
+
+
+@docs_bp.route("/admin/firme-documenti/stats")
+@login_required
+@admin_required
+def api_firme_documenti_stats():
+    """
+    API per ottenere statistiche delle firme documenti.
+    
+    Returns:
+        JSON: Statistiche delle firme documenti
+    """
+    try:
+        from models import FirmaDocumento
+        
+        # Ottieni tutte le firme
+        firme = FirmaDocumento.query.all()
+        
+        # Calcola statistiche
+        total_firme = len(firme)
+        oggi = datetime.now().date()
+        firme_oggi = len([f for f in firme if f.timestamp.date() == oggi])
+        firme_firmate = len([f for f in firme if f.stato == 'firmato'])
+        firme_rifiutate = len([f for f in firme if f.stato == 'rifiutato'])
+        
+        # Raggruppa per documento
+        documenti_firme = set()
+        for firma in firme:
+            documenti_firme.add(firma.document_id)
+        
+        return jsonify({
+            "total_firme": total_firme,
+            "firme_oggi": firme_oggi,
+            "firme_firmate": firme_firmate,
+            "firme_rifiutate": firme_rifiutate,
+            "documenti_firme": len(documenti_firme)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "error": f"Errore nel caricamento statistiche: {str(e)}"
+        }), 500
+
+
+@docs_bp.route("/admin/registro-invii")
+@login_required
+@admin_required
+def admin_registro_invii():
+    """
+    Dashboard admin per visualizzare il registro invii PDF con stato avanzamento.
+    
+    Returns:
+        template: Template con registro invii
+    """
+    try:
+        from services.registro_invii_service import RegistroInviiService
+        
+        # Ottieni il registro completo
+        registro = RegistroInviiService.get_registro_invii_completo()
+        
+        # Ottieni le statistiche
+        statistiche = RegistroInviiService.get_statistiche_registro()
+        
+        # Ottieni filtri dalla query string
+        filtro_stato = request.args.get('stato')
+        filtro_documento = request.args.get('documento', type=int)
+        filtro_utente = request.args.get('utente', type=int)
+        
+        # Applica filtri se presenti
+        if filtro_stato or filtro_documento or filtro_utente:
+            registro = RegistroInviiService.get_registro_filtrato(
+                filtro_stato=filtro_stato,
+                filtro_documento=filtro_documento,
+                filtro_utente=filtro_utente
+            )
+        
+        # Ordina per data invio (più recenti prima)
+        registro.sort(key=lambda x: x.data_invio, reverse=True)
+        
+        return render_template(
+            "admin/registro_invii.html",
+            registro=registro,
+            statistiche=statistiche,
+            filtro_stato=filtro_stato,
+            filtro_documento=filtro_documento,
+            filtro_utente=filtro_utente
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore nel caricamento del registro invii: {str(e)}", "danger")
+        return redirect(url_for("docs.dashboard_docs"))
+
+
+@docs_bp.route("/admin/registro-invii/export/csv")
+@login_required
+@admin_required
+def export_registro_invii_csv():
+    """
+    Export CSV del registro invii PDF.
+    
+    Returns:
+        CSV: File CSV con il registro invii
+    """
+    try:
+        from services.registro_invii_service import RegistroInviiService
+        import csv
+        from io import StringIO
+        
+        # Ottieni il registro completo
+        registro = RegistroInviiService.get_registro_invii_completo()
+        
+        # Crea il CSV in memoria
+        si = StringIO()
+        writer = csv.writer(si)
+        
+        # Header
+        writer.writerow([
+            "Documento",
+            "Utente",
+            "Email Utente",
+            "Data Invio",
+            "Inviato Da",
+            "Esito Invio",
+            "Stato Lettura",
+            "Data Lettura",
+            "IP Lettura",
+            "Stato Firma",
+            "Data Firma",
+            "IP Firma",
+            "Commento Firma",
+            "Progresso %",
+            "Stato Completo"
+        ])
+        
+        # Dati
+        for record in registro:
+            writer.writerow([
+                record.documento_titolo,
+                record.utente_nome,
+                record.utente_email,
+                record.data_invio_formatted,
+                record.inviato_da,
+                record.esito_invio_display,
+                record.stato_lettura_display,
+                record.data_lettura_formatted,
+                record.ip_lettura or "N/A",
+                record.stato_firma_display,
+                record.data_firma_formatted,
+                record.ip_firma or "N/A",
+                record.commento_firma or "N/A",
+                f"{record.progresso_percentuale}%",
+                "✅ Completato" if record.is_completo else "⏳ In Corso"
+            ])
+        
+        # Prepara la risposta
+        output = si.getvalue()
+        si.close()
+        
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment;filename=registro_invii_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore durante l'export: {str(e)}", "danger")
+        return redirect(url_for("docs.admin_registro_invii"))
+
+
+@docs_bp.route("/admin/registro-invii/stats")
+@login_required
+@admin_required
+def api_registro_invii_stats():
+    """
+    API per ottenere statistiche del registro invii.
+    
+    Returns:
+        JSON: Statistiche del registro invii
+    """
+    try:
+        from services.registro_invii_service import RegistroInviiService
+        
+        statistiche = RegistroInviiService.get_statistiche_registro()
+        
+        return jsonify(statistiche)
+        
+    except Exception as e:
+        return jsonify({
+            "error": f"Errore nel caricamento statistiche: {str(e)}"
+        }), 500
+
+
+@docs_bp.route("/admin/registro-invii/dettagli/<int:invio_id>")
+@login_required
+@admin_required
+def dettagli_invio(invio_id):
+    """
+    Mostra i dettagli completi di un singolo invio.
+    
+    Args:
+        invio_id (int): ID dell'invio PDF
+        
+    Returns:
+        template: Template con dettagli invio
+    """
+    try:
+        from services.registro_invii_service import RegistroInviiService
+        
+        dettagli = RegistroInviiService.get_dettagli_invio(invio_id)
+        
+        if not dettagli:
+            flash("❌ Invio non trovato", "danger")
+            return redirect(url_for("docs.admin_registro_invii"))
+        
+        return render_template(
+            "admin/dettagli_invio.html",
+            dettagli=dettagli
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore nel caricamento dettagli: {str(e)}", "danger")
+        return redirect(url_for("docs.admin_registro_invii"))
+
+
+@docs_bp.route("/admin/test-reminder-pdf")
+@login_required
+@admin_required
+def test_reminder_pdf():
+    """
+    Route per testare manualmente il sistema di reminder PDF.
+    
+    Returns:
+        JSON: Risultato del test
+    """
+    try:
+        from services.pdf_reminder_service import PDFReminderService
+        
+        # Esegui il controllo reminder
+        result = PDFReminderService.check_reminder_pdf()
+        
+        if result.get('success'):
+            reminder_inviati = result.get('reminder_inviati', 0)
+            errori = result.get('errori', 0)
+            
+            flash(f"✅ Test reminder completato - {reminder_inviati} reminder inviati, {errori} errori", "success")
+        else:
+            flash(f"❌ Errore nel test reminder: {result.get('error', 'Errore sconosciuto')}", "danger")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        error_msg = f"❌ Errore nel test reminder PDF: {str(e)}"
+        flash(error_msg, "danger")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@docs_bp.route("/admin/reminder-pdf/stats")
+@login_required
+@admin_required
+def api_reminder_pdf_stats():
+    """
+    API per ottenere statistiche sui reminder PDF.
+    
+    Returns:
+        JSON: Statistiche sui reminder
+    """
+    try:
+        from services.pdf_reminder_service import PDFReminderService
+        
+        statistiche = PDFReminderService.get_statistiche_reminder()
+        
+        return jsonify(statistiche)
+        
+    except Exception as e:
+        return jsonify({
+            "error": f"Errore nel caricamento statistiche reminder: {str(e)}"
+        }), 500
+
+
+@docs_bp.route("/admin/analisi-documenti")
+@login_required
+@admin_required
+def admin_analisi_documenti():
+    """
+    Dashboard admin per l'analisi aggregata dei documenti.
+    
+    Returns:
+        template: Template con analisi documenti
+    """
+    try:
+        from services.document_analytics_service import DocumentAnalyticsService
+        
+        # Ottieni filtri dalla query string
+        filtro_reparto = request.args.get('reparto')
+        filtro_stato = request.args.get('stato')
+        solo_anomalie = request.args.get('anomalie', type=bool)
+        
+        # Ottieni l'analisi completa
+        if solo_anomalie:
+            analisi_data = DocumentAnalyticsService.get_documenti_con_anomalie()
+        else:
+            analisi_data = DocumentAnalyticsService.get_analisi_aggregata_documenti()
+        
+        # Applica filtri
+        if filtro_reparto:
+            analisi_data = [item for item in analisi_data if item['reparto'] == filtro_reparto]
+        
+        if filtro_stato:
+            analisi_data = [item for item in analisi_data if item['stato_compliance'] == filtro_stato]
+        
+        # Ottieni statistiche generali
+        statistiche_generali = DocumentAnalyticsService.get_statistiche_generali()
+        
+        # Ottieni analisi per reparto
+        analisi_per_reparto = DocumentAnalyticsService.get_analisi_per_reparto()
+        
+        return render_template(
+            "admin/analisi_documenti.html",
+            analisi_data=analisi_data,
+            statistiche_generali=statistiche_generali,
+            analisi_per_reparto=analisi_per_reparto,
+            filtro_reparto=filtro_reparto,
+            filtro_stato=filtro_stato,
+            solo_anomalie=solo_anomalie
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore nel caricamento analisi documenti: {str(e)}", "danger")
+        return redirect(url_for("docs.dashboard_docs"))
+
+
+@docs_bp.route("/admin/analisi-documenti/export/csv")
+@login_required
+@admin_required
+def export_analisi_documenti_csv():
+    """
+    Export CSV dell'analisi aggregata documenti.
+    
+    Returns:
+        CSV: File CSV con l'analisi documenti
+    """
+    try:
+        from services.document_analytics_service import DocumentAnalyticsService
+        import csv
+        from io import StringIO
+        
+        # Ottieni l'analisi completa
+        analisi_data = DocumentAnalyticsService.get_analisi_aggregata_documenti()
+        
+        # Crea il CSV in memoria
+        si = StringIO()
+        writer = csv.writer(si)
+        
+        # Header
+        writer.writerow([
+            "ID Documento",
+            "Documento",
+            "Reparto",
+            "Uploader",
+            "Data Creazione",
+            "Download",
+            "Letture",
+            "Firme",
+            "Firme Rifiutate",
+            "Ultima Firma",
+            "Ultima Lettura",
+            "Ultimo Download",
+            "% Lettura",
+            "% Firma",
+            "Stato Compliance",
+            "Anomalie",
+            "Numero Anomalie"
+        ])
+        
+        # Dati
+        for item in analisi_data:
+            writer.writerow([
+                item['document_id'],
+                item['documento'],
+                item['reparto'],
+                item['uploader'],
+                item['data_creazione'],
+                item['download'],
+                item['letture'],
+                item['firme'],
+                item['firme_rifiutate'],
+                item['ultima_firma'] or "N/A",
+                item['ultima_lettura'] or "N/A",
+                item['ultimo_download'] or "N/A",
+                f"{item['percentuale_lettura']}%",
+                f"{item['percentuale_firma']}%",
+                item['stato_compliance'],
+                "; ".join(item['anomalie']) if item['anomalie'] else "Nessuna",
+                item['anomalie_count']
+            ])
+        
+        # Prepara la risposta
+        output = si.getvalue()
+        si.close()
+        
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment;filename=analisi_documenti_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore durante l'export: {str(e)}", "danger")
+        return redirect(url_for("docs.admin_analisi_documenti"))
+
+
+@docs_bp.route("/admin/analisi-documenti/stats")
+@login_required
+@admin_required
+def api_analisi_documenti_stats():
+    """
+    API per ottenere statistiche dell'analisi documenti.
+    
+    Returns:
+        JSON: Statistiche dell'analisi
+    """
+    try:
+        from services.document_analytics_service import DocumentAnalyticsService
+        
+        statistiche = DocumentAnalyticsService.get_statistiche_generali()
+        
+        return jsonify(statistiche)
+        
+    except Exception as e:
+        return jsonify({
+            "error": f"Errore nel caricamento statistiche analisi: {str(e)}"
+        }), 500
+
+
+@docs_bp.route("/admin/analisi-documenti/reparto/<int:reparto_id>")
+@login_required
+@admin_required
+def analisi_documenti_reparto(reparto_id):
+    """
+    Mostra l'analisi dettagliata per un reparto specifico.
+    
+    Args:
+        reparto_id (int): ID del reparto
+        
+    Returns:
+        template: Template con analisi reparto
+    """
+    try:
+        from services.document_analytics_service import DocumentAnalyticsService
+        from models import Department
+        
+        # Ottieni il reparto
+        reparto = Department.query.get_or_404(reparto_id)
+        
+        # Ottieni l'analisi per reparto
+        analisi_per_reparto = DocumentAnalyticsService.get_analisi_per_reparto()
+        
+        if reparto.name not in analisi_per_reparto:
+            flash("❌ Nessun dato trovato per questo reparto", "warning")
+            return redirect(url_for("docs.admin_analisi_documenti"))
+        
+        reparto_data = analisi_per_reparto[reparto.name]
+        
+        return render_template(
+            "admin/analisi_reparto.html",
+            reparto=reparto,
+            reparto_data=reparto_data
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore nel caricamento analisi reparto: {str(e)}", "danger")
+        return redirect(url_for("docs.admin_analisi_documenti"))
+
+
+@docs_bp.route("/admin/analisi-ai-documenti")
+@login_required
+@admin_required
+def admin_analisi_ai_documenti():
+    """
+    Dashboard admin per l'analisi AI dei documenti.
+    
+    Returns:
+        template: Template con analisi AI
+    """
+    try:
+        from services.ai_document_analysis_service import AIDocumentAnalysisService
+        
+        # Esegui l'analisi AI
+        risultato_ai = AIDocumentAnalysisService.analizza_documenti_con_ai()
+        
+        if not risultato_ai['success']:
+            flash(f"❌ Errore nell'analisi AI: {risultato_ai.get('error', 'Errore sconosciuto')}", "danger")
+            return redirect(url_for("docs.admin_analisi_documenti"))
+        
+        return render_template(
+            "admin/analisi_ai_documenti.html",
+            risultato_ai=risultato_ai
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore nel caricamento analisi AI: {str(e)}", "danger")
+        return redirect(url_for("docs.admin_analisi_documenti"))
+
+
+@docs_bp.route("/admin/analisi-ai-documenti/report")
+@login_required
+@admin_required
+def admin_analisi_ai_report():
+    """
+    Genera e mostra il report AI completo.
+    
+    Returns:
+        template: Template con report AI
+    """
+    try:
+        from services.ai_document_analysis_service import AIDocumentAnalysisService
+        
+        # Genera il report AI
+        report_ai = AIDocumentAnalysisService.genera_report_ai()
+        
+        return render_template(
+            "admin/analisi_ai_report.html",
+            report_ai=report_ai
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore nella generazione report AI: {str(e)}", "danger")
+        return redirect(url_for("docs.admin_analisi_ai_documenti"))
+
+
+@docs_bp.route("/admin/analisi-ai-documenti/export/report")
+@login_required
+@admin_required
+def export_analisi_ai_report():
+    """
+    Export del report AI in formato testo.
+    
+    Returns:
+        text: Report AI in formato testo
+    """
+    try:
+        from services.ai_document_analysis_service import AIDocumentAnalysisService
+        
+        # Genera il report AI
+        report_ai = AIDocumentAnalysisService.genera_report_ai()
+        
+        return Response(
+            report_ai,
+            mimetype="text/plain",
+            headers={"Content-Disposition": f"attachment;filename=report_ai_documenti_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"}
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore nell'export report AI: {str(e)}", "danger")
+        return redirect(url_for("docs.admin_analisi_ai_documenti"))
+
+
+@docs_bp.route("/admin/analisi-ai-documenti/stats")
+@login_required
+@admin_required
+def api_analisi_ai_stats():
+    """
+    API per ottenere statistiche dell'analisi AI.
+    
+    Returns:
+        JSON: Statistiche dell'analisi AI
+    """
+    try:
+        from services.ai_document_analysis_service import AIDocumentAnalysisService
+        
+        # Ottieni statistiche AI
+        stats = AIDocumentAnalysisService.get_stats()
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@docs_bp.route("/admin/analisi-ai")
+@login_required
+@admin_required
+def admin_analisi_ai():
+    """
+    Dashboard admin per l'analisi AI documentale avanzata.
+    Interfaccia per filtrare e visualizzare analisi AI in tempo reale.
+    
+    Returns:
+        template: Template con interfaccia analisi AI
+    """
+    try:
+        return render_template("admin/analisi_ai.html")
+        
+    except Exception as e:
+        flash(f"❌ Errore nel caricamento pagina analisi AI: {str(e)}", "danger")
+        return redirect(url_for("docs.admin_analisi_documenti"))
+
+
+@docs_bp.route("/documenti/<int:id>/firma")
+@login_required
+def firma_documento(id):
+    """
+    Pagina per firmare un documento.
+    
+    Args:
+        id (int): ID del documento da firmare
+        
+    Returns:
+        template: Template per la firma del documento
+    """
+    try:
+        from models import FirmaDocumento
+        
+        document = Document.query.get_or_404(id)
+        
+        # Verifica permessi
+        if not current_user.is_admin and not current_user.is_ceo:
+            if document.company_id != current_user.company_id:
+                flash("❌ Permessi insufficienti per firmare questo documento", "danger")
+                return redirect(url_for("docs.dashboard_docs"))
+        
+        # Verifica se l'utente ha già firmato questo documento
+        firma_esistente = FirmaDocumento.query.filter_by(
+            user_id=current_user.id,
+            document_id=document.id
+        ).first()
+        
+        return render_template(
+            "documenti/firma_documento.html", 
+            document=document,
+            firma_esistente=firma_esistente
+        )
+        
+    except Exception as e:
+        flash(f"❌ Errore durante il caricamento della pagina firma: {str(e)}", "danger")
+        return redirect(url_for("docs.dashboard_docs"))
+
+
+@docs_bp.route("/documenti/<int:id>/firma/action", methods=["POST"])
+@login_required
+def firma_documento_action(id):
+    """
+    Processa l'azione di firma (firma o rifiuto).
+    
+    Args:
+        id (int): ID del documento
+        
+    Returns:
+        redirect: Redirect alla dashboard o alla pagina firma
+    """
+    try:
+        from models import FirmaDocumento
+        
+        document = Document.query.get_or_404(id)
+        action = request.form.get('action')
+        commento = request.form.get('commento', '').strip()
+        
+        # Verifica permessi
+        if not current_user.is_admin and not current_user.is_ceo:
+            if document.company_id != current_user.company_id:
+                flash("❌ Permessi insufficienti per firmare questo documento", "danger")
+                return redirect(url_for("docs.dashboard_docs"))
+        
+        # Verifica se l'utente ha già firmato questo documento
+        firma_esistente = FirmaDocumento.query.filter_by(
+            user_id=current_user.id,
+            document_id=document.id
+        ).first()
+        
+        if firma_esistente:
+            flash("❌ Hai già firmato questo documento", "warning")
+            return redirect(url_for("docs.firma_documento", id=id))
+        
+        # Determina lo stato in base all'azione
+        if action == 'firma':
+            stato = 'firmato'
+            messaggio = "✅ Documento firmato con successo!"
+        elif action == 'rifiuta':
+            stato = 'rifiutato'
+            messaggio = "❌ Firma rifiutata e registrata."
+        else:
+            flash("❌ Azione non valida", "danger")
+            return redirect(url_for("docs.firma_documento", id=id))
+        
+        # Crea il record di firma
+        firma = FirmaDocumento(
+            user_id=current_user.id,
+            document_id=document.id,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            stato=stato,
+            commento=commento
+        )
+        
+        db.session.add(firma)
+        db.session.commit()
+        
+        flash(messaggio, "success")
+        return redirect(url_for("docs.dashboard_docs"))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"❌ Errore durante la firma: {str(e)}", "danger")
+        return redirect(url_for("docs.firma_documento", id=id)) 

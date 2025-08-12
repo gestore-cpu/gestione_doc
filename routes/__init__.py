@@ -13,6 +13,8 @@ from .firme_manuali_routes import firme_manuali_bp
 from .prove_evacuazione_routes import prove_evacuazione_bp
 from .visite_mediche_avanzate_routes import visite_mediche_avanzate_bp
 from .document_intelligence_routes import document_intelligence_bp
+from .ai_routes import ai_bp
+from .ai_analisi_routes import ai_analisi_bp
 
 # Lista di tutti i blueprint per la registrazione
 blueprints = [
@@ -29,5 +31,7 @@ blueprints = [
     firme_manuali_bp,
     prove_evacuazione_bp,
     visite_mediche_avanzate_bp,
-    document_intelligence_bp
+    document_intelligence_bp,
+    ai_bp,
+    ai_analisi_bp
 ]

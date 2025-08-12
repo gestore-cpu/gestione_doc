@@ -3,6 +3,99 @@
 {% block title %}Dashboard Documenti{% endblock %}
 
 {% block content %}
+<style>
+/* Stili personalizzati per l'analisi AI */
+.ai-report-content {
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-top: 0.5rem;
+}
+
+.ai-report-content h1, .ai-report-content h2, .ai-report-content h3 {
+    color: #0d6efd;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.ai-report-content strong {
+    color: #198754;
+}
+
+.ai-report-content .alert-section {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.ai-report-content .success-section {
+    background-color: #d1e7dd;
+    border: 1px solid #badbcc;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.ai-report-content .warning-section {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.ai-report-content .danger-section {
+    background-color: #f8d7da;
+    border: 1px solid #f5c2c7;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+/* Animazione per il bottone AI */
+.btn-ai-analyzing {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* Stili per il box AI */
+.ai-card {
+    transition: all 0.3s ease;
+}
+
+.ai-card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.ai-spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0dcaf0;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+
 <div class="container-fluid">
     <!-- Header della Dashboard Documenti -->
     <div class="row mb-4">
@@ -140,6 +233,134 @@
                                 <button class="btn btn-primary" onclick="applyFilters()">
                                     <i class="fas fa-filter"></i> Applica Filtri
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analisi AI Documenti -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-info ai-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-robot"></i> Analisi AI Documenti</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <p class="mb-0">
+                                <i class="fas fa-lightbulb"></i> 
+                                <strong>Analisi Intelligente:</strong> 
+                                Ottieni insights automatici sull'utilizzo dei documenti, compliance per reparto e suggerimenti per migliorare la gestione documentale.
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button id="analizzaAiBtn" class="btn btn-info">
+                                <i class="fas fa-robot"></i> 💡 Analizza con AI
+                            </button>
+                            <div id="aiSpinner" class="spinner-border text-info ms-2 d-none" role="status">
+                                <span class="visually-hidden">Caricamento...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Pulsanti Download Report -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="d-flex align-items-center">
+                                <span class="me-2"><i class="fas fa-download"></i> 📥 Scarica report:</span>
+                                <button class="btn btn-sm btn-outline-secondary me-2" onclick="downloadReport('txt')">
+                                    <i class="fas fa-file-alt"></i> .txt
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary me-2" onclick="downloadReport('pdf')">
+                                    <i class="fas fa-file-pdf"></i> .pdf
+                                </button>
+                                <div id="downloadSpinner" class="spinner-border spinner-border-sm text-secondary ms-2 d-none" role="status">
+                                    <span class="visually-hidden">Download...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                    
+                    <!-- Box Risultati AI -->
+                    <div id="aiReportBox" class="alert alert-info d-none mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0"><i class="fas fa-chart-bar"></i> Report Analisi AI</h6>
+                            <div>
+                                <button id="exportAiReportBtn" class="btn btn-sm btn-outline-info d-none" onclick="exportAiReport()">
+                                    <i class="fas fa-download"></i> Esporta Report
+                                </button>
+                                <button id="copyAiReportBtn" class="btn btn-sm btn-outline-secondary d-none" onclick="copyAiReport()">
+                                    <i class="fas fa-copy"></i> Copia
+                                </button>
+                            </div>
+                        </div>
+                        <div id="aiReportContent" class="ai-report-content"></div>
+                    </div>
+                    
+                    <div id="aiErrorBox" class="alert alert-danger d-none mt-3">
+                        <h6><i class="fas fa-exclamation-triangle"></i> Errore Analisi AI</h6>
+                        <div id="aiErrorContent"></div>
+                    </div>
+                    
+                    <!-- Grafico Statistiche per Reparto -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-chart-bar"></i> 📊 Statistiche per Reparto</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <canvas id="repartoChart" width="400" height="200"></canvas>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex flex-column">
+                                                <button class="btn btn-sm btn-outline-primary mb-2" onclick="loadRepartoStats()">
+                                                    <i class="fas fa-sync"></i> Aggiorna Grafico
+                                                </button>
+                                                <div id="chartSpinner" class="spinner-border spinner-border-sm text-primary d-none" role="status">
+                                                    <span class="visually-hidden">Caricamento...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analisi AI -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-robot"></i> 🧠 Analisi AI Documenti</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div id="analisiAI">
+                                                <p class="text-muted">Clicca "Carica Analisi AI" per visualizzare le statistiche avanzate.</p>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex flex-column">
+                                                <button class="btn btn-sm btn-outline-info mb-2" onclick="loadAnalisiAI()">
+                                                    <i class="fas fa-robot"></i> Carica Analisi AI
+                                                </button>
+                                                <div id="analisiSpinner" class="spinner-border spinner-border-sm text-info d-none" role="status">
+                                                    <span class="visually-hidden">Caricamento...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -294,8 +515,8 @@ function applyFilters() {
 
 function signDocument(docId) {
     if (confirm('Confermi di voler firmare questo documento?')) {
-        // Implementa la logica di firma
-        console.log('Firmando documento:', docId);
+        // Reindirizza alla pagina di firma
+        window.location.href = `/documenti/${docId}/firma`;
         
         // Trigger evento Jack
         document.dispatchEvent(new CustomEvent('jack-event', {
@@ -322,6 +543,304 @@ function exportToCSV() {
 function exportToPDF() {
     // Implementa l'esportazione PDF
     console.log('Esportando in PDF...');
+}
+
+// Funzione per esportare il report AI
+function exportAiReport() {
+    const reportContent = document.getElementById('aiReportContent');
+    const reportText = reportContent.textContent || reportContent.innerText;
+    
+    if (!reportText) {
+        alert('Nessun report disponibile per l\'esportazione.');
+        return;
+    }
+    
+    // Crea un blob con il contenuto del report
+    const blob = new Blob([reportText], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    
+    // Crea un link temporaneo per il download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `report_ai_documenti_${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Pulisci
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    console.log('✅ Report AI esportato con successo');
+}
+
+// Funzione per copiare il report AI negli appunti
+function copyAiReport() {
+    const reportContent = document.getElementById('aiReportContent');
+    const reportText = reportContent.textContent || reportContent.innerText;
+    
+    if (!reportText) {
+        alert('Nessun report disponibile per la copia.');
+        return;
+    }
+    
+    // Usa l'API Clipboard se disponibile
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(reportText).then(() => {
+            console.log('✅ Report AI copiato negli appunti');
+            // Mostra feedback visivo
+            const btn = document.getElementById('copyAiReportBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Copiato!';
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-success');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-secondary');
+            }, 2000);
+        }).catch(err => {
+            console.error('❌ Errore nella copia:', err);
+            alert('Errore nella copia del report. Riprovare.');
+        });
+    } else {
+        // Fallback per browser più vecchi
+        const textArea = document.createElement('textarea');
+        textArea.value = reportText;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        console.log('✅ Report AI copiato negli appunti (fallback)');
+        alert('Report copiato negli appunti!');
+    }
+}
+
+// Funzione per download del report AI
+function downloadReport(format) {
+    const downloadSpinner = document.getElementById('downloadSpinner');
+    const buttons = document.querySelectorAll('button[onclick^="downloadReport"]');
+    
+    // Mostra spinner e disabilita pulsanti
+    downloadSpinner.classList.remove('d-none');
+    buttons.forEach(btn => btn.disabled = true);
+    
+    // URL per il download
+    const downloadUrl = `/docs/ai/download_report?format=${format}`;
+    
+    // Crea un link temporaneo per il download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `report_ai_documenti_${new Date().toISOString().slice(0, 10)}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Nascondi spinner e riabilita pulsanti dopo un breve delay
+    setTimeout(() => {
+        downloadSpinner.classList.add('d-none');
+        buttons.forEach(btn => btn.disabled = false);
+    }, 2000);
+    
+    console.log(`✅ Download report AI in formato ${format} avviato`);
+}
+
+// Variabile globale per il grafico
+let repartoChart = null;
+
+// Funzione per caricare statistiche reparto e creare grafico
+function loadRepartoStats() {
+    const chartSpinner = document.getElementById('chartSpinner');
+    const canvas = document.getElementById('repartoChart');
+    
+    // Mostra spinner
+    chartSpinner.classList.remove('d-none');
+    
+    fetch('/docs/ai/reparto_stats')
+        .then(response => {
+            if (!response.ok) throw new Error(`Errore HTTP: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            console.log('✅ Statistiche reparto ricevute:', data);
+            
+            if (data.reparto_stats && data.reparto_stats.length > 0) {
+                createRepartoChart(data.reparto_stats);
+            } else {
+                console.log('⚠️ Nessun dato disponibile per il grafico');
+                // Mostra messaggio "Nessun dato"
+                if (repartoChart) {
+                    repartoChart.destroy();
+                }
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.font = '16px Arial';
+                ctx.fillStyle = '#6c757d';
+                ctx.textAlign = 'center';
+                ctx.fillText('Nessun dato disponibile', canvas.width / 2, canvas.height / 2);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Errore caricamento statistiche reparto:', error);
+            alert('Errore nel caricamento delle statistiche per reparto');
+        })
+        .finally(() => {
+            chartSpinner.classList.add('d-none');
+        });
+}
+
+// Funzione per caricare analisi AI
+function loadAnalisiAI() {
+    const analisiSpinner = document.getElementById('analisiSpinner');
+    const analisiContainer = document.getElementById('analisiAI');
+    
+    // Mostra spinner
+    analisiSpinner.classList.remove('d-none');
+    
+    fetch('/docs/ai/analisi_ai')
+        .then(response => {
+            if (!response.ok) throw new Error(`Errore HTTP: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            console.log('✅ Analisi AI ricevuta:', data);
+            
+            let html = '';
+            
+            // Reparti inattivi
+            html += `<div class="mb-3">
+                <strong>📌 Reparti inattivi (30gg):</strong><br>
+                <span class="text-muted">${data.reparti_inattivi.join(', ') || 'Nessuno'}</span>
+            </div>`;
+            
+            // Documenti obbligatori non scaricati
+            html += `<div class="mb-3">
+                <strong>🚨 Documenti obbligatori non scaricati:</strong><br>
+                <span class="text-muted">${data.documenti_obbligatori_non_scaricati.join(', ') || 'Tutti scaricati'}</span>
+            </div>`;
+            
+            // Utenti senza firme
+            html += `<div class="mb-3">
+                <strong>📤 Utenti senza firme:</strong><br>
+                <span class="text-muted">${data.utenti_scaricano_senza_firma.join(', ') || 'Tutti hanno firmato'}</span>
+            </div>`;
+            
+            // Download fuori orario
+            html += `<div class="mb-3">
+                <strong>🕒 Download fuori orario:</strong><br>
+                <ul class="list-unstyled">`;
+            if (data.download_fuori_orario.length > 0) {
+                data.download_fuori_orario.forEach(item => {
+                    html += `<li class="text-muted">• ${item}</li>`;
+                });
+            } else {
+                html += `<li class="text-muted">• Nessun download fuori orario</li>`;
+            }
+            html += `</ul></div>`;
+            
+            // Tipologie poco usate
+            html += `<div class="mb-3">
+                <strong>🏷️ Tipologie poco usate:</strong><br>
+                <ul class="list-unstyled">`;
+            if (data.tipi_poco_usati.length > 0) {
+                data.tipi_poco_usati.forEach(item => {
+                    html += `<li class="text-muted">• ${item.tipo}: ${item.count} download</li>`;
+                });
+            } else {
+                html += `<li class="text-muted">• Nessuna tipologia poco usata</li>`;
+            }
+            html += `</ul></div>`;
+            
+            analisiContainer.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('❌ Errore caricamento analisi AI:', error);
+            analisiContainer.innerHTML = '<p class="text-danger">Errore nel caricamento dell\'analisi AI</p>';
+        })
+        .finally(() => {
+            analisiSpinner.classList.add('d-none');
+        });
+}
+
+// Funzione per creare il grafico bar chart
+function createRepartoChart(stats) {
+    const canvas = document.getElementById('repartoChart');
+    const ctx = canvas.getContext('2d');
+    
+    // Distruggi grafico esistente se presente
+    if (repartoChart) {
+        repartoChart.destroy();
+    }
+    
+    // Prepara i dati per Chart.js
+    const labels = stats.map(item => item.nome);
+    const firmeData = stats.map(item => item.firme);
+    const downloadData = stats.map(item => item.download);
+    const lettureData = stats.map(item => item.letture);
+    
+    // Crea il grafico
+    repartoChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Firme',
+                    data: firmeData,
+                    backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Download',
+                    data: downloadData,
+                    backgroundColor: 'rgba(108, 117, 125, 0.8)',
+                    borderColor: 'rgba(108, 117, 125, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Letture',
+                    data: lettureData,
+                    backgroundColor: 'rgba(13, 202, 240, 0.8)',
+                    borderColor: 'rgba(13, 202, 240, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Numero di Operazioni'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Reparti'
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Statistiche Documenti per Reparto',
+                    font: {
+                        size: 16
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            }
+        }
+    });
 }
 
 // Funzionalità Chat Jack AI
@@ -355,49 +874,164 @@ document.getElementById("jackSendBtn").onclick = async function () {
 
 
 
-// Inizializzazione quando il DOM è pronto
-document.addEventListener('DOMContentLoaded', function() {
-    // Configurazione per Jack Onboarding
-    if (window.JackOnboarding) {
-        // Personalizza messaggi per questa dashboard
-        const dashboardMessages = [
-            {
-                text: "Ciao {{nome}}! 👋 Benvenuto nella Dashboard Documenti!",
-                action: null,
-                highlight: null
-            },
-            {
-                text: "Qui puoi vedere tutti i documenti aziendali organizzati.",
-                action: null,
-                highlight: '#documentsTable'
-            },
-            {
-                text: "Usa i filtri per trovare rapidamente quello che cerchi!",
-                action: null,
-                highlight: '.card-header'
-            },
-            {
-                text: "Clicca su 'Carica Documento' per aggiungere nuovi file.",
-                action: null,
-                highlight: '.btn-upload'
-            },
-            {
-                text: "Ogni documento può essere firmato, scaricato o analizzato con AI.",
-                action: null,
-                highlight: '.btn-group'
-            },
-            {
-                text: "Perfetto! Ora sei pronto per gestire i documenti! 🎯",
-                action: null,
-                highlight: null
+// Funzione per l'analisi AI dei documenti
+document.getElementById('analizzaAiBtn').addEventListener('click', function () {
+    const btn = this;
+    const spinner = document.getElementById('aiSpinner');
+    const reportBox = document.getElementById('aiReportBox');
+    const errorBox = document.getElementById('aiErrorBox');
+    const reportContent = document.getElementById('aiReportContent');
+    const errorContent = document.getElementById('aiErrorContent');
+
+    // Reset stato
+    reportBox.classList.add('d-none');
+    errorBox.classList.add('d-none');
+    spinner.classList.remove('d-none');
+    btn.disabled = true;
+    btn.classList.add('btn-ai-analyzing');
+    btn.innerHTML = '<i class="fas fa-robot"></i> 🔄 Analizzando...';
+
+    // Chiamata API AI
+    fetch('/docs/ai/analizza_utilizzo')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Errore HTTP: ${response.status} - ${response.statusText}`);
             }
-        ];
-        
-        // Aggiorna i messaggi se l'onboarding è disponibile
-        if (window.JackOnboarding.updateMessages) {
-            window.JackOnboarding.updateMessages(dashboardMessages);
-        }
-    }
+            return response.json();
+        })
+        .then(data => {
+            console.log('✅ Risposta AI ricevuta:', data);
+            
+            // Formatta il report per una migliore visualizzazione
+            let formattedReport = data.report;
+            
+            // Aggiungi statistiche se disponibili
+            if (data.statistiche) {
+                const stats = data.statistiche;
+                formattedReport = `
+📊 **STATISTICHE RAPIDE**
+- Documenti analizzati: ${stats.total_documenti || 0}
+- Reparti coinvolti: ${stats.total_reparti || 0}
+- Compliance Rate: ${stats.compliance_rate || 0}%
+- Documenti Compliant: ${stats.compliant || 0}
+- In Attesa: ${stats.in_attesa || 0}
+- Non Utilizzati: ${stats.non_utilizzati || 0}
+- Anomalie Totali: ${stats.total_anomalie || 0}
+
+---
+
+${formattedReport}
+                `;
+            }
+            
+            // Mostra il report
+            reportContent.innerHTML = formattedReport.replace(/\n/g, '<br>');
+            reportBox.classList.remove('d-none');
+            
+            // Mostra i pulsanti di azione
+            document.getElementById('exportAiReportBtn').classList.remove('d-none');
+            document.getElementById('copyAiReportBtn').classList.remove('d-none');
+            
+            // Scroll al report
+            reportBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        })
+        .catch(error => {
+            console.error('❌ Errore analisi AI:', error);
+            
+            let errorMessage = error.message || 'Errore imprevisto durante l\'analisi AI';
+            
+            // Gestione errori specifici
+            if (error.message.includes('404')) {
+                errorMessage = 'Route AI non trovata. Verificare che il server sia configurato correttamente.';
+            } else if (error.message.includes('500')) {
+                errorMessage = 'Errore interno del server durante l\'analisi AI. Riprovare più tardi.';
+            } else if (error.message.includes('timeout')) {
+                errorMessage = 'Timeout durante l\'analisi AI. L\'operazione ha impiegato troppo tempo.';
+            }
+            
+            errorContent.textContent = errorMessage;
+            errorBox.classList.remove('d-none');
+            
+            // Scroll all'errore
+            errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        })
+        .finally(() => {
+            // Ripristina stato
+            spinner.classList.add('d-none');
+            btn.disabled = false;
+            btn.classList.remove('btn-ai-analyzing');
+            btn.innerHTML = '<i class="fas fa-robot"></i> 💡 Analizza con AI';
+        });
 });
+
+    // Inizializzazione quando il DOM è pronto
+    document.addEventListener('DOMContentLoaded', function() {
+        // Carica Chart.js se non è già caricato
+        if (typeof Chart === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+            script.onload = function() {
+                console.log('✅ Chart.js caricato con successo');
+                // Carica automaticamente le statistiche reparto
+                loadRepartoStats();
+            };
+            document.head.appendChild(script);
+        } else {
+            // Chart.js già disponibile, carica subito le statistiche
+            loadRepartoStats();
+        }
+        
+        // Configurazione per Jack Onboarding
+        if (window.JackOnboarding) {
+            // Personalizza messaggi per questa dashboard
+            const dashboardMessages = [
+                {
+                    text: "Ciao {{nome}}! 👋 Benvenuto nella Dashboard Documenti!",
+                    action: null,
+                    highlight: null
+                },
+                {
+                    text: "Qui puoi vedere tutti i documenti aziendali organizzati.",
+                    action: null,
+                    highlight: '#documentsTable'
+                },
+                {
+                    text: "Usa i filtri per trovare rapidamente quello che cerchi!",
+                    action: null,
+                    highlight: '.card-header'
+                },
+                {
+                    text: "Clicca su 'Carica Documento' per aggiungere nuovi file.",
+                    action: null,
+                    highlight: '.btn-upload'
+                },
+                {
+                    text: "Ogni documento può essere firmato, scaricato o analizzato con AI.",
+                    action: null,
+                    highlight: '.btn-group'
+                },
+                {
+                    text: "Prova l'analisi AI per ottenere insights sui documenti! 🤖",
+                    action: null,
+                    highlight: '#analizzaAiBtn'
+                },
+                {
+                    text: "Visualizza le statistiche per reparto nel grafico! 📊",
+                    action: null,
+                    highlight: '#repartoChart'
+                },
+                {
+                    text: "Perfetto! Ora sei pronto per gestire i documenti! 🎯",
+                    action: null,
+                    highlight: null
+                }
+            ];
+            
+            // Aggiorna i messaggi se l'onboarding è disponibile
+            if (window.JackOnboarding.updateMessages) {
+                window.JackOnboarding.updateMessages(dashboardMessages);
+            }
+        }
+    });
 </script>
 {% endblock %} 

@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}📊 Registro Invii PDF - Dashboard Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h2><i class="fas fa-chart-line text-primary"></i> Registro Invii PDF</h2>
+                            <p class="text-muted mb-0">Monitoraggio completo degli invii PDF con stato di avanzamento</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{{ url_for('docs.export_registro_invii_csv') }}" class="btn btn-success">
+                                <i class="fas fa-download"></i> Export CSV
+                            </a>
+                            <a href="{{ url_for('docs.dashboard_docs') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Torna ai Documenti
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-list"></i> Totali</h4>
+                            <h2 class="mb-0">{{ statistiche.totali }}</h2>
+                            <p class="mb-0">Invii registrati</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-file-pdf fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-check-circle"></i> Completati</h4>
+                            <h2 class="mb-0">{{ statistiche.completati }}</h2>
+                            <p class="mb-0">Processi completi</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-clock"></i> In Attesa</h4>
+                            <h2 class="mb-0">{{ statistiche.in_attesa }}</h2>
+                            <p class="mb-0">Da completare</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-hourglass-half fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-times-circle"></i> Rifiutati</h4>
+                            <h2 class="mb-0">{{ statistiche.rifiutati }}</h2>
+                            <p class="mb-0">Firme rifiutate</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-times fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-eye"></i> Firmati</h4>
+                            <h2 class="mb-0">{{ statistiche.firmati }}</h2>
+                            <p class="mb-0">Documenti firmati</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-signature fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-percentage"></i> Progresso</h4>
+                            <h2 class="mb-0">{{ statistiche.percentuale_completamento }}%</h2>
+                            <p class="mb-0">Completamento</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-pie fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-filter"></i> Filtri</h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="{{ url_for('docs.admin_registro_invii') }}" class="row">
+                        <div class="col-md-3">
+                            <label for="stato" class="form-label">Stato</label>
+                            <select name="stato" id="stato" class="form-select">
+                                <option value="">Tutti gli stati</option>
+                                <option value="completato" {% if filtro_stato == 'completato' %}selected{% endif %}>✅ Completato</option>
+                                <option value="in_attesa" {% if filtro_stato == 'in_attesa' %}selected{% endif %}>⏳ In Attesa</option>
+                                <option value="rifiutato" {% if filtro_stato == 'rifiutato' %}selected{% endif %}>❌ Rifiutato</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="documento" class="form-label">Documento</label>
+                            <select name="documento" id="documento" class="form-select">
+                                <option value="">Tutti i documenti</option>
+                                <!-- Opzioni dinamiche per documenti -->
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="utente" class="form-label">Utente</label>
+                            <select name="utente" id="utente" class="form-select">
+                                <option value="">Tutti gli utenti</option>
+                                <!-- Opzioni dinamiche per utenti -->
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i> Filtra
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabella Registro -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-table"></i> Registro Invii PDF</h5>
+                </div>
+                <div class="card-body">
+                    {% if registro %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th><i class="fas fa-file-pdf"></i> Documento</th>
+                                        <th><i class="fas fa-user"></i> Utente</th>
+                                        <th><i class="fas fa-calendar"></i> Data Invio</th>
+                                        <th><i class="fas fa-envelope"></i> Inviato Da</th>
+                                        <th><i class="fas fa-check-circle"></i> Esito Invio</th>
+                                        <th><i class="fas fa-eye"></i> Stato Lettura</th>
+                                        <th><i class="fas fa-signature"></i> Stato Firma</th>
+                                        <th><i class="fas fa-chart-line"></i> Progresso</th>
+                                        <th><i class="fas fa-cogs"></i> Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for record in registro %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-file-pdf text-danger me-2"></i>
+                                                <span title="{{ record.documento_titolo }}">
+                                                    {{ record.documento_titolo[:30] }}{% if record.documento_titolo|length > 30 %}...{% endif %}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-user-circle text-primary me-2"></i>
+                                                <div>
+                                                    <strong>{{ record.utente_nome }}</strong><br>
+                                                    <small class="text-muted">{{ record.utente_email }}</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-clock"></i> {{ record.data_invio_formatted }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="text-muted">{{ record.inviato_da }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge {{ record.esito_invio_badge_class }}">
+                                                {{ record.esito_invio_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge {{ record.stato_lettura_badge_class }}">
+                                                {{ record.stato_lettura_display }}
+                                            </span>
+                                            {% if record.data_lettura %}
+                                                <br><small class="text-muted">{{ record.data_lettura_formatted }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge {{ record.stato_firma_badge_class }}">
+                                                {{ record.stato_firma_display }}
+                                            </span>
+                                            {% if record.data_firma %}
+                                                <br><small class="text-muted">{{ record.data_firma_formatted }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar {{ record.progresso_badge_class }}" 
+                                                     role="progressbar" 
+                                                     style="width: {{ record.progresso_percentuale }}%"
+                                                     aria-valuenow="{{ record.progresso_percentuale }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                    {{ record.progresso_percentuale }}%
+                                                </div>
+                                            </div>
+                                            <small class="text-muted">{{ record.progresso_display }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-sm btn-outline-info" 
+                                                        data-bs-toggle="tooltip" title="Dettagli"
+                                                        onclick="showInvioDetails({{ record.documento_id }}, {{ record.utente_id }})">
+                                                    <i class="fas fa-info-circle"></i>
+                                                </button>
+                                                <a href="{{ url_for('docs.view_pdf_tracciato', id=record.documento_id) }}" 
+                                                   class="btn btn-sm btn-outline-primary"
+                                                   data-bs-toggle="tooltip" title="Visualizza PDF">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{{ url_for('docs.firma_documento', id=record.documento_id) }}" 
+                                                   class="btn btn-sm btn-outline-success"
+                                                   data-bs-toggle="tooltip" title="Pagina Firma">
+                                                    <i class="fas fa-signature"></i>
+                                                </a>
+                                                <button type="button" class="btn btn-sm btn-outline-warning"
+                                                        data-bs-toggle="tooltip" title="Invia Reminder"
+                                                        onclick="sendReminder('{{ record.utente_email }}', '{{ record.documento_titolo }}')">
+                                                    <i class="fas fa-bell"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">Nessun invio trovato</h4>
+                            <p class="text-muted">
+                                {% if filtro_stato or filtro_documento or filtro_utente %}
+                                    Nessun invio corrisponde ai filtri applicati.
+                                {% else %}
+                                    Non ci sono ancora invii PDF registrati nel sistema.
+                                {% endif %}
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per dettagli invio -->
+<div class="modal fade" id="invioDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-info-circle"></i> Dettagli Invio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="invioDetailsContent">
+                <!-- Contenuto dinamico -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Inizializza tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+
+    // Funzione per mostrare dettagli invio
+    function showInvioDetails(documentoId, utenteId) {
+        // Qui potresti fare una chiamata AJAX per ottenere più dettagli
+        document.getElementById('invioDetailsContent').innerHTML = `
+            <div class="text-center">
+                <i class="fas fa-spinner fa-spin fa-2x text-primary mb-3"></i>
+                <p>Caricamento dettagli invio...</p>
+                <p class="text-muted">Documento ID: ${documentoId}, Utente ID: ${utenteId}</p>
+            </div>
+        `;
+        
+        var modal = new bootstrap.Modal(document.getElementById('invioDetailsModal'));
+        modal.show();
+    }
+
+    // Funzione per inviare reminder
+    function sendReminder(email, documento) {
+        if (confirm(`Inviare un reminder per il documento "${documento}" a ${email}?`)) {
+            // Qui implementeresti la logica per inviare il reminder
+            alert('Funzionalità reminder in sviluppo...');
+        }
+    }
+
+    // Auto-refresh ogni 30 secondi per aggiornamenti in tempo reale
+    setInterval(function() {
+        console.log('Aggiornamento automatico registro invii...');
+    }, 30000);
+</script>
+{% endblock %}

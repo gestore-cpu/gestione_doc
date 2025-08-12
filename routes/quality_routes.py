@@ -8,7 +8,7 @@ import os
 import json
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from database import get_db
+from extensions import db
 from models import (
     User, Document, Company, Department, AuditLog, 
     EventoFormazione, PartecipazioneFormazione,
@@ -34,7 +34,7 @@ def get_certificazioni():
         JSON: Lista certificazioni
     """
     try:
-        db = get_db()
+        db = db()
         certificazioni = db.query(Certificazione).order_by(Certificazione.created_at.desc()).all()
         
         certificazioni_data = []
@@ -82,7 +82,7 @@ def create_certificazione():
             if field not in data:
                 return jsonify({'error': f'Campo obbligatorio mancante: {field}'}), 400
         
-        db = get_db()
+        db = db()
         
         # Creazione certificazione
         certificazione = Certificazione(
@@ -126,7 +126,7 @@ def update_certificazione(id):
     """
     try:
         data = request.get_json()
-        db = get_db()
+        db = db()
         
         certificazione = db.query(Certificazione).filter(Certificazione.id == id).first()
         if not certificazione:
@@ -177,7 +177,7 @@ def delete_certificazione(id):
         JSON: Conferma eliminazione
     """
     try:
-        db = get_db()
+        db = db()
         
         certificazione = db.query(Certificazione).filter(Certificazione.id == id).first()
         if not certificazione:
@@ -218,7 +218,7 @@ def get_documenti_qualita():
         data_inizio = request.args.get('data_inizio')
         data_fine = request.args.get('data_fine')
         
-        db = get_db()
+        db = db()
         query = db.query(DocumentoQualita)
         
         # Applica filtri
@@ -293,7 +293,7 @@ def upload_documento_qualita():
         if not titolo or not versione or not certificazione_id:
             return jsonify({'error': 'Campi obbligatori mancanti'}), 400
         
-        db = get_db()
+        db = db()
         
         # Verifica certificazione esistente
         certificazione = db.query(Certificazione).filter(Certificazione.id == certificazione_id).first()
@@ -350,7 +350,7 @@ def get_audit():
         JSON: Lista audit
     """
     try:
-        db = get_db()
+        db = db()
         audit_list = db.query(Audit).order_by(Audit.created_at.desc()).all()
         
         audit_data = []
@@ -395,7 +395,7 @@ def create_audit():
             if field not in data:
                 return jsonify({'error': f'Campo obbligatorio mancante: {field}'}), 400
         
-        db = get_db()
+        db = db()
         
         # Creazione audit
         audit = Audit(
@@ -443,7 +443,7 @@ def add_audit_checklist(id):
         if 'domande' not in data or not isinstance(data['domande'], list):
             return jsonify({'error': 'Campo domande obbligatorio e deve essere una lista'}), 400
         
-        db = get_db()
+        db = db()
         
         # Verifica audit esistente
         audit = db.query(Audit).filter(Audit.id == id).first()
@@ -498,7 +498,7 @@ def get_azioni_correttive():
         assegnato_a = request.args.get('assegnato_a', type=int)
         priorita = request.args.get('priorita')
         
-        db = get_db()
+        db = db()
         query = db.query(AzioneCorrettiva)
         
         # Applica filtri
@@ -562,7 +562,7 @@ def create_azione_correttiva():
             if field not in data:
                 return jsonify({'error': f'Campo obbligatorio mancante: {field}'}), 400
         
-        db = get_db()
+        db = db()
         
         # Verifica utente assegnato
         assegnato_user = db.query(User).filter(User.id == data['assegnato_a']).first()
@@ -612,7 +612,7 @@ def get_eventi_formazione():
         JSON: Lista eventi formazione
     """
     try:
-        db = get_db()
+        db = db()
         eventi = db.query(EventoFormazione).order_by(EventoFormazione.data_evento.desc()).all()
         
         eventi_data = []
@@ -662,7 +662,7 @@ def create_evento_formazione():
             if field not in data:
                 return jsonify({'error': f'Campo obbligatorio mancante: {field}'}), 400
         
-        db = get_db()
+        db = db()
         
         # Creazione evento
         evento = EventoFormazione(
@@ -719,7 +719,7 @@ def save_attestato_formazione():
         if not evento_id or not user_id or not data_rilascio:
             return jsonify({'error': 'Campi obbligatori mancanti'}), 400
         
-        db = get_db()
+        db = db()
         
         # Verifica evento e utente
         evento = db.query(EventoFormazione).filter(EventoFormazione.id == evento_id).first()
@@ -781,7 +781,7 @@ def get_quality_stats():
         JSON: Statistiche qualità
     """
     try:
-        db = get_db()
+        db = db()
         
         # Statistiche certificazioni
         certificazioni_totali = db.query(Certificazione).count()

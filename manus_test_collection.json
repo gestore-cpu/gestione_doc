@@ -1,0 +1,227 @@
+{
+  "info": {
+    "name": "Manus Core - Test Collection",
+    "description": "Collezione Postman per testare le funzionalità Manus Core (mapping utenti, coverage, webhook)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "manus_webhook_secret",
+      "value": "your_webhook_secret_here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Mapping Utenti",
+      "item": [
+        {
+          "name": "Lista Mapping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/manus/mapping/list",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "manus", "mapping", "list"]
+            },
+            "description": "Lista tutti i mapping utenti Manus"
+          },
+          "response": []
+        },
+        {
+          "name": "Crea Mapping",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manus_user_id\": \"u_abc123\",\n  \"syn_user_id\": 42,\n  \"email\": \"user@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/manus/mapping/create",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "manus", "mapping", "create"]
+            },
+            "description": "Crea un nuovo mapping utente Manus"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Coverage Formazione",
+      "item": [
+        {
+          "name": "Rebuild Coverage per Utente",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/manus/coverage/rebuild/42",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "manus", "coverage", "rebuild", "42"]
+            },
+            "description": "Ricalcola coverage formazione per un utente specifico"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Webhook Manus",
+      "item": [
+        {
+          "name": "Test Webhook - Course Completed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Manus-Event",
+                "value": "COURSE_COMPLETED"
+              },
+              {
+                "key": "X-Manus-Signature",
+                "value": "{{hmac_signature}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": \"COURSE123\",\n  \"manus_user_id\": \"u_abc123\",\n  \"email\": \"user@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/manus/hooks",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "manus", "hooks"]
+            },
+            "description": "Test webhook per completamento corso"
+          },
+          "response": []
+        },
+        {
+          "name": "Test Webhook - Manual Updated",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Manus-Event",
+                "value": "MANUAL_UPDATED"
+              },
+              {
+                "key": "X-Manus-Signature",
+                "value": "{{hmac_signature}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"azienda_id\": 1,\n  \"azienda_ref\": \"mercury\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/manus/hooks",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "manus", "hooks"]
+            },
+            "description": "Test webhook per aggiornamento manuale"
+          },
+          "response": []
+        },
+        {
+          "name": "Test Webhook - Course Updated",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Manus-Event",
+                "value": "COURSE_UPDATED"
+              },
+              {
+                "key": "X-Manus-Signature",
+                "value": "{{hmac_signature}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"azienda_id\": 1,\n  \"azienda_ref\": \"mercury\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/manus/hooks",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "manus", "hooks"]
+            },
+            "description": "Test webhook per aggiornamento corso"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Webhook Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/manus/hooks/health",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "manus", "hooks", "health"]
+            },
+            "description": "Health check del webhook Manus"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Calcola firma HMAC per webhook",
+          "if (pm.request.headers.has('X-Manus-Signature')) {",
+          "  const body = pm.request.body.raw;",
+          "  const secret = pm.collectionVariables.get('manus_webhook_secret');",
+          "  ",
+          "  // Calcola HMAC SHA256",
+          "  const crypto = require('crypto');",
+          "  const hmac = crypto.createHmac('sha256', secret);",
+          "  hmac.update(body);",
+          "  const signature = hmac.digest('hex');",
+          "  ",
+          "  // Imposta la firma nell'header",
+          "  pm.request.headers.upsert({",
+          "    key: 'X-Manus-Signature',",
+          "    value: signature",
+          "    disabled: false",
+          "  });",
+          "}"
+        ]
+      }
+    }
+  ]
+}

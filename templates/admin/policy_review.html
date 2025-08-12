@@ -1,0 +1,521 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-file-alt me-2"></i>
+                        📊 Report Revisione AI #{{ review.id }}
+                    </h2>
+                    <p class="text-muted mb-0">Analisi periodica delle policy automatiche</p>
+                </div>
+                <div class="d-flex gap-2">
+                    {% if review.status == 'pending' %}
+                        <button class="btn btn-success" onclick="markAsReviewed()">
+                            <i class="fas fa-check me-1"></i>
+                            Marca Revisionato
+                        </button>
+                    {% endif %}
+                    <a href="{{ url_for('admin.policy_reviews_list') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Torna ai Report
+                    </a>
+                </div>
+            </div>
+
+            <!-- Informazioni Report -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Informazioni Report
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><strong>Data Creazione:</strong></h6>
+                            <p>{{ review.created_at.strftime('%d/%m/%Y %H:%M:%S') if review.created_at else 'N/A' }}</p>
+                            
+                            <h6><strong>Stato:</strong></h6>
+                            <span class="badge bg-{{ 'warning' if review.status == 'pending' else 'success' if review.status == 'reviewed' else 'info' }} fs-6">
+                                {{ review.get_status_display() }}
+                            </span>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><strong>Suggerimenti Generati:</strong></h6>
+                            <p>{{ review.get_suggestions_count() }}</p>
+                            
+                            <h6><strong>Suggerimenti Applicati:</strong></h6>
+                            <p>{{ review.get_applied_suggestions_count() }}</p>
+                            
+                            {% if review.admin_notes %}
+                                <h6><strong>Note Admin:</strong></h6>
+                                <p class="text-muted">{{ review.admin_notes }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report AI -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-robot me-2"></i>
+                        📋 Report AI
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="bg-light p-3 rounded" style="white-space: pre-line; font-family: 'Courier New', monospace;">
+                        {{ review.report }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Suggerimenti AI -->
+            {% if review.suggestions %}
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            💡 Suggerimenti AI ({{ review.suggestions|length }})
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-warning" onclick="selectAllSuggestions()">
+                                <i class="fas fa-check-square me-1"></i>
+                                Seleziona Tutti
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="activateSelectedSuggestions()">
+                                <i class="fas fa-bolt me-1"></i>
+                                Attiva Selezionati
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for suggestion in review.suggestions %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-{{ 'success' if suggestion.action == 'approve' else 'danger' }}">
+                                <div class="card-header bg-{{ 'success' if suggestion.action == 'approve' else 'danger' }} text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-{{ 'check' if suggestion.action == 'approve' else 'times' }} me-2"></i>
+                                        Suggerimento #{{ loop.index }}
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <h6><strong>Tipo:</strong></h6>
+                                    <span class="badge bg-info">{{ suggestion.type|title }}</span>
+                                    
+                                    <h6 class="mt-3"><strong>Condizione:</strong></h6>
+                                    <pre class="bg-light p-2 rounded small"><code>{{ suggestion.condition }}</code></pre>
+                                    
+                                    <h6 class="mt-3"><strong>Azione:</strong></h6>
+                                    <span class="badge bg-{{ 'success' if suggestion.action == 'approve' else 'danger' }}">
+                                        {{ suggestion.action|title }}
+                                    </span>
+                                    
+                                    {% if suggestion.priority %}
+                                    <h6 class="mt-3"><strong>Priorità:</strong></h6>
+                                    <span class="badge bg-warning">{{ suggestion.priority }}</span>
+                                    {% endif %}
+                                    
+                                    {% if suggestion.confidence %}
+                                    <h6 class="mt-3"><strong>Confidenza:</strong></h6>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-{{ 'success' if suggestion.confidence > 80 else 'warning' if suggestion.confidence > 60 else 'danger' }}" 
+                                             style="width: {{ suggestion.confidence }}%">
+                                            {{ suggestion.confidence }}%
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <h6 class="mt-3"><strong>Spiegazione:</strong></h6>
+                                    <p class="text-muted">{{ suggestion.explanation }}</p>
+                                    
+                                    <div class="mt-3">
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <div class="form-check">
+                                                <input class="form-check-input suggestion-checkbox" type="checkbox" 
+                                                       value="{{ loop.index0 }}" id="suggestion_{{ loop.index0 }}">
+                                                <label class="form-check-label" for="suggestion_{{ loop.index0 }}">
+                                                    <small>Seleziona per attivazione multipla</small>
+                                                </label>
+                                            </div>
+                                            <button class="btn btn-sm btn-success" onclick="applySuggestion({{ loop.index0 }})">
+                                                <i class="fas fa-play me-1"></i>
+                                                Applica Suggerimento
+                                            </button>
+                                            <button class="btn btn-sm btn-primary" onclick="showActivationModal({{ loop.index0 }})">
+                                                <i class="fas fa-bolt me-1"></i>
+                                                Attiva Rapida
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ⚠️ Nessun Suggerimento
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-info-circle text-muted fa-3x mb-3"></i>
+                    <p class="text-muted">L'AI non ha generato suggerimenti per questo periodo.</p>
+                    <p class="text-muted">Le policy attuali potrebbero essere già ottimali.</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Suggerimenti Applicati -->
+            {% if review.applied_suggestions %}
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        ✅ Suggerimenti Applicati ({{ review.applied_suggestions|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for suggestion in review.applied_suggestions %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-check me-2"></i>
+                                        Applicato #{{ loop.index }}
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <h6><strong>Condizione:</strong></h6>
+                                    <pre class="bg-light p-2 rounded small"><code>{{ suggestion.condition }}</code></pre>
+                                    
+                                    <h6 class="mt-3"><strong>Azione:</strong></h6>
+                                    <span class="badge bg-success">{{ suggestion.action|title }}</span>
+                                    
+                                    <h6 class="mt-3"><strong>Spiegazione:</strong></h6>
+                                    <p class="text-muted">{{ suggestion.explanation }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Azioni -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-cogs me-2"></i>
+                        Azioni
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% if review.status == 'pending' %}
+                        <div class="col-md-4">
+                            <button class="btn btn-success w-100" onclick="markAsReviewed()">
+                                <i class="fas fa-check me-1"></i>
+                                Marca Revisionato
+                            </button>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-4">
+                            <a href="{{ url_for('admin.manage_ai_policies') }}" class="btn btn-primary w-100">
+                                <i class="fas fa-robot me-1"></i>
+                                Gestisci Policy
+                            </a>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="{{ url_for('admin.policy_reviews_list') }}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-arrow-left me-1"></i>
+                                Torna ai Report
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Attivazione Rapida -->
+            <div class="modal fade" id="activationModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-bolt me-2"></i>
+                                ⚡ Attivazione Rapida Policy
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="POST" action="{{ url_for('admin.activate_ai_suggestion', review_id=review.id) }}">
+                            <div class="modal-body">
+                                <div class="alert alert-info">
+                                    <h6><i class="fas fa-info-circle me-2"></i>Configurazione Rapida</h6>
+                                    <p class="mb-0">Configura la nuova policy basata sul suggerimento AI.</p>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="policyName" class="form-label">Nome Policy:</label>
+                                    <input type="text" class="form-control" id="policyName" name="policy_name" 
+                                           placeholder="Nome della policy" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="policyDescription" class="form-label">Descrizione:</label>
+                                    <textarea class="form-control" id="policyDescription" name="policy_description" 
+                                              rows="3" placeholder="Descrizione della policy"></textarea>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="policyPriority" class="form-label">Priorità:</label>
+                                            <select class="form-select" id="policyPriority" name="priority">
+                                                <option value="1">🔴 Critica (1)</option>
+                                                <option value="2">🟠 Alta (2)</option>
+                                                <option value="3" selected>🟡 Media (3)</option>
+                                                <option value="4">🟢 Bassa (4)</option>
+                                                <option value="5">⚪ Molto Bassa (5)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="policyConfidence" class="form-label">Confidenza:</label>
+                                            <input type="range" class="form-range" id="policyConfidence" name="confidence" 
+                                                   min="0" max="100" value="70" oninput="updateConfidenceValue(this.value)">
+                                            <small class="text-muted">Confidenza: <span id="confidenceValue">70</span>%</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="activateImmediately" name="active" value="1" checked>
+                                        <label class="form-check-label" for="activateImmediately">
+                                            <i class="fas fa-play me-1"></i>
+                                            Attiva immediatamente
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Se deselezionato, la policy verrà salvata come bozza</small>
+                                </div>
+                                
+                                <div class="alert alert-warning">
+                                    <h6><i class="fas fa-exclamation-triangle me-2"></i>Attenzione</h6>
+                                    <p class="mb-0">La policy verrà creata e applicata automaticamente alle nuove richieste di accesso.</p>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-bolt me-1"></i>
+                                    Crea Policy
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Marca Revisionato -->
+            {% if review.status == 'pending' %}
+            <div class="modal fade" id="markReviewedModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-check me-2"></i>
+                                Marca Report Revisionato
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="POST" action="{{ url_for('admin.mark_review_reviewed', review_id=review.id) }}">
+                            <div class="modal-body">
+                                <p>Confermi di aver revisionato questo report?</p>
+                                <div class="mb-3">
+                                    <label for="adminNotes" class="form-label">Note (opzionale):</label>
+                                    <textarea class="form-control" id="adminNotes" name="admin_notes" rows="3" 
+                                              placeholder="Inserisci eventuali note sulla revisione..."></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-check me-1"></i>
+                                    Conferma Revisione
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function applySuggestion(suggestionIndex) {
+    if (confirm('Applicare questo suggerimento AI? Verrà creata una nuova policy basata su questo suggerimento.')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("admin.apply_ai_suggestion", review_id=review.id) }}';
+        
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'suggestion_index';
+        input.value = suggestionIndex;
+        
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function showActivationModal(suggestionIndex) {
+    // Recupera dati del suggerimento
+    const suggestions = {{ review.suggestions|tojson }};
+    const suggestion = suggestions[suggestionIndex];
+    
+    // Popola il modal con i dati del suggerimento
+    document.getElementById('policyName').value = `Policy AI - ${suggestion.action} - ${new Date().toLocaleDateString()}`;
+    document.getElementById('policyDescription').value = suggestion.explanation || '';
+    document.getElementById('policyPriority').value = suggestion.priority || 3;
+    document.getElementById('policyConfidence').value = suggestion.confidence || 70;
+    updateConfidenceValue(suggestion.confidence || 70);
+    
+    // Aggiungi dati nascosti al form
+    const form = document.querySelector('#activationModal form');
+    let conditionInput = form.querySelector('input[name="condition"]');
+    if (!conditionInput) {
+        conditionInput = document.createElement('input');
+        conditionInput.type = 'hidden';
+        conditionInput.name = 'condition';
+        form.appendChild(conditionInput);
+    }
+    conditionInput.value = suggestion.condition;
+    
+    let actionInput = form.querySelector('input[name="action"]');
+    if (!actionInput) {
+        actionInput = document.createElement('input');
+        actionInput.type = 'hidden';
+        actionInput.name = 'action';
+        form.appendChild(actionInput);
+    }
+    actionInput.value = suggestion.action;
+    
+    let explanationInput = form.querySelector('input[name="explanation"]');
+    if (!explanationInput) {
+        explanationInput = document.createElement('input');
+        explanationInput.type = 'hidden';
+        explanationInput.name = 'explanation';
+        form.appendChild(explanationInput);
+    }
+    explanationInput.value = suggestion.explanation || '';
+    
+    // Mostra modal
+    const modal = new bootstrap.Modal(document.getElementById('activationModal'));
+    modal.show();
+}
+
+function updateConfidenceValue(value) {
+    document.getElementById('confidenceValue').textContent = value;
+}
+
+function selectAllSuggestions() {
+    const checkboxes = document.querySelectorAll('.suggestion-checkbox');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = !allChecked;
+    });
+    
+    const button = event.target;
+    if (allChecked) {
+        button.innerHTML = '<i class="fas fa-check-square me-1"></i>Seleziona Tutti';
+    } else {
+        button.innerHTML = '<i class="fas fa-square me-1"></i>Deseleziona Tutti';
+    }
+}
+
+function activateSelectedSuggestions() {
+    const selectedCheckboxes = document.querySelectorAll('.suggestion-checkbox:checked');
+    
+    if (selectedCheckboxes.length === 0) {
+        alert('Seleziona almeno un suggerimento da attivare.');
+        return;
+    }
+    
+    if (confirm(`Attivare ${selectedCheckboxes.length} suggerimenti selezionati?`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("admin.activate_multiple_suggestions", review_id=review.id) }}';
+        
+        selectedCheckboxes.forEach(checkbox => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'suggestion_indices';
+            input.value = checkbox.value;
+            form.appendChild(input);
+        });
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function markAsReviewed() {
+    const modal = new bootstrap.Modal(document.getElementById('markReviewedModal'));
+    modal.show();
+}
+
+// Auto-refresh ogni 3 minuti
+setTimeout(() => {
+    if (confirm('Aggiornare il report con i dati più recenti?')) {
+        location.reload();
+    }
+}, 180000);
+</script>
+
+<style>
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.progress {
+    height: 8px;
+    border-radius: 4px;
+}
+
+pre {
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.8em;
+}
+
+.badge {
+    font-size: 0.8em;
+}
+</style>
+{% endblock %} 

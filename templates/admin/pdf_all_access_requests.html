@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body { 
+    font-family: Arial, sans-serif; 
+    font-size: 12px; 
+    margin: 20px;
+}
+h2 { 
+    color: #333; 
+    border-bottom: 2px solid #007bff; 
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin-top: 20px;
+}
+th, td { 
+    border: 1px solid #ddd; 
+    padding: 8px; 
+    text-align: left; 
+    font-size: 11px;
+}
+th { 
+    background-color: #f8f9fa; 
+    font-weight: bold;
+    color: #333;
+}
+tr:nth-child(even) { 
+    background-color: #f9f9f9; 
+}
+.status-pending { 
+    color: #856404; 
+    font-weight: bold;
+}
+.status-approved { 
+    color: #155724; 
+    font-weight: bold;
+}
+.status-denied { 
+    color: #721c24; 
+    font-weight: bold;
+}
+.header-info {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #e9ecef;
+    border-radius: 5px;
+}
+.header-info p {
+    margin: 5px 0;
+    font-size: 11px;
+}
+</style>
+</head>
+<body>
+<h2>📋 Storico Richieste di Accesso</h2>
+
+<div class="header-info">
+    <p><strong>Data generazione:</strong> {{ datetime.now().strftime('%d/%m/%Y %H:%M:%S') }}</p>
+    <p><strong>Totale richieste:</strong> {{ requests|length }}</p>
+    <p><strong>Filtri applicati:</strong> 
+        {% if request.args.get('status') %}Stato: {{ request.args.get('status') }}{% endif %}
+        {% if request.args.get('user_id') %}Utente: {{ request.args.get('user_id') }}{% endif %}
+        {% if request.args.get('file_id') %}File: {{ request.args.get('file_id') }}{% endif %}
+        {% if not request.args.get('status') and not request.args.get('user_id') and not request.args.get('file_id') %}Nessun filtro{% endif %}
+    </p>
+</div>
+
+<table>
+<thead>
+<tr>
+<th>Data Richiesta</th>
+<th>Utente</th>
+<th>Email</th>
+<th>File</th>
+<th>Azienda</th>
+<th>Reparto</th>
+<th>Motivazione</th>
+<th>Stato</th>
+<th>Risposta Admin</th>
+</tr>
+</thead>
+<tbody>
+{% for r in requests %}
+<tr>
+<td>{{ r.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+<td>{{ r.user.first_name or '' }} {{ r.user.last_name or '' }}</td>
+<td>{{ r.user.email }}</td>
+<td>{{ r.document.title or r.document.original_filename or 'Documento non trovato' }}</td>
+<td>{{ r.document.company.name if r.document.company else "" }}</td>
+<td>{{ r.document.department.name if r.document.department else "" }}</td>
+<td>{{ r.note or "" }}</td>
+<td class="status-{{ r.status }}">{{ r.status|title }}</td>
+<td>{{ r.risposta_ai or "" }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+{% if not requests %}
+<div style="text-align: center; padding: 40px; color: #666;">
+    <p><strong>Nessuna richiesta di accesso trovata</strong></p>
+    <p>Non ci sono richieste di accesso che corrispondono ai criteri di ricerca.</p>
+</div>
+{% endif %}
+
+<div style="margin-top: 30px; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 10px;">
+    <p><strong>Legenda stati:</strong></p>
+    <ul style="margin: 5px 0; padding-left: 20px;">
+        <li><strong>Pending:</strong> Richiesta in attesa di valutazione</li>
+        <li><strong>Approved:</strong> Richiesta approvata con accesso concesso</li>
+        <li><strong>Denied:</strong> Richiesta respinta con motivazione</li>
+    </ul>
+    <p style="margin-top: 10px;">
+        <strong>Note:</strong> Questo documento è stato generato automaticamente dal sistema di gestione documentale.
+        Per informazioni aggiuntive contattare l'amministratore del sistema.
+    </p>
+</div>
+</body>
+</html> 

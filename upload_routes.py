@@ -5,7 +5,9 @@ from flask import current_app
 from extensions import db, bcrypt
 from models import Document, Company, Department
 from utils_extra import save_file_and_upload_to_drive, allowed_file, notify_upload  # assicurati che siano in utils_extra.py
+from services.antivirus_service import antivirus_service
 import os
+import tempfile
 
 upload_bp = Blueprint('upload', __name__, url_prefix='/upload')
 
@@ -41,7 +43,48 @@ def upload_to_drive():
             flash("❌ Estensione file non valida", "danger")
             return redirect(url_for('upload.upload_to_drive'))
 
+        # 🛡️ Prima verifica antivirus del file caricato
+        try:
+            # Salva temporaneamente il file per la scansione
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                file.seek(0)  # Reset position
+                temp_file.write(file.read())
+                temp_file_path = temp_file.name
+                file.seek(0)  # Reset per uso successivo
+            
+            # Scansiona il file con ClamAV
+            scan_result = antivirus_service.scan_file_path(temp_file_path)
+            
+            # Rimuovi file temporaneo
+            try:
+                os.unlink(temp_file_path)
+            except:
+                pass
+            
+            # Controlla risultato scansione
+            if scan_result['verdict'] == 'infected':
+                flash(f"🦠 File infetto rilevato: {scan_result['details']}", "danger")
+                return redirect(url_for('upload.upload_to_drive'))
+            
+            elif scan_result['verdict'] == 'error':
+                strict_mode = os.getenv('STRICT_UPLOAD_SECURITY', 'False').lower() == 'true'
+                if strict_mode:
+                    flash(f"⚠️ Errore scansione antivirus: {scan_result['details']}", "danger")
+                    return redirect(url_for('upload.upload_to_drive'))
+                else:
+                    flash(f"⚠️ Scansione antivirus fallita, ma upload consentito: {scan_result['details']}", "warning")
+            
+        except Exception as e:
+            current_app.logger.error(f"Errore scansione antivirus: {e}")
+            strict_mode = os.getenv('STRICT_UPLOAD_SECURITY', 'False').lower() == 'true'
+            if strict_mode:
+                flash("❌ Errore durante la scansione antivirus. Upload bloccato.", "danger")
+                return redirect(url_for('upload.upload_to_drive'))
+            else:
+                flash("⚠️ Errore scansione antivirus, ma upload consentito.", "warning")
+
         # 🔄 Salvataggio multiplo per combinazioni azienda/reparto
+        saved_documents = []
         try:
             for company_id in company_ids:
                 company = Company.query.get(company_id)
@@ -78,9 +121,25 @@ def upload_to_drive():
                     )
 
                     db.session.add(doc)
+                    db.session.flush()  # Ottieni l'ID del documento
+                    
+                    saved_documents.append((doc.id, local_path))
                     notify_upload(doc)  # opzionale
 
             db.session.commit()
+            
+            # 🛡️ Post-commit: calcola hash e salva risultati scansione per ogni documento
+            for doc_id, file_path in saved_documents:
+                try:
+                    # Processa file: calcola hash SHA-256 e salva risultato antivirus
+                    is_safe, detailed_scan = antivirus_service.process_uploaded_file(file_path, doc_id)
+                    
+                    if not is_safe:
+                        current_app.logger.warning(f"Documento {doc_id} marcato come non sicuro dopo elaborazione")
+                    
+                except Exception as e:
+                    current_app.logger.error(f"Errore post-processing documento {doc_id}: {e}")
+            
             flash("✅ Documento caricato con successo per tutte le combinazioni", "success")
 
         except Exception as e:

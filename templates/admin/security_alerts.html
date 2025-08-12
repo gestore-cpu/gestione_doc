@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Security Alerts - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h2">🚨 Security Alerts</h1>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('admin.alert_statistics') }}" class="btn btn-info">
+                        📊 Statistiche
+                    </a>
+                    <a href="{{ url_for('admin.export_alerts', **current_filters) }}" class="btn btn-success">
+                        📥 Export CSV
+                    </a>
+                </div>
+            </div>
+
+            <!-- Statistiche rapide -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">🔴 Alert Aperti</h5>
+                            <h2 class="card-text">{{ stats.open_alerts }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">📊 Totale (30gg)</h5>
+                            <h2 class="card-text">{{ stats.total_alerts }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">✅ Chiusi</h5>
+                            <h2 class="card-text">{{ stats.closed_alerts }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">📈 Regola Top</h5>
+                            <h6 class="card-text">{{ stats.most_triggered_rule or 'N/A' }}</h6>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtri -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 Filtri</h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="severity" class="form-label">Severità</label>
+                            <select name="severity" id="severity" class="form-select">
+                                <option value="all">Tutte</option>
+                                {% for level in severity_levels %}
+                                <option value="{{ level.value }}" 
+                                    {{ 'selected' if current_filters.severity == level.value else '' }}>
+                                    {{ level.value.title() }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="status" class="form-label">Stato</label>
+                            <select name="status" id="status" class="form-select">
+                                <option value="all">Tutti</option>
+                                {% for status in alert_statuses %}
+                                <option value="{{ status.value }}" 
+                                    {{ 'selected' if current_filters.status == status.value else '' }}>
+                                    {{ status.value.title() }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="user_id" class="form-label">Utente</label>
+                            <select name="user_id" id="user_id" class="form-select">
+                                <option value="">Tutti</option>
+                                {% for user in users_with_alerts %}
+                                <option value="{{ user.id }}" 
+                                    {{ 'selected' if current_filters.user_id == user.id else '' }}>
+                                    {{ user.username }} ({{ user.email }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">Filtra</button>
+                            <a href="{{ url_for('admin.security_alerts') }}" class="btn btn-secondary">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tabella Alert -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Alert di Sicurezza</h5>
+                </div>
+                <div class="card-body">
+                    {% if alerts.items %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="alertsTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Timestamp</th>
+                                    <th>Utente</th>
+                                    <th>Regola</th>
+                                    <th>Severità</th>
+                                    <th>Stato</th>
+                                    <th>Dettagli</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for alert in alerts.items %}
+                                <tr class="
+                                    {% if alert.severity.value == 'high' %}table-danger
+                                    {% elif alert.severity.value == 'medium' %}table-warning
+                                    {% else %}table-light{% endif %}">
+                                    <td>{{ alert.id }}</td>
+                                    <td>
+                                        <span title="{{ alert.ts.strftime('%d/%m/%Y %H:%M:%S') }}">
+                                            {{ alert.ts.strftime('%d/%m %H:%M') }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <strong>{{ alert.user.username }}</strong><br>
+                                        <small class="text-muted">{{ alert.user.email }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ alert.rule_id }}</span>
+                                    </td>
+                                    <td>
+                                        {% set severity_colors = {
+                                            'low': 'success',
+                                            'medium': 'warning',
+                                            'high': 'danger'
+                                        } %}
+                                        <span class="badge bg-{{ severity_colors.get(alert.severity.value, 'secondary') }}">
+                                            {{ alert.severity.value.title() }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if alert.status.value == 'open' %}
+                                        <span class="badge bg-danger">Aperto</span>
+                                        {% else %}
+                                        <span class="badge bg-success">Chiuso</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span title="{{ alert.details }}">
+                                            {{ alert.details[:50] }}{% if alert.details|length > 50 %}...{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{{ url_for('admin.alert_detail', alert_id=alert.id) }}" 
+                                               class="btn btn-info" title="Dettagli">
+                                                👁️
+                                            </a>
+                                            {% if alert.status.value == 'open' %}
+                                            <button type="button" 
+                                                    class="btn btn-success close-alert-btn" 
+                                                    data-alert-id="{{ alert.id }}"
+                                                    title="Chiudi">
+                                                ✅
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Paginazione -->
+                    {% if alerts.pages > 1 %}
+                    <nav aria-label="Alert pagination">
+                        <ul class="pagination justify-content-center">
+                            {% if alerts.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.security_alerts', page=alerts.prev_num, **current_filters) }}">
+                                    Precedente
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for page_num in alerts.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num != alerts.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('admin.security_alerts', page=page_num, **current_filters) }}">
+                                            {{ page_num }}
+                                        </a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">…</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if alerts.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.security_alerts', page=alerts.next_num, **current_filters) }}">
+                                    Successivo
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">Nessun alert trovato con i filtri correnti.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per chiudere alert -->
+<div class="modal fade" id="closeAlertModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Chiudi Alert</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="closeAlertForm" method="POST">
+                <div class="modal-body">
+                    <p>Sei sicuro di voler chiudere questo alert?</p>
+                    <div class="mb-3">
+                        <label for="closeNote" class="form-label">Nota (opzionale)</label>
+                        <textarea class="form-control" id="closeNote" name="note" rows="3" 
+                                  placeholder="Aggiungi una nota sulla risoluzione..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-success">Chiudi Alert</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestione chiusura alert
+    const closeButtons = document.querySelectorAll('.close-alert-btn');
+    const modal = new bootstrap.Modal(document.getElementById('closeAlertModal'));
+    const form = document.getElementById('closeAlertForm');
+    
+    closeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const alertId = this.dataset.alertId;
+            form.action = `{{ url_for('admin.close_alert', alert_id=0) }}`.replace('0', alertId);
+            modal.show();
+        });
+    });
+    
+    // DataTable initialization (se disponibile)
+    if (typeof $ !== 'undefined' && $.fn.DataTable) {
+        $('#alertsTable').DataTable({
+            pageLength: 25,
+            order: [[1, 'desc']], // Ordina per timestamp
+            columnDefs: [
+                { orderable: false, targets: [7] } // Disabilita ordinamento per colonna azioni
+            ]
+        });
+    }
+});
+</script>
+{% endblock %}

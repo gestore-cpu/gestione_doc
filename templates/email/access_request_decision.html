@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decisione Richiesta di Accesso</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .header.approved {
+            background-color: #28a745;
+        }
+        .header.denied {
+            background-color: #dc3545;
+        }
+        .content {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 0 0 5px 5px;
+        }
+        .info-box {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .value {
+            color: #212529;
+        }
+        .status-approved {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .status-denied {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .button {
+            display: inline-block;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .button.approved {
+            background-color: #28a745;
+        }
+        .button.denied {
+            background-color: #6c757d;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    {% if approved %}
+    <div class="header approved">
+        <h1>✅ Richiesta di Accesso Approvata</h1>
+        <p>Sistema di Gestione Documenti</p>
+    </div>
+    {% else %}
+    <div class="header denied">
+        <h1>❌ Richiesta di Accesso Negata</h1>
+        <p>Sistema di Gestione Documenti</p>
+    </div>
+    {% endif %}
+    
+    <div class="content">
+        {% if approved %}
+        <p>La tua richiesta di accesso è stata <span class="status-approved">APPROVATA</span>!</p>
+        {% else %}
+        <p>La tua richiesta di accesso è stata <span class="status-denied">NEGATA</span>.</p>
+        {% endif %}
+        
+        <div class="info-box">
+            <p><span class="label">📄 Documento:</span> <span class="value">{{ document_title }}</span></p>
+            <p><span class="label">👤 Richiedente:</span> <span class="value">{{ requester_name }}</span></p>
+            <p><span class="label">📅 Data Richiesta:</span> <span class="value">{{ request_date }}</span></p>
+            {% if approved %}
+            <p><span class="label">⏰ Scadenza Accesso:</span> <span class="value">{{ expiry_date }}</span></p>
+            {% endif %}
+            {% if decision_reason %}
+            <p><span class="label">📝 Motivo Decisione:</span> <span class="value">{{ decision_reason }}</span></p>
+            {% endif %}
+        </div>
+        
+        {% if approved %}
+        <div class="info-box">
+            <p><strong>🎉 Cosa puoi fare ora:</strong></p>
+            <ul>
+                <li>Scarica il documento fino alla data di scadenza</li>
+                <li>L'accesso scadrà automaticamente il {{ expiry_date }}</li>
+                <li>Se hai bisogno di più tempo, richiedi una proroga</li>
+            </ul>
+        </div>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <a href="{{ download_url }}" class="button approved">⬇️ Scarica Documento</a>
+        </div>
+        
+        <div class="warning">
+            <p><strong>⚠️ Importante:</strong></p>
+            <ul>
+                <li>L'accesso è temporaneo e scadrà il {{ expiry_date }}</li>
+                <li>Non condividere il documento con altri utenti</li>
+                <li>Rispetta le policy di sicurezza aziendali</li>
+            </ul>
+        </div>
+        {% else %}
+        <div class="info-box">
+            <p><strong>ℹ️ Informazioni:</strong></p>
+            <ul>
+                <li>La richiesta è stata valutata e negata</li>
+                <li>Se ritieni che sia un errore, contatta l'amministratore</li>
+                <li>Puoi presentare una nuova richiesta in futuro</li>
+            </ul>
+        </div>
+        
+        {% if decision_reason %}
+        <div class="warning">
+            <p><strong>📝 Motivo della negazione:</strong></p>
+            <p>{{ decision_reason }}</p>
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+    
+    <div class="footer">
+        <p>Questo messaggio è stato inviato automaticamente dal sistema di gestione documenti.</p>
+        <p>Per supporto, contatta l'amministratore di sistema.</p>
+    </div>
+</body>
+</html>

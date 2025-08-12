@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-flask me-2"></i>
+                        🧪 Simulazione Policy #{{ policy.id }}
+                    </h2>
+                    <p class="text-muted mb-0">Test della policy sui dati storici delle richieste di accesso</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" onclick="activatePolicy({{ policy.id }})">
+                        <i class="fas fa-play me-1"></i>
+                        Attiva Policy
+                    </button>
+                    <a href="{{ url_for('admin.manage_ai_policies') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Torna alla Gestione
+                    </a>
+                </div>
+            </div>
+
+            <!-- Dettagli Policy -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Dettagli Policy
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><strong>Nome:</strong> {{ policy.name }}</h6>
+                            <p><strong>Descrizione:</strong> {{ policy.description or 'Nessuna descrizione' }}</p>
+                            <p><strong>Condizione:</strong></p>
+                            <pre class="bg-light p-2 rounded"><code>{{ policy.condition }}</code></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><strong>Azione:</strong></h6>
+                            {% if policy.action == 'approve' %}
+                                <span class="badge bg-success fs-6">
+                                    <i class="fas fa-check me-1"></i>
+                                    Approva
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger fs-6">
+                                    <i class="fas fa-times me-1"></i>
+                                    Nega
+                                </span>
+                            {% endif %}
+                            
+                            <h6 class="mt-3"><strong>Priorità:</strong></h6>
+                            <span class="badge bg-info">{{ policy.get_priority_display() }}</span>
+                            
+                            <h6 class="mt-3"><strong>Confidenza:</strong></h6>
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar bg-{{ 'success' if policy.confidence > 80 else 'warning' if policy.confidence > 60 else 'danger' }}" 
+                                     style="width: {{ policy.confidence }}%">
+                                    {{ policy.confidence }}%
+                                </div>
+                            </div>
+                            
+                            <h6 class="mt-3"><strong>Stato:</strong></h6>
+                            {% if policy.active %}
+                                <span class="badge bg-success">✅ Attiva</span>
+                            {% else %}
+                                <span class="badge bg-warning">⏳ In Attesa</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risultati Simulazione -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        📊 Risultati Simulazione
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="text-primary">{{ results.total }}</h3>
+                                <p class="text-muted">Richieste Analizzate</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="text-info">{{ results.match }}</h3>
+                                <p class="text-muted">Richieste Corrispondenti</p>
+                                <small class="text-muted">{{ "%.1f"|format(results.impact_analysis.match_percentage) }}%</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="text-success">{{ results.approve }}</h3>
+                                <p class="text-muted">Auto-Approva</p>
+                                <small class="text-muted">{{ "%.1f"|format(results.impact_analysis.approve_percentage) }}%</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                <h3 class="text-danger">{{ results.deny }}</h3>
+                                <p class="text-muted">Auto-Nega</p>
+                                <small class="text-muted">{{ "%.1f"|format(results.impact_analysis.deny_percentage) }}%</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Grafico Risultati -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <canvas id="simulationChart" width="400" height="200"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-lightbulb me-2"></i>
+                                        Analisi Impatto
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info">
+                                        <h6><i class="fas fa-info-circle me-2"></i>Efficienza Policy</h6>
+                                        <p class="mb-0">
+                                            Questa policy avrebbe processato automaticamente 
+                                            <strong>{{ "%.1f"|format(results.impact_analysis.efficiency_score * 100) }}%</strong> 
+                                            delle richieste storiche.
+                                        </p>
+                                    </div>
+                                    
+                                    {% if results.impact_analysis.efficiency_score > 0.3 %}
+                                        <div class="alert alert-success">
+                                            <h6><i class="fas fa-check-circle me-2"></i>Alta Efficienza</h6>
+                                            <p class="mb-0">Questa policy ha un impatto significativo e potrebbe essere molto utile.</p>
+                                        </div>
+                                    {% elif results.impact_analysis.efficiency_score > 0.1 %}
+                                        <div class="alert alert-warning">
+                                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Efficienza Media</h6>
+                                            <p class="mb-0">Considerare di modificare la policy per aumentare la copertura.</p>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-danger">
+                                            <h6><i class="fas fa-times-circle me-2"></i>Bassa Efficienza</h6>
+                                            <p class="mb-0">Questa policy ha un impatto limitato. Considerare di rivederla.</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Richieste Corrispondenti -->
+            {% if results.matches %}
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        📂 Richieste Corrispondenti ({{ results.matches|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Data/Ora</th>
+                                    <th>Utente</th>
+                                    <th>Documento</th>
+                                    <th>Stato Originale</th>
+                                    <th>Motivazione</th>
+                                    <th>Risultato Simulazione</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in results.matches %}
+                                <tr>
+                                    <td>
+                                        <small>{{ req.created_at.strftime('%d/%m/%Y %H:%M') if req.created_at else 'N/A' }}</small>
+                                    </td>
+                                    <td>
+                                        <strong>{{ req.user.username if req.user else 'N/A' }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ req.user.email if req.user else 'N/A' }}</small>
+                                    </td>
+                                    <td>
+                                        <strong>{{ req.document.title or req.document.original_filename if req.document else 'N/A' }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ req.document.company.name if req.document and req.document.company else 'N/A' }}</small>
+                                    </td>
+                                    <td>
+                                        {% if req.status == 'approved' %}
+                                            <span class="badge bg-success">✅ Approvata</span>
+                                        {% elif req.status == 'denied' %}
+                                            <span class="badge bg-danger">❌ Negata</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">⏳ In Attesa</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>{{ req.note[:50] + '...' if req.note and req.note|length > 50 else req.note or 'N/A' }}</small>
+                                    </td>
+                                    <td>
+                                        {% if policy.action == 'approve' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check me-1"></i>
+                                                Auto-Approva
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger">
+                                                <i class="fas fa-times me-1"></i>
+                                                Auto-Nega
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ⚠️ Nessuna Corrispondenza
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-info-circle text-muted fa-3x mb-3"></i>
+                    <p class="text-muted">Questa policy non corrisponde a nessuna richiesta storica.</p>
+                    <p class="text-muted">Considerare di modificare la condizione per aumentare la copertura.</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Azioni -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-cogs me-2"></i>
+                        Azioni
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <button class="btn btn-success w-100" onclick="activatePolicy({{ policy.id }})">
+                                <i class="fas fa-play me-1"></i>
+                                Attiva Policy
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="{{ url_for('admin.edit_policy', policy_id=policy.id) }}" class="btn btn-warning w-100">
+                                <i class="fas fa-edit me-1"></i>
+                                Modifica Policy
+                            </a>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="{{ url_for('admin.manage_ai_policies') }}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-arrow-left me-1"></i>
+                                Torna alla Gestione
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Grafico risultati simulazione
+const ctx = document.getElementById('simulationChart').getContext('2d');
+const simulationChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Auto-{{ "Approva" if policy.action == "approve" else "Nega" }}', 'Non Corrisponde'],
+        datasets: [{
+            data: [{{ results.match }}, {{ results.total - results.match }}],
+            backgroundColor: ['{{ "#28a745" if policy.action == "approve" else "#dc3545" }}', '#6c757d'],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            },
+            title: {
+                display: true,
+                text: 'Distribuzione Risultati Simulazione'
+            }
+        }
+    }
+});
+
+function activatePolicy(policyId) {
+    if (confirm('Attivare questa policy? La policy verrà applicata automaticamente alle nuove richieste di accesso.')) {
+        fetch(`/admin/access_requests/ai_policies/${policyId}/activate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Policy attivata con successo!');
+                window.location.href = '{{ url_for("admin.manage_ai_policies") }}';
+            } else {
+                alert('Errore: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Errore durante l\'attivazione della policy');
+        });
+    }
+}
+
+// Auto-refresh ogni 2 minuti per aggiornare i dati
+setTimeout(() => {
+    if (confirm('Aggiornare la simulazione con i dati più recenti?')) {
+        location.reload();
+    }
+}, 120000);
+</script>
+
+<style>
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.progress {
+    height: 8px;
+    border-radius: 4px;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    border-top: none;
+}
+
+.badge {
+    font-size: 0.8em;
+}
+
+pre {
+    max-height: 200px;
+    overflow-y: auto;
+}
+</style>
+{% endblock %} 

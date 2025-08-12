@@ -1,513 +1,428 @@
+#!/usr/bin/env python3
 """
-Servizio AI per monitoraggio comportamenti sospetti nei download documentali.
-Implementa il sistema di alert automatici per sicurezza e compliance (NIS2, ISO 27001).
+Servizio per il monitoraggio AI post-migrazione.
+Rileva comportamenti anomali degli utenti/guest appena importati.
 """
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Tuple
-from sqlalchemy import and_, func, desc
+from typing import Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
-from flask import current_app
-import requests
-import json
-
-from models import db, AIAlert, DownloadLog, DocumentActivityLog, User, Document
-from services.ai import get_ai_response
+from sqlalchemy import text, func, and_, or_
+from models import User, GuestUser, AttivitaAI, AlertAI, DownloadLog, DocumentActivityLog
 
 logger = logging.getLogger(__name__)
 
 class AIMonitoringService:
-    """
-    Servizio per il monitoraggio AI dei comportamenti sospetti nei download.
-    """
+    """Servizio per il monitoraggio AI post-migrazione."""
     
-    def __init__(self):
-        self.suspicious_patterns = {
-            'download_massivo': {
-                'threshold': 5,  # >5 download
-                'timeframe': 2,  # in <2 minuti
-                'severity': 'alta'
-            },
-            'accesso_fuori_orario': {
-                'start_hour': 20,  # 20:00
-                'end_hour': 7,     # 07:00
-                'severity': 'media'
-            },
-            'ripetizione_file': {
-                'threshold': 3,  # >3 volte
-                'timeframe': 5,  # in 5 minuti
-                'severity': 'media'
-            },
-            'ip_sospetto': {
-                'severity': 'alta'
-            }
-        }
+    def __init__(self, db_session: Session):
+        self.db = db_session
     
-    def analizza_download_sospetti(self) -> List[Dict]:
+    def check_download_massivo(self, user_id: int = None, guest_id: int = None) -> Optional[AlertAI]:
         """
-        Analizza i log di download per identificare comportamenti sospetti.
-        
-        Returns:
-            List[Dict]: Lista di alert generati
-        """
-        try:
-            alerts = []
-            
-            # 1. Analisi download multipli in breve tempo
-            alerts.extend(self._check_massive_downloads())
-            
-            # 2. Analisi accessi fuori orario
-            alerts.extend(self._check_off_hours_access())
-            
-            # 3. Analisi ripetizione file
-            alerts.extend(self._check_file_repetition())
-            
-            # 4. Analisi IP sospetti
-            alerts.extend(self._check_suspicious_ips())
-            
-            # 5. Analisi tentativi su documenti bloccati
-            alerts.extend(self._check_blocked_document_attempts())
-            
-            logger.info(f"Analisi completata: {len(alerts)} alert generati")
-            return alerts
-            
-        except Exception as e:
-            logger.error(f"Errore durante analisi download sospetti: {e}")
-            return []
-    
-    def _check_massive_downloads(self) -> List[Dict]:
-        """
-        Identifica download multipli (>5) in breve tempo (<2 minuti) dallo stesso utente.
-        """
-        alerts = []
-        
-        try:
-            # Query per trovare utenti con >5 download in <2 minuti
-            recent_downloads = db.session.query(
-                DownloadLog.user_id,
-                func.count(DownloadLog.id).label('download_count'),
-                func.min(DownloadLog.timestamp).label('first_download'),
-                func.max(DownloadLog.timestamp).label('last_download')
-            ).filter(
-                DownloadLog.timestamp >= datetime.utcnow() - timedelta(hours=1)
-            ).group_by(DownloadLog.user_id).having(
-                func.count(DownloadLog.id) >= self.suspicious_patterns['download_massivo']['threshold']
-            ).all()
-            
-            for user_id, count, first_dl, last_dl in recent_downloads:
-                time_diff = (last_dl - first_dl).total_seconds() / 60
-                
-                if time_diff <= self.suspicious_patterns['download_massivo']['timeframe']:
-                    user = User.query.get(user_id)
-                    if user:
-                        alert = {
-                            'alert_type': 'download_massivo',
-                            'user_id': user_id,
-                            'severity': self.suspicious_patterns['download_massivo']['severity'],
-                            'description': f"Utente {user.username} ha scaricato {count} documenti in {time_diff:.1f} minuti",
-                            'details': {
-                                'download_count': count,
-                                'timeframe_minutes': time_diff,
-                                'first_download': first_dl.isoformat(),
-                                'last_download': last_dl.isoformat()
-                            }
-                        }
-                        alerts.append(alert)
-                        
-        except Exception as e:
-            logger.error(f"Errore durante controllo download massivi: {e}")
-        
-        return alerts
-    
-    def _check_off_hours_access(self) -> List[Dict]:
-        """
-        Identifica accessi fuori orario lavorativo (20:00-07:00).
-        """
-        alerts = []
-        
-        try:
-            current_hour = datetime.utcnow().hour
-            is_off_hours = (
-                current_hour >= self.suspicious_patterns['accesso_fuori_orario']['start_hour'] or
-                current_hour <= self.suspicious_patterns['accesso_fuori_orario']['end_hour']
-            )
-            
-            if is_off_hours:
-                # Trova download nelle ultime ore fuori orario
-                off_hours_downloads = DownloadLog.query.filter(
-                    and_(
-                        DownloadLog.timestamp >= datetime.utcnow() - timedelta(hours=12),
-                        func.extract('hour', DownloadLog.timestamp) >= self.suspicious_patterns['accesso_fuori_orario']['start_hour']
-                    )
-                ).all()
-                
-                for download in off_hours_downloads:
-                    user = User.query.get(download.user_id)
-                    if user:
-                        alert = {
-                            'alert_type': 'accesso_fuori_orario',
-                            'user_id': download.user_id,
-                            'document_id': download.document_id,
-                            'severity': self.suspicious_patterns['accesso_fuori_orario']['severity'],
-                            'description': f"Accesso fuori orario da {user.username} alle {download.timestamp.strftime('%H:%M')}",
-                            'details': {
-                                'access_time': download.timestamp.isoformat(),
-                                'hour': download.timestamp.hour
-                            }
-                        }
-                        alerts.append(alert)
-                        
-        except Exception as e:
-            logger.error(f"Errore durante controllo accessi fuori orario: {e}")
-        
-        return alerts
-    
-    def _check_file_repetition(self) -> List[Dict]:
-        """
-        Identifica ripetizioni dello stesso file (>3 volte in 5 minuti).
-        """
-        alerts = []
-        
-        try:
-            # Query per trovare ripetizioni dello stesso documento
-            recent_downloads = DownloadLog.query.filter(
-                DownloadLog.timestamp >= datetime.utcnow() - timedelta(minutes=10)
-            ).order_by(DownloadLog.user_id, DownloadLog.document_id, DownloadLog.timestamp).all()
-            
-            # Raggruppa per utente e documento
-            user_doc_downloads = {}
-            for download in recent_downloads:
-                key = (download.user_id, download.document_id)
-                if key not in user_doc_downloads:
-                    user_doc_downloads[key] = []
-                user_doc_downloads[key].append(download)
-            
-            # Controlla ripetizioni
-            for (user_id, doc_id), downloads in user_doc_downloads.items():
-                if len(downloads) >= self.suspicious_patterns['ripetizione_file']['threshold']:
-                    time_diff = (downloads[-1].timestamp - downloads[0].timestamp).total_seconds() / 60
-                    
-                    if time_diff <= self.suspicious_patterns['ripetizione_file']['timeframe']:
-                        user = User.query.get(user_id)
-                        document = Document.query.get(doc_id)
-                        
-                        if user and document:
-                            alert = {
-                                'alert_type': 'ripetizione_file',
-                                'user_id': user_id,
-                                'document_id': doc_id,
-                                'severity': self.suspicious_patterns['ripetizione_file']['severity'],
-                                'description': f"Utente {user.username} ha scaricato '{document.title}' {len(downloads)} volte in {time_diff:.1f} minuti",
-                                'details': {
-                                    'download_count': len(downloads),
-                                    'timeframe_minutes': time_diff,
-                                    'document_title': document.title
-                                }
-                            }
-                            alerts.append(alert)
-                            
-        except Exception as e:
-            logger.error(f"Errore durante controllo ripetizione file: {e}")
-        
-        return alerts
-    
-    def _check_suspicious_ips(self) -> List[Dict]:
-        """
-        Identifica accessi da IP sospetti o non aziendali.
-        """
-        alerts = []
-        
-        try:
-            # Lista IP aziendali autorizzati (da configurare)
-            authorized_ips = current_app.config.get('AUTHORIZED_IPS', [])
-            
-            # Per ora, controlliamo solo se ci sono IP registrati
-            # In futuro, si può implementare geolocalizzazione
-            recent_activities = DocumentActivityLog.query.filter(
-                DocumentActivityLog.timestamp >= datetime.utcnow() - timedelta(hours=1)
-            ).all()
-            
-            for activity in recent_activities:
-                # Se l'IP non è nella lista autorizzata
-                if hasattr(activity, 'ip_address') and activity.ip_address:
-                    if activity.ip_address not in authorized_ips:
-                        user = User.query.get(activity.user_id)
-                        if user:
-                            alert = {
-                                'alert_type': 'ip_sospetto',
-                                'user_id': activity.user_id,
-                                'document_id': activity.document_id,
-                                'severity': self.suspicious_patterns['ip_sospetto']['severity'],
-                                'description': f"Accesso da IP sospetto {activity.ip_address} da {user.username}",
-                                'details': {
-                                    'ip_address': activity.ip_address,
-                                    'action': activity.action
-                                }
-                            }
-                            alerts.append(alert)
-                            
-        except Exception as e:
-            logger.error(f"Errore durante controllo IP sospetti: {e}")
-        
-        return alerts
-    
-    def _check_blocked_document_attempts(self) -> List[Dict]:
-        """
-        Identifica tentativi di download su documenti bloccati.
-        """
-        alerts = []
-        
-        try:
-            # Trova tentativi di download su documenti non scaricabili
-            blocked_attempts = DocumentActivityLog.query.filter(
-                and_(
-                    DocumentActivityLog.action == 'download_denied',
-                    DocumentActivityLog.timestamp >= datetime.utcnow() - timedelta(hours=1)
-                )
-            ).all()
-            
-            for attempt in blocked_attempts:
-                user = User.query.get(attempt.user_id)
-                document = Document.query.get(attempt.document_id)
-                
-                if user and document:
-                    alert = {
-                        'alert_type': 'tentativo_documento_bloccato',
-                        'user_id': attempt.user_id,
-                        'document_id': attempt.document_id,
-                        'severity': 'media',
-                        'description': f"Tentativo di download documento bloccato '{document.title}' da {user.username}",
-                        'details': {
-                            'document_title': document.title,
-                            'reason': attempt.note or 'Documento non scaricabile'
-                        }
-                    }
-                    alerts.append(alert)
-                    
-        except Exception as e:
-            logger.error(f"Errore durante controllo tentativi documenti bloccati: {e}")
-        
-        return alerts
-    
-    def create_ai_alert(self, alert_data: Dict) -> Optional[AIAlert]:
-        """
-        Crea un record AIAlert nel database.
+        Controlla se un utente/guest ha effettuato download massivo (>20 file) nelle prime 24h.
         
         Args:
-            alert_data: Dizionario con i dati dell'alert
+            user_id: ID utente
+            guest_id: ID guest
             
         Returns:
-            AIAlert: L'oggetto alert creato
+            AlertAI se rilevato comportamento anomalo
         """
         try:
-            # Genera analisi AI del comportamento
-            ai_analysis = self._generate_ai_analysis(alert_data)
+            # Verifica se è un nuovo import
+            attivita = self._get_attivita_ai(user_id, guest_id)
+            if not attivita or not attivita.is_nuovo_import:
+                return None
             
-            alert = AIAlert(
-                alert_type=alert_data['alert_type'],
-                user_id=alert_data['user_id'],
-                document_id=alert_data.get('document_id'),
-                severity=alert_data['severity'],
-                description=alert_data['description'],
-                ip_address=alert_data.get('details', {}).get('ip_address'),
-                user_agent=alert_data.get('details', {}).get('user_agent'),
-                resolved=False
-            )
+            # Controlla se è entro 24h dall'import
+            if attivita.giorni_da_import > 1:
+                return None
             
-            db.session.add(alert)
-            db.session.commit()
+            # Conta download nelle ultime 24h
+            download_count = self._count_downloads_24h(user_id, guest_id)
             
-            logger.info(f"Alert AI creato: {alert.id} - {alert.alert_type}")
-            return alert
+            if download_count > 20:
+                # Crea alert
+                alert = AlertAI(
+                    user_id=user_id,
+                    guest_id=guest_id,
+                    tipo_alert='download_massivo',
+                    descrizione=f'Download massivo rilevato: {download_count} file scaricati nelle prime 24h post-migrazione',
+                    ip_address=self._get_last_ip(user_id, guest_id),
+                    user_agent=self._get_last_user_agent(user_id, guest_id)
+                )
+                
+                self.db.add(alert)
+                self.db.commit()
+                
+                logger.warning(f"🚨 Alert AI: Download massivo per {'utente' if user_id else 'guest'} {user_id or guest_id}")
+                return alert
+            
+            return None
             
         except Exception as e:
-            logger.error(f"Errore durante creazione alert AI: {e}")
-            db.session.rollback()
+            logger.error(f"Errore controllo download massivo: {e}")
             return None
     
-    def _generate_ai_analysis(self, alert_data: Dict) -> str:
+    def check_accessi_falliti(self, user_id: int = None, guest_id: int = None) -> Optional[AlertAI]:
         """
-        Genera analisi AI del comportamento sospetto.
+        Controlla se un utente/guest ha >5 tentativi di accesso falliti nelle prime 48h.
         
         Args:
-            alert_data: Dati dell'alert
+            user_id: ID utente
+            guest_id: ID guest
             
         Returns:
-            str: Analisi AI generata
+            AlertAI se rilevato comportamento anomalo
         """
         try:
-            prompt = f"""
-            Analizza questo pattern di download sospetto:
+            # Verifica se è un nuovo import
+            attivita = self._get_attivita_ai(user_id, guest_id)
+            if not attivita or not attivita.is_nuovo_import:
+                return None
             
-            Tipo Alert: {alert_data['alert_type']}
-            Descrizione: {alert_data['description']}
-            Severità: {alert_data['severity']}
-            Dettagli: {json.dumps(alert_data.get('details', {}), indent=2)}
+            # Controlla se è entro 48h dall'import
+            if attivita.giorni_da_import > 2:
+                return None
             
-            È sospetto? Quali sono i rischi e cosa consigliare all'admin?
+            # Conta accessi falliti nelle ultime 48h
+            failed_count = self._count_failed_logins_48h(user_id, guest_id)
             
-            Fornisci:
-            1. Valutazione rischio (basso/medio/alto/critico)
-            2. Possibili motivazioni legittime
-            3. Azioni consigliate per l'admin
-            4. Misure preventive
-            """
+            if failed_count > 5:
+                # Crea alert
+                alert = AlertAI(
+                    user_id=user_id,
+                    guest_id=guest_id,
+                    tipo_alert='accessi_falliti',
+                    descrizione=f'Accessi falliti rilevati: {failed_count} tentativi falliti nelle prime 48h post-migrazione',
+                    ip_address=self._get_last_ip(user_id, guest_id),
+                    user_agent=self._get_last_user_agent(user_id, guest_id)
+                )
+                
+                self.db.add(alert)
+                self.db.commit()
+                
+                logger.warning(f"🚨 Alert AI: Accessi falliti per {'utente' if user_id else 'guest'} {user_id or guest_id}")
+                return alert
             
-            ai_response = get_ai_response(prompt)
-            return ai_response or "Analisi AI non disponibile"
+            return None
             
         except Exception as e:
-            logger.error(f"Errore durante generazione analisi AI: {e}")
-            return "Errore durante analisi AI"
+            logger.error(f"Errore controllo accessi falliti: {e}")
+            return None
     
-    def send_admin_notification(self, alert: AIAlert) -> bool:
+    def check_ip_sospetto(self, user_id: int = None, guest_id: int = None, current_ip: str = None) -> Optional[AlertAI]:
         """
-        Invia notifica email all'admin (opzionale).
+        Controlla se un utente/guest accede da IP sospetto entro 7 giorni.
         
         Args:
-            alert: L'alert da notificare
+            user_id: ID utente
+            guest_id: ID guest
+            current_ip: IP corrente
             
         Returns:
-            bool: True se inviata con successo
+            AlertAI se rilevato comportamento anomalo
         """
         try:
-            # Per ora, logghiamo solo la notifica
-            # In futuro, implementare invio email
-            logger.info(f"Notifica admin per alert {alert.id}: {alert.description}")
-            return True
+            # Verifica se è un nuovo import
+            attivita = self._get_attivita_ai(user_id, guest_id)
+            if not attivita or not attivita.is_nuovo_import:
+                return None
+            
+            # Controlla se è entro 7 giorni dall'import
+            if attivita.giorni_da_import > 7:
+                return None
+            
+            if not current_ip:
+                return None
+            
+            # Verifica se l'IP è sospetto
+            if self._is_suspicious_ip(current_ip):
+                # Crea alert
+                alert = AlertAI(
+                    user_id=user_id,
+                    guest_id=guest_id,
+                    tipo_alert='ip_sospetto',
+                    descrizione=f'Accesso da IP sospetto rilevato: {current_ip} entro 7 giorni post-migrazione',
+                    ip_address=current_ip,
+                    user_agent=self._get_last_user_agent(user_id, guest_id)
+                )
+                
+                self.db.add(alert)
+                self.db.commit()
+                
+                logger.warning(f"🚨 Alert AI: IP sospetto per {'utente' if user_id else 'guest'} {user_id or guest_id}: {current_ip}")
+                return alert
+            
+            return None
             
         except Exception as e:
-            logger.error(f"Errore durante invio notifica admin: {e}")
-            return False
+            logger.error(f"Errore controllo IP sospetto: {e}")
+            return None
     
-    def get_recent_alerts(self, hours: int = 24) -> List[AIAlert]:
+    def check_comportamento_anomalo(self, user_id: int = None, guest_id: int = None) -> Optional[AlertAI]:
         """
-        Recupera gli alert recenti.
+        Controlla comportamenti anomali generali post-migrazione.
         
         Args:
-            hours: Numero di ore da considerare
+            user_id: ID utente
+            guest_id: ID guest
             
         Returns:
-            List[AIAlert]: Lista degli alert
+            AlertAI se rilevato comportamento anomalo
         """
         try:
-            return AIAlert.query.filter(
-                AIAlert.created_at >= datetime.utcnow() - timedelta(hours=hours)
-            ).order_by(AIAlert.created_at.desc()).all()
+            # Verifica se è un nuovo import
+            attivita = self._get_attivita_ai(user_id, guest_id)
+            if not attivita or not attivita.is_nuovo_import:
+                return None
+            
+            # Controlla se è entro 30 giorni dall'import
+            if attivita.giorni_da_import > 30:
+                return None
+            
+            # Analizza pattern di comportamento
+            anomalies = self._detect_behavior_anomalies(user_id, guest_id)
+            
+            if anomalies:
+                # Crea alert
+                alert = AlertAI(
+                    user_id=user_id,
+                    guest_id=guest_id,
+                    tipo_alert='comportamento_anomalo',
+                    descrizione=f'Comportamento anomalo rilevato: {anomalies}',
+                    ip_address=self._get_last_ip(user_id, guest_id),
+                    user_agent=self._get_last_user_agent(user_id, guest_id)
+                )
+                
+                self.db.add(alert)
+                self.db.commit()
+                
+                logger.warning(f"🚨 Alert AI: Comportamento anomalo per {'utente' if user_id else 'guest'} {user_id or guest_id}")
+                return alert
+            
+            return None
             
         except Exception as e:
-            logger.error(f"Errore durante recupero alert recenti: {e}")
-            return []
+            logger.error(f"Errore controllo comportamento anomalo: {e}")
+            return None
     
-    def resolve_alert(self, alert_id: int, resolved_by: str) -> bool:
+    def run_all_checks(self, user_id: int = None, guest_id: int = None, current_ip: str = None) -> List[AlertAI]:
         """
-        Marca un alert come risolto.
+        Esegue tutti i controlli AI per un utente/guest.
         
         Args:
-            alert_id: ID dell'alert
-            resolved_by: Chi ha risolto l'alert
+            user_id: ID utente
+            guest_id: ID guest
+            current_ip: IP corrente
             
         Returns:
-            bool: True se risolto con successo
+            Lista di alert generati
         """
+        alerts = []
+        
+        # Controllo download massivo
+        alert = self.check_download_massivo(user_id, guest_id)
+        if alert:
+            alerts.append(alert)
+        
+        # Controllo accessi falliti
+        alert = self.check_accessi_falliti(user_id, guest_id)
+        if alert:
+            alerts.append(alert)
+        
+        # Controllo IP sospetto
+        alert = self.check_ip_sospetto(user_id, guest_id, current_ip)
+        if alert:
+            alerts.append(alert)
+        
+        # Controllo comportamento anomalo
+        alert = self.check_comportamento_anomalo(user_id, guest_id)
+        if alert:
+            alerts.append(alert)
+        
+        return alerts
+    
+    def _get_attivita_ai(self, user_id: int = None, guest_id: int = None) -> Optional[AttivitaAI]:
+        """Recupera l'attività AI per un utente/guest."""
         try:
-            alert = AIAlert.query.get(alert_id)
-            if alert:
-                alert.resolved = True
-                alert.resolved_by = resolved_by
-                alert.resolved_at = datetime.utcnow()
-                db.session.commit()
+            if user_id:
+                return self.db.query(AttivitaAI).filter(AttivitaAI.user_id == user_id).first()
+            elif guest_id:
+                return self.db.query(AttivitaAI).filter(AttivitaAI.guest_id == guest_id).first()
+            return None
+        except Exception as e:
+            logger.error(f"Errore recupero attività AI: {e}")
+            return None
+    
+    def _count_downloads_24h(self, user_id: int = None, guest_id: int = None) -> int:
+        """Conta i download nelle ultime 24h."""
+        try:
+            yesterday = datetime.utcnow() - timedelta(days=1)
+            
+            if user_id:
+                return self.db.query(DownloadLog).filter(
+                    and_(
+                        DownloadLog.user_id == user_id,
+                        DownloadLog.timestamp >= yesterday
+                    )
+                ).count()
+            elif guest_id:
+                # Per i guest, controlla le attività guest
+                return self.db.query(DocumentActivityLog).filter(
+                    and_(
+                        DocumentActivityLog.user_id == guest_id,
+                        DocumentActivityLog.action == 'download',
+                        DocumentActivityLog.timestamp >= yesterday
+                    )
+                ).count()
+            
+            return 0
+        except Exception as e:
+            logger.error(f"Errore conteggio download: {e}")
+            return 0
+    
+    def _count_failed_logins_48h(self, user_id: int = None, guest_id: int = None) -> int:
+        """Conta gli accessi falliti nelle ultime 48h."""
+        try:
+            two_days_ago = datetime.utcnow() - timedelta(days=2)
+            
+            # Controlla log di accesso fallito
+            # Nota: Questo dipende dalla struttura del tuo sistema di logging
+            # Adatta la query in base ai tuoi log di autenticazione
+            
+            return 0  # Placeholder
+        except Exception as e:
+            logger.error(f"Errore conteggio accessi falliti: {e}")
+            return 0
+    
+    def _is_suspicious_ip(self, ip: str) -> bool:
+        """Verifica se un IP è sospetto."""
+        try:
+            # Lista di IP sospetti (esempi)
+            suspicious_ips = [
+                '192.168.1.100',  # IP interno sospetto
+                '10.0.0.50',      # IP interno sospetto
+                # Aggiungi altri IP sospetti
+            ]
+            
+            # Verifica se l'IP è nella lista sospetti
+            if ip in suspicious_ips:
                 return True
-            return False
             
+            # Verifica se è un IP esterno quando dovrebbe essere interno
+            if not ip.startswith(('192.168.', '10.', '172.')):
+                return True
+            
+            return False
         except Exception as e:
-            logger.error(f"Errore durante risoluzione alert: {e}")
-            db.session.rollback()
+            logger.error(f"Errore verifica IP sospetto: {e}")
             return False
     
-    def get_alert_statistics(self) -> Dict:
-        """
-        Recupera statistiche degli alert.
-        
-        Returns:
-            Dict: Statistiche degli alert
-        """
+    def _detect_behavior_anomalies(self, user_id: int = None, guest_id: int = None) -> str:
+        """Rileva anomalie nel comportamento."""
         try:
-            total_alerts = AIAlert.query.count()
-            resolved_alerts = AIAlert.query.filter(AIAlert.resolved == True).count()
-            pending_alerts = total_alerts - resolved_alerts
+            anomalies = []
             
-            # Statistiche per severità
-            severity_stats = db.session.query(
-                AIAlert.severity,
-                func.count(AIAlert.id).label('count')
-            ).group_by(AIAlert.severity).all()
+            # Controlla orari di accesso insoliti
+            if self._has_unusual_access_times(user_id, guest_id):
+                anomalies.append("Orari di accesso insoliti")
             
-            # Statistiche per tipo
-            type_stats = db.session.query(
-                AIAlert.alert_type,
-                func.count(AIAlert.id).label('count')
-            ).group_by(AIAlert.alert_type).all()
+            # Controlla pattern di navigazione anomali
+            if self._has_anomalous_navigation(user_id, guest_id):
+                anomalies.append("Pattern di navigazione anomali")
             
-            return {
-                'total': total_alerts,
-                'resolved': resolved_alerts,
-                'pending': pending_alerts,
-                'severity_stats': {s.severity: s.count for s in severity_stats},
-                'type_stats': {t.alert_type: t.count for t in type_stats}
-            }
+            # Controlla tentativi di accesso a documenti riservati
+            if self._has_restricted_document_access(user_id, guest_id):
+                anomalies.append("Tentativi di accesso a documenti riservati")
             
+            return "; ".join(anomalies) if anomalies else ""
         except Exception as e:
-            logger.error(f"Errore durante recupero statistiche alert: {e}")
-            return {}
-
-
-# Istanza globale del servizio
-ai_monitoring_service = AIMonitoringService()
-
-
-def analizza_download_sospetti() -> List[Dict]:
-    """
-    Funzione principale per analizzare i download sospetti.
+            logger.error(f"Errore rilevamento anomalie comportamento: {e}")
+            return ""
     
-    Returns:
-        List[Dict]: Lista di alert generati
-    """
-    return ai_monitoring_service.analizza_download_sospetti()
+    def _has_unusual_access_times(self, user_id: int = None, guest_id: int = None) -> bool:
+        """Verifica se ci sono accessi in orari insoliti."""
+        try:
+            # Controlla accessi tra le 23:00 e le 06:00
+            # Implementa la logica specifica per il tuo sistema
+            return False  # Placeholder
+        except Exception as e:
+            logger.error(f"Errore verifica orari accesso: {e}")
+            return False
+    
+    def _has_anomalous_navigation(self, user_id: int = None, guest_id: int = None) -> bool:
+        """Verifica se ci sono pattern di navigazione anomali."""
+        try:
+            # Implementa la logica per rilevare navigazione anomala
+            return False  # Placeholder
+        except Exception as e:
+            logger.error(f"Errore verifica navigazione anomala: {e}")
+            return False
+    
+    def _has_restricted_document_access(self, user_id: int = None, guest_id: int = None) -> bool:
+        """Verifica se ci sono tentativi di accesso a documenti riservati."""
+        try:
+            # Implementa la logica per rilevare accessi a documenti riservati
+            return False  # Placeholder
+        except Exception as e:
+            logger.error(f"Errore verifica accessi documenti riservati: {e}")
+            return False
+    
+    def _get_last_ip(self, user_id: int = None, guest_id: int = None) -> Optional[str]:
+        """Recupera l'ultimo IP utilizzato."""
+        try:
+            # Implementa la logica per recuperare l'ultimo IP
+            return None  # Placeholder
+        except Exception as e:
+            logger.error(f"Errore recupero ultimo IP: {e}")
+            return None
+    
+    def _get_last_user_agent(self, user_id: int = None, guest_id: int = None) -> Optional[str]:
+        """Recupera l'ultimo user agent utilizzato."""
+        try:
+            # Implementa la logica per recuperare l'ultimo user agent
+            return None  # Placeholder
+        except Exception as e:
+            logger.error(f"Errore recupero ultimo user agent: {e}")
+            return None
 
 
-def create_ai_alert(alert_data: Dict) -> Optional[AIAlert]:
+def genera_alert_ai_post_import(user_id: int = None, guest_id: int = None, current_ip: str = None) -> List[Dict]:
     """
-    Crea un alert AI.
+    Genera alert AI per utenti/guest post-migrazione.
     
     Args:
-        alert_data: Dati dell'alert
+        user_id: ID utente
+        guest_id: ID guest
+        current_ip: IP corrente
         
     Returns:
-        AIAlert: Alert creato
+        Lista di alert generati
     """
-    return ai_monitoring_service.create_ai_alert(alert_data)
-
-
-def get_recent_alerts(hours: int = 24) -> List[AIAlert]:
-    """
-    Recupera alert recenti.
-    
-    Args:
-        hours: Ore da considerare
+    try:
+        from database import get_db
         
-    Returns:
-        List[AIAlert]: Lista alert
-    """
-    return ai_monitoring_service.get_recent_alerts(hours)
-
-
-def get_alert_statistics() -> Dict:
-    """
-    Recupera statistiche alert.
-    
-    Returns:
-        Dict: Statistiche
-    """
-    return ai_monitoring_service.get_alert_statistics() 
+        db = get_db()
+        monitoring_service = AIMonitoringService(db)
+        
+        alerts = monitoring_service.run_all_checks(user_id, guest_id, current_ip)
+        
+        results = []
+        for alert in alerts:
+            results.append({
+                'id': alert.id,
+                'tipo_alert': alert.tipo_alert,
+                'descrizione': alert.descrizione,
+                'stato': alert.stato,
+                'timestamp': alert.timestamp.isoformat(),
+                'ip_address': alert.ip_address
+            })
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Errore generazione alert AI post-import: {e}")
+        return [] 

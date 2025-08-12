@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-brain me-2"></i>
+                        🧠 Analisi AI Richieste Accesso
+                    </h2>
+                    <p class="text-muted mb-0">Analisi intelligente dei pattern e insight operativi</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('admin.all_access_requests_stats') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-chart-bar me-1"></i>
+                        Torna alle Statistiche
+                    </a>
+                    <a href="{{ url_for('admin.all_access_requests') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-list me-1"></i>
+                        Vista Lista
+                    </a>
+                </div>
+            </div>
+
+            <!-- Card Analisi AI -->
+            <div class="card">
+                <div class="card-header bg-gradient-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-robot me-2"></i>
+                        Analisi AI Pattern Richieste
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <h6><i class="fas fa-info-circle me-2"></i>Informazioni sull'Analisi</h6>
+                        <ul class="mb-0">
+                            <li><strong>Periodo Analisi:</strong> Tutte le richieste storiche disponibili</li>
+                            <li><strong>Algoritmo:</strong> Analisi statistica avanzata con pattern recognition</li>
+                            <li><strong>Focus:</strong> Identificazione utenti a rischio, documenti problematici, pattern temporali</li>
+                            <li><strong>Output:</strong> Suggerimenti operativi per migliorare le politiche di accesso</li>
+                        </ul>
+                    </div>
+
+                    <!-- Contenuto Analisi -->
+                    <div class="analysis-content" style="white-space: pre-line; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.6; background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #007bff;">
+                        {{ analysis }}
+                    </div>
+
+                    <!-- Sezione Azioni -->
+                    <div class="mt-4">
+                        <h6><i class="fas fa-lightbulb me-2"></i>Azioni Suggerite</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-warning">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-warning">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                            Azioni Immediate
+                                        </h6>
+                                        <ul class="mb-0">
+                                            <li>Rivedere politiche di accesso per utenti a rischio</li>
+                                            <li>Valutare documenti con alto tasso di negazioni</li>
+                                            <li>Implementare formazione per reparti problematici</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-info">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-info">
+                                            <i class="fas fa-chart-line me-1"></i>
+                                            Monitoraggio Continuo
+                                        </h6>
+                                        <ul class="mb-0">
+                                            <li>Monitorare pattern temporali ricorrenti</li>
+                                            <li>Tracciare metriche di approvazione per reparto</li>
+                                            <li>Analizzare trend di richieste per documento</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sezione Metriche -->
+                    <div class="mt-4">
+                        <h6><i class="fas fa-tachometer-alt me-2"></i>Metriche Chiave</h6>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <h4 class="text-primary mb-1">📊</h4>
+                                    <small class="text-muted">Tasso Approvazione</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <h4 class="text-warning mb-1">⏱️</h4>
+                                    <small class="text-muted">Tempo Medio Risposta</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <h4 class="text-danger mb-1">🚨</h4>
+                                    <small class="text-muted">Utenti a Rischio</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3 bg-light rounded">
+                                    <h4 class="text-success mb-1">📈</h4>
+                                    <small class="text-muted">Trend Richieste</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sezione Note -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Note Importanti</h6>
+                        <ul class="mb-0">
+                            <li><strong>Dati Storici:</strong> L'analisi è basata sui dati storici disponibili nel sistema</li>
+                            <li><strong>Verifica Manuale:</strong> Si raccomanda di verificare i risultati con i responsabili dei reparti</li>
+                            <li><strong>Aggiornamento:</strong> L'analisi viene aggiornata automaticamente con nuovi dati</li>
+                            <li><strong>Privacy:</strong> Nessun dato sensibile viene inviato a servizi esterni</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pulsanti Azione -->
+            <div class="row mt-4">
+                <div class="col-12 text-center">
+                    <button class="btn btn-primary me-2" onclick="window.print()">
+                        <i class="fas fa-print me-1"></i>
+                        Stampa Analisi
+                    </button>
+                    <button class="btn btn-success me-2" onclick="exportAnalysis()">
+                        <i class="fas fa-download me-1"></i>
+                        Esporta PDF
+                    </button>
+                    <button class="btn btn-info" onclick="refreshAnalysis()">
+                        <i class="fas fa-sync-alt me-1"></i>
+                        Aggiorna Analisi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.analysis-content {
+    max-height: 600px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+@media print {
+    .btn, .alert {
+        display: none !important;
+    }
+    
+    .analysis-content {
+        max-height: none;
+        overflow: visible;
+    }
+}
+</style>
+
+<script>
+function exportAnalysis() {
+    // Simula esportazione PDF
+    alert('Funzionalità di esportazione PDF in sviluppo');
+}
+
+function refreshAnalysis() {
+    // Ricarica la pagina per aggiornare l'analisi
+    location.reload();
+}
+
+// Auto-refresh ogni 10 minuti
+setTimeout(() => {
+    if (confirm('Aggiornare l\'analisi AI con i dati più recenti?')) {
+        location.reload();
+    }
+}, 600000);
+</script>
+{% endblock %} 

@@ -1,0 +1,460 @@
+<!-- Tab Copertura (Manus) - Template Bootstrap Completo -->
+<div class="tab-pane fade" id="manus-coverage" role="tabpanel">
+    <div class="container-fluid">
+        <!-- Header con statistiche -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center mb-2">
+                                    <div class="bg-success rounded-circle p-3 me-3">
+                                        <i class="fas fa-check text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="mb-0 text-success" id="completi-count">0</h3>
+                                        <small class="text-muted">Completi</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center mb-2">
+                                    <div class="bg-warning rounded-circle p-3 me-3">
+                                        <i class="fas fa-clock text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="mb-0 text-warning" id="mancanti-count">0</h3>
+                                        <small class="text-muted">Mancanti</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center mb-2">
+                                    <div class="bg-info rounded-circle p-3 me-3">
+                                        <i class="fas fa-users text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="mb-0 text-info" id="mappings-count">0</h3>
+                                        <small class="text-muted">Mapping</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center mb-2">
+                                    <div class="bg-primary rounded-circle p-3 me-3">
+                                        <i class="fas fa-percentage text-white"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="mb-0 text-primary" id="percentuale">0%</h3>
+                                        <small class="text-muted">Copertura</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Azioni principali -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">
+                            <i class="fas fa-cogs"></i> Azioni
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <button class="btn btn-primary w-100" onclick="loadMappings()" id="btn-load">
+                                    <i class="fas fa-sync me-2"></i>
+                                    <span id="btn-load-text">Carica Mapping</span>
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-success w-100" onclick="rebuildAllCoverage()" id="btn-rebuild-all">
+                                    <i class="fas fa-calculator me-2"></i>
+                                    Ricalcola Tutti
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-outline-secondary w-100" onclick="exportCoverage()">
+                                    <i class="fas fa-download me-2"></i>
+                                    Export CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabella mapping con filtri -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="fas fa-table"></i> Mapping Utenti Manus
+                        </h6>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm" id="filter-status" style="width: auto;">
+                                <option value="">Tutti gli status</option>
+                                <option value="true">Attivi</option>
+                                <option value="false">Inattivi</option>
+                            </select>
+                            <input type="text" class="form-control form-control-sm" id="search-input" 
+                                   placeholder="Cerca..." style="width: 200px;">
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="mappings-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>
+                                            <i class="fas fa-user"></i> ID Manus
+                                        </th>
+                                        <th>
+                                            <i class="fas fa-envelope"></i> Email
+                                        </th>
+                                        <th>
+                                            <i class="fas fa-user-check"></i> Utente SYNTHIA
+                                        </th>
+                                        <th>
+                                            <i class="fas fa-toggle-on"></i> Status
+                                        </th>
+                                        <th>
+                                            <i class="fas fa-calendar"></i> Ultimo Aggiornamento
+                                        </th>
+                                        <th>
+                                            <i class="fas fa-cogs"></i> Azioni
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mappings-tbody">
+                                    <tr id="loading-row">
+                                        <td colspan="6" class="text-center py-4">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Caricamento...</span>
+                                            </div>
+                                            <p class="mt-2 text-muted">Caricamento mapping...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per dettagli mapping -->
+<div class="modal fade" id="mapping-details-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-edit"></i> Dettagli Mapping
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="mapping-details-content">
+                <!-- Contenuto popolato via JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                <button type="button" class="btn btn-primary" onclick="editMapping()">Modifica</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="toast-notification" class="toast" role="alert">
+        <div class="toast-header">
+            <i class="fas fa-info-circle text-primary me-2"></i>
+            <strong class="me-auto" id="toast-title">Notifica</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toast-message">
+            <!-- Messaggio popolato via JavaScript -->
+        </div>
+    </div>
+</div>
+
+<script>
+// Variabili globali
+let mappingsData = [];
+let filteredData = [];
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    // Carica mapping quando si clicca sulla tab
+    $('a[data-toggle="tab"][href="#manus-coverage"]').on('shown.bs.tab', function (e) {
+        loadMappings();
+    });
+    
+    // Filtri
+    document.getElementById('filter-status').addEventListener('change', filterMappings);
+    document.getElementById('search-input').addEventListener('input', filterMappings);
+});
+
+// Carica lista mapping
+function loadMappings() {
+    const btnLoad = document.getElementById('btn-load');
+    const btnLoadText = document.getElementById('btn-load-text');
+    
+    // Disabilita bottone e mostra loading
+    btnLoad.disabled = true;
+    btnLoadText.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Caricamento...';
+    
+    fetch('/admin/manus/mapping/list')
+        .then(response => response.json())
+        .then(data => {
+            mappingsData = data;
+            filteredData = data;
+            renderMappingsTable();
+            updateStats();
+            showToast('success', `Caricati ${data.length} mapping`);
+        })
+        .catch(error => {
+            console.error('Errore caricamento mapping:', error);
+            showToast('error', 'Errore nel caricamento dei mapping');
+        })
+        .finally(() => {
+            // Riabilita bottone
+            btnLoad.disabled = false;
+            btnLoadText.textContent = 'Carica Mapping';
+        });
+}
+
+// Renderizza tabella mapping
+function renderMappingsTable() {
+    const tbody = document.getElementById('mappings-tbody');
+    tbody.innerHTML = '';
+    
+    if (filteredData.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center py-4">
+                    <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">Nessun mapping trovato</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    filteredData.forEach(mapping => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <code class="bg-light px-2 py-1 rounded">${mapping.manus_user_id}</code>
+            </td>
+            <td>
+                ${mapping.email ? 
+                    `<a href="mailto:${mapping.email}" class="text-decoration-none">
+                        <i class="fas fa-envelope me-1"></i>${mapping.email}
+                    </a>` : 
+                    '<span class="text-muted">-</span>'
+                }
+            </td>
+            <td>
+                ${mapping.syn_user_id ? 
+                    `<span class="badge bg-success">
+                        <i class="fas fa-user-check me-1"></i>ID: ${mapping.syn_user_id}
+                    </span>` : 
+                    '<span class="badge bg-warning">
+                        <i class="fas fa-user-times me-1"></i>Non mappato
+                    </span>'
+                }
+            </td>
+            <td>
+                <span class="badge ${mapping.active ? 'bg-success' : 'bg-danger'}">
+                    <i class="fas fa-${mapping.active ? 'check' : 'times'} me-1"></i>
+                    ${mapping.active ? 'Attivo' : 'Inattivo'}
+                </span>
+            </td>
+            <td>
+                <small class="text-muted">
+                    <i class="fas fa-clock me-1"></i>
+                    ${mapping.updated_at ? new Date(mapping.updated_at).toLocaleDateString('it-IT') : '-'}
+                </small>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button class="btn btn-outline-info" onclick="showMappingDetails(${mapping.id})" 
+                            title="Dettagli">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    ${mapping.syn_user_id ? 
+                        `<button class="btn btn-outline-success" onclick="rebuildCoverage(${mapping.syn_user_id})" 
+                                title="Ricalcola Coverage">
+                            <i class="fas fa-calculator"></i>
+                        </button>` : 
+                        `<button class="btn btn-outline-warning" onclick="createMapping(${mapping.id})" 
+                                title="Crea Mapping">
+                            <i class="fas fa-plus"></i>
+                        </button>`
+                    }
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Filtra mapping
+function filterMappings() {
+    const statusFilter = document.getElementById('filter-status').value;
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    
+    filteredData = mappingsData.filter(mapping => {
+        const statusMatch = statusFilter === '' || mapping.active.toString() === statusFilter;
+        const searchMatch = !searchTerm || 
+            mapping.manus_user_id.toLowerCase().includes(searchTerm) ||
+            (mapping.email && mapping.email.toLowerCase().includes(searchTerm));
+        
+        return statusMatch && searchMatch;
+    });
+    
+    renderMappingsTable();
+}
+
+// Aggiorna statistiche
+function updateStats() {
+    const total = mappingsData.length;
+    const attivi = mappingsData.filter(m => m.active).length;
+    const mappati = mappingsData.filter(m => m.syn_user_id).length;
+    
+    document.getElementById('mappings-count').textContent = total;
+    document.getElementById('completi-count').textContent = mappati;
+    document.getElementById('mancanti-count').textContent = total - mappati;
+    document.getElementById('percentuale').textContent = 
+        total > 0 ? Math.round((mappati / total) * 100) + '%' : '0%';
+}
+
+// Ricalcola coverage per utente specifico
+function rebuildCoverage(userId) {
+    const btn = event.target.closest('button');
+    const originalContent = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    
+    fetch(`/admin/manus/coverage/rebuild/${userId}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.ok) {
+            showToast('success', `Coverage aggiornato: ${data.updated} record`);
+        } else {
+            showToast('error', 'Errore nell\'aggiornamento: ' + (data.error || ''));
+        }
+    })
+    .catch(error => {
+        console.error('Errore rebuild coverage:', error);
+        showToast('error', 'Errore nel ricalcolo coverage');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    });
+}
+
+// Ricalcola coverage per tutti gli utenti
+function rebuildAllCoverage() {
+    if (!confirm('Ricalcolare coverage per tutti gli utenti? Questa operazione potrebbe richiedere tempo.')) {
+        return;
+    }
+    
+    const btn = document.getElementById('btn-rebuild-all');
+    const originalContent = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Elaborazione...';
+    
+    // TODO: implementare endpoint per rebuild globale
+    setTimeout(() => {
+        showToast('info', 'Funzionalità in sviluppo');
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }, 1000);
+}
+
+// Export coverage
+function exportCoverage() {
+    // TODO: implementare export CSV
+    showToast('info', 'Funzionalità in sviluppo');
+}
+
+// Mostra dettagli mapping
+function showMappingDetails(mappingId) {
+    const mapping = mappingsData.find(m => m.id === mappingId);
+    if (!mapping) return;
+    
+    const content = document.getElementById('mapping-details-content');
+    content.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Informazioni Manus</h6>
+                <p><strong>ID:</strong> <code>${mapping.manus_user_id}</code></p>
+                <p><strong>Email:</strong> ${mapping.email || '-'}</p>
+            </div>
+            <div class="col-md-6">
+                <h6>Mapping SYNTHIA</h6>
+                <p><strong>User ID:</strong> ${mapping.syn_user_id || 'Non mappato'}</p>
+                <p><strong>Status:</strong> 
+                    <span class="badge ${mapping.active ? 'bg-success' : 'bg-danger'}">
+                        ${mapping.active ? 'Attivo' : 'Inattivo'}
+                    </span>
+                </p>
+            </div>
+        </div>
+    `;
+    
+    new bootstrap.Modal(document.getElementById('mapping-details-modal')).show();
+}
+
+// Crea mapping
+function createMapping(mappingId) {
+    // TODO: implementare creazione mapping
+    showToast('info', 'Funzionalità in sviluppo');
+}
+
+// Edit mapping
+function editMapping() {
+    // TODO: implementare modifica mapping
+    showToast('info', 'Funzionalità in sviluppo');
+}
+
+// Toast notifications
+function showToast(type, message) {
+    const toast = document.getElementById('toast-notification');
+    const title = document.getElementById('toast-title');
+    const messageEl = document.getElementById('toast-message');
+    
+    // Imposta icona e colore in base al tipo
+    const iconMap = {
+        'success': 'fas fa-check-circle text-success',
+        'error': 'fas fa-exclamation-circle text-danger',
+        'warning': 'fas fa-exclamation-triangle text-warning',
+        'info': 'fas fa-info-circle text-info'
+    };
+    
+    title.innerHTML = `<i class="${iconMap[type] || iconMap.info} me-2"></i>Notifica`;
+    messageEl.textContent = message;
+    
+    // Mostra toast
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+}
+</script>

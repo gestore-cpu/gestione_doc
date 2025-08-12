@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Genera Report CEO - Manuale{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    📊 Genera Report CEO Mensile
+                </h1>
+                <a href="{{ url_for('ceo_report.report_dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+                </a>
+            </div>
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-cog"></i> Parametri Report
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="month" class="form-label">
+                                                <i class="fas fa-calendar"></i> Mese
+                                            </label>
+                                            <select class="form-select" id="month" name="month" required>
+                                                <option value="">Seleziona mese...</option>
+                                                {% for month_num, month_name in months %}
+                                                <option value="{{ month_num }}" 
+                                                        {% if month_num == 12 %}selected{% endif %}>
+                                                    {{ month_name }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="year" class="form-label">
+                                                <i class="fas fa-calendar-alt"></i> Anno
+                                            </label>
+                                            <select class="form-select" id="year" name="year" required>
+                                                <option value="">Seleziona anno...</option>
+                                                {% for year in years %}
+                                                <option value="{{ year }}" 
+                                                        {% if year == 2024 %}selected{% endif %}>
+                                                    {{ year }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="send_email" name="send_email">
+                                        <label class="form-check-label" for="send_email">
+                                            <i class="fas fa-envelope"></i> Invia report via email al CEO
+                                        </label>
+                                        <div class="form-text">
+                                            Se abilitato, il report verrà inviato automaticamente all'email configurata per il CEO.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-file-pdf"></i> Genera Report
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-info-circle"></i> Informazioni
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <h6>📊 Contenuto del Report</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success"></i> Invii PDF sensibili</li>
+                                <li><i class="fas fa-check text-success"></i> Alert AI attivi</li>
+                                <li><i class="fas fa-check text-success"></i> Eventi audit trail</li>
+                            </ul>
+
+                            <hr>
+
+                            <h6>⚙️ Criteri di Sensibilità</h6>
+                            <ul class="list-unstyled small">
+                                <li><i class="fas fa-exclamation-triangle text-warning"></i> Mittente admin</li>
+                                <li><i class="fas fa-exclamation-triangle text-warning"></i> Destinatario con alert AI alto/critico</li>
+                                <li><i class="fas fa-exclamation-triangle text-warning"></i> Guest con scadenza < 3 giorni</li>
+                                <li><i class="fas fa-exclamation-triangle text-warning"></i> Email esterna</li>
+                            </ul>
+
+                            <hr>
+
+                            <h6>📅 Generazione Automatica</h6>
+                            <p class="small text-muted mb-0">
+                                I report vengono generati automaticamente il primo giorno di ogni mese alle 9:00.
+                                Questa funzione permette di generare report per periodi specifici.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-cog"></i> Configurazione
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <small class="text-muted">Email CEO:</small><br>
+                                    <strong>{{ config.CEO_EMAIL or 'Non configurata' }}</strong>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Invio Email:</small><br>
+                                    {% if config.ENABLE_CEO_EMAIL_REPORTS %}
+                                        <span class="badge bg-success">Abilitato</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Disabilitato</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Esempi di Report -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-eye"></i> Anteprima Contenuto
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="border rounded p-3">
+                                        <h6 class="text-danger">
+                                            <i class="fas fa-file-pdf"></i> Invii PDF Sensibili
+                                        </h6>
+                                        <p class="small text-muted mb-0">
+                                            Lista degli invii PDF che hanno attivato criteri di sensibilità:
+                                        </p>
+                                        <ul class="small mt-2">
+                                            <li>Data/Ora invio</li>
+                                            <li>Utente/Guest destinatario</li>
+                                            <li>Email mittente e destinatario</li>
+                                            <li>Criterio di sensibilità</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded p-3">
+                                        <h6 class="text-warning">
+                                            <i class="fas fa-robot"></i> Alert AI Attivi
+                                        </h6>
+                                        <p class="small text-muted mb-0">
+                                            Alert AI con livello alto o critico:
+                                        </p>
+                                        <ul class="small mt-2">
+                                            <li>Data creazione alert</li>
+                                            <li>Utente/Guest coinvolto</li>
+                                            <li>Tipo di alert</li>
+                                            <li>Livello e stato</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded p-3">
+                                        <h6 class="text-info">
+                                            <i class="fas fa-search"></i> Eventi Audit Trail
+                                        </h6>
+                                        <p class="small text-muted mb-0">
+                                            Eventi di audit trail del mese:
+                                        </p>
+                                        <ul class="small mt-2">
+                                            <li>Modifiche permessi</li>
+                                            <li>Creazione/eliminazione documenti</li>
+                                            <li>Download massivi</li>
+                                            <li>Modifiche utenti/guest</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Imposta valori di default per mese e anno (mese precedente)
+    const now = new Date();
+    const lastMonth = now.getMonth() === 0 ? 12 : now.getMonth();
+    const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    
+    document.getElementById('month').value = lastMonth;
+    document.getElementById('year').value = lastMonthYear;
+});
+</script>
+{% endblock %}

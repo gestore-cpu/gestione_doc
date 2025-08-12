@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}🖋️ Firme Documenti - Dashboard Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h2><i class="fas fa-signature text-primary"></i> Dashboard Firme Documenti</h2>
+                            <p class="text-muted mb-0">Monitoraggio completo delle firme digitali sui documenti</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{{ url_for('docs.export_firme_documenti_csv') }}" class="btn btn-success">
+                                <i class="fas fa-download"></i> Export CSV
+                            </a>
+                            <a href="{{ url_for('docs.dashboard_docs') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Torna ai Documenti
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-signature"></i> Totali</h4>
+                            <h2 class="mb-0">{{ total_firme }}</h2>
+                            <p class="mb-0">Firme registrate</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-file-signature fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-check"></i> Firmate</h4>
+                            <h2 class="mb-0">{{ firme_firmate }}</h2>
+                            <p class="mb-0">Documenti firmati</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check-circle fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-times"></i> Rifiutate</h4>
+                            <h2 class="mb-0">{{ firme_rifiutate }}</h2>
+                            <p class="mb-0">Firme rifiutate</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-times-circle fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="card-title"><i class="fas fa-calendar-day"></i> Oggi</h4>
+                            <h2 class="mb-0">{{ firme_oggi }}</h2>
+                            <p class="mb-0">Firme di oggi</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-calendar fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabella Firme -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list"></i> Lista Firme Documenti</h5>
+                </div>
+                <div class="card-body">
+                    {% if firme %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th><i class="fas fa-hashtag"></i> ID</th>
+                                        <th><i class="fas fa-user"></i> Utente</th>
+                                        <th><i class="fas fa-envelope"></i> Email</th>
+                                        <th><i class="fas fa-file-pdf"></i> Documento</th>
+                                        <th><i class="fas fa-signature"></i> Stato Firma</th>
+                                        <th><i class="fas fa-calendar"></i> Data/Ora</th>
+                                        <th><i class="fas fa-globe"></i> IP Address</th>
+                                        <th><i class="fas fa-comment"></i> Commento</th>
+                                        <th><i class="fas fa-cogs"></i> Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for firma in firme %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ firma.id }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-user-circle text-primary me-2"></i>
+                                                <strong>{{ firma.user_display }}</strong>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="text-muted">{{ firma.user.email if firma.user else 'N/A' }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-file-pdf text-danger me-2"></i>
+                                                <span title="{{ firma.document_display }}">
+                                                    {{ firma.document_display[:30] }}{% if firma.document_display|length > 30 %}...{% endif %}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge {{ firma.stato_badge_class }}">
+                                                {{ firma.stato_display }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-clock"></i> {{ firma.timestamp_formatted }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <code class="text-muted">{{ firma.ip_address or 'N/A' }}</code>
+                                        </td>
+                                        <td>
+                                            {% if firma.commento %}
+                                                <span class="text-muted" title="{{ firma.commento }}">
+                                                    {{ firma.commento[:30] }}{% if firma.commento|length > 30 %}...{% endif %}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button type="button" class="btn btn-sm btn-outline-info" 
+                                                        data-bs-toggle="tooltip" title="Dettagli"
+                                                        onclick="showFirmaDetails({{ firma.id }})">
+                                                    <i class="fas fa-info-circle"></i>
+                                                </button>
+                                                {% if firma.document %}
+                                                <a href="{{ url_for('docs.view_pdf_tracciato', id=firma.document_id) }}" 
+                                                   class="btn btn-sm btn-outline-primary"
+                                                   data-bs-toggle="tooltip" title="Visualizza PDF">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                {% endif %}
+                                                <a href="{{ url_for('docs.firma_documento', id=firma.document_id) }}" 
+                                                   class="btn btn-sm btn-outline-success"
+                                                   data-bs-toggle="tooltip" title="Pagina Firma">
+                                                    <i class="fas fa-signature"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-file-signature fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">Nessuna firma registrata</h4>
+                            <p class="text-muted">Non ci sono ancora firme documenti tracciate nel sistema.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raggruppamento per Documento -->
+    {% if documenti_firme %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-pie"></i> Statistiche per Documento</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for doc_id, firme_doc in documenti_firme.items() %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-file-pdf"></i> 
+                                        {% set doc = firme_doc[0].document %}
+                                        {{ doc.title if doc else f'Documento {doc_id}' }}
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-2">
+                                        <strong>Firme totali:</strong> {{ firme_doc|length }}
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Firmate:</strong> {{ firme_doc|selectattr('stato', 'equalto', 'firmato')|list|length }}
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Rifiutate:</strong> {{ firme_doc|selectattr('stato', 'equalto', 'rifiutato')|list|length }}
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>Ultima firma:</strong> {{ firme_doc[0].timestamp_formatted }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal per dettagli firma -->
+<div class="modal fade" id="firmaDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-info-circle"></i> Dettagli Firma</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="firmaDetailsContent">
+                <!-- Contenuto dinamico -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Inizializza tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+
+    // Funzione per mostrare dettagli firma
+    function showFirmaDetails(firmaId) {
+        // Qui potresti fare una chiamata AJAX per ottenere più dettagli
+        // Per ora mostriamo un messaggio di esempio
+        document.getElementById('firmaDetailsContent').innerHTML = `
+            <div class="text-center">
+                <i class="fas fa-spinner fa-spin fa-2x text-primary mb-3"></i>
+                <p>Caricamento dettagli firma ID: ${firmaId}</p>
+                <p class="text-muted">Funzionalità in sviluppo...</p>
+            </div>
+        `;
+        
+        var modal = new bootstrap.Modal(document.getElementById('firmaDetailsModal'));
+        modal.show();
+    }
+
+    // Auto-refresh ogni 30 secondi per aggiornamenti in tempo reale
+    setInterval(function() {
+        // Qui potresti aggiungere una chiamata AJAX per aggiornare i dati
+        console.log('Aggiornamento automatico dashboard firme documenti...');
+    }, 30000);
+</script>
+{% endblock %}

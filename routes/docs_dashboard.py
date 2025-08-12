@@ -7,7 +7,7 @@ from datetime import datetime, date, timedelta
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, case
-from database import get_db
+from extensions import db
 from models import Document, User, Company, Department
 
 router = APIRouter()
@@ -17,7 +17,7 @@ async def get_dashboard_data(
     user_id: int,
     period: str = Query("current_month", description="Periodo di analisi"),
     company: Optional[str] = Query(None, description="Filtro azienda"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(db)
 ):
     """
     Restituisce dati aggregati per la dashboard AI documentale di Jack
@@ -303,7 +303,7 @@ async def get_reparto_details(
     user_id: int,
     reparto: str,
     period: str = Query("current_month"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(db)
 ):
     """
     Restituisce dettagli criticità per reparto specifico
@@ -379,7 +379,7 @@ async def get_reparto_details(
 async def get_trend_data(
     user_id: int,
     months: int = Query(6, description="Numero mesi per trend"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(db)
 ):
     """
     Restituisce dati trend per grafici

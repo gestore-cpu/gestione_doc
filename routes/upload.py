@@ -9,6 +9,7 @@ from flask_mail import Message
 from extensions import db, mail
 from models import Document, Company, Department
 from forms import UploadForm
+from utils_extra import save_file_and_upload
 import bcrypt
 
 upload_bp = Blueprint('upload', __name__, url_prefix='/upload')
@@ -60,23 +61,77 @@ def upload_file():
                 new_filename = os.path.basename(local_path)
                 filepath = local_path
 
-                doc = Document(
-                    title=title,
-                    description=description,
-                    filename=new_filename,
-                    original_filename=file.filename,
-                    visibility=visibility,
-                    password=bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode('utf-8') if password else None,
-                    shared_email=shared_email,
-                    uploader_email=current_user.email,
-                    user_id=current_user.id,
-                    company_id=int(company_id),
-                    department_id=int(department_id),
-                    created_at=datetime.utcnow()
-                )
+                # === SCANSIONE ANTIVIRUS E CALCOLO HASH ===
+                try:
+                    from services.antivirus_service import antivirus_service
+                    
+                    # Processo di sicurezza: prima del salvataggio nel DB
+                    # Crea documento temporaneo per il file ID
+                    doc = Document(
+                        title=title,
+                        description=description,
+                        filename=new_filename,
+                        original_filename=file.filename,
+                        visibility=visibility,
+                        password=bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode('utf-8') if password else None,
+                        shared_email=shared_email,
+                        uploader_email=current_user.email,
+                        user_id=current_user.id,
+                        company_id=int(company_id),
+                        department_id=int(department_id),
+                        created_at=datetime.utcnow()
+                    )
 
-                db.session.add(doc)
-                db.session.flush()
+                    db.session.add(doc)
+                    db.session.flush()  # Ottieni l'ID senza commitare
+                    
+                    # Processamento sicurezza del file
+                    is_safe, scan_result = antivirus_service.process_uploaded_file(local_path, doc.id)
+                    
+                    if not is_safe:
+                        # File infetto o errore critico
+                        flash(f"🚫 Upload bloccato: {scan_result.get('details', 'File potenzialmente pericoloso')}", "danger")
+                        db.session.rollback()
+                        
+                        # Elimina il file fisico
+                        import os
+                        if os.path.exists(local_path):
+                            os.remove(local_path)
+                        
+                        # Log dell'evento
+                        try:
+                            from utils.audit_utils import log_audit_event
+                            log_audit_event(
+                                current_user.id if current_user.is_authenticated else None,
+                                'upload_blocked',
+                                'file',
+                                None,
+                                {'filename': file.filename, 'reason': scan_result.get('details', 'Security scan failed')}
+                            )
+                        except Exception as log_error:
+                            current_app.logger.error(f"Errore logging audit: {log_error}")
+                        
+                        return redirect(url_for('upload.upload'))
+                    
+                    current_app.logger.info(f"File {doc.id} passed security checks: {scan_result.get('verdict', 'unknown')}")
+                    
+                    # === APPLICAZIONE WATERMARK PDF ===
+                    try:
+                        from services.watermark_service import watermark_service
+                        watermark_applied = watermark_service.process_document_for_watermark(doc, current_user, local_path)
+                        if watermark_applied:
+                            current_app.logger.info(f"Watermark applicato al documento {doc.id}")
+                        else:
+                            current_app.logger.info(f"Watermark non necessario o errore per documento {doc.id}")
+                    except Exception as e:
+                        current_app.logger.error(f"Errore applicazione watermark: {e}")
+                        # Non bloccare l'upload per errori di watermark
+                    
+                except Exception as e:
+                    current_app.logger.error(f"Errore scansione sicurezza: {e}")
+                    flash("⚠️ Errore durante la scansione di sicurezza. Upload bloccato.", "danger")
+                    db.session.rollback()
+                    return redirect(url_for('upload.upload'))
 
                 # === CLASSIFICAZIONE AI DEL DOCUMENTO ===
                 try:
@@ -85,20 +140,20 @@ def upload_file():
                 except Exception as e:
                     current_app.logger.error(f"Errore classificazione AI: {e}")
                 
-                        # === INDICIZZAZIONE PER RICERCA SEMANTICA ===
-        try:
-            from services.semantic_search import indicizza_documento
-            indicizza_documento(doc, file_path)
-        except Exception as e:
-            current_app.logger.error(f"Errore indicizzazione semantica: {e}")
-        
-        # === GESTIONE VERSIONI AUTOMATICA ===
-        try:
-            from utils.version_utils import attiva_nuova_versione
-            # Crea la prima versione del documento
-            attiva_nuova_versione(doc, filename, file_path, current_user, "Versione iniziale")
-        except Exception as e:
-            current_app.logger.error(f"Errore creazione versione: {e}")
+                # === INDICIZZAZIONE PER RICERCA SEMANTICA ===
+                try:
+                    from services.semantic_search import indicizza_documento
+                    indicizza_documento(doc, local_path)
+                except Exception as e:
+                    current_app.logger.error(f"Errore indicizzazione semantica: {e}")
+                
+                # === GESTIONE VERSIONI AUTOMATICA ===
+                try:
+                    from utils.version_utils import attiva_nuova_versione
+                    # Crea la prima versione del documento
+                    attiva_nuova_versione(doc, new_filename, local_path, current_user, "Versione iniziale")
+                except Exception as e:
+                    current_app.logger.error(f"Errore creazione versione: {e}")
 
         generate_qr_for_doc(doc)
         notify_upload(doc)

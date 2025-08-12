@@ -1,0 +1,336 @@
+{
+  "info": {
+    "name": "Manus Core - Test Collection v2",
+    "description": "Collezione Postman per testare le funzionalità Manus Core con variabili configurabili",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://localhost:5000",
+      "type": "string",
+      "description": "URL base del server (sostituisci con il tuo HOST)"
+    },
+    {
+      "key": "session_id",
+      "value": "your_session_id_here",
+      "type": "string",
+      "description": "Session ID per autenticazione admin (ottenuto dal login)"
+    },
+    {
+      "key": "manus_webhook_secret",
+      "value": "your_webhook_secret_here",
+      "type": "string",
+      "description": "Secret per firma HMAC webhook"
+    },
+    {
+      "key": "test_user_id",
+      "value": "42",
+      "type": "string",
+      "description": "ID utente SYNTHIA per i test"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health Check",
+      "item": [
+        {
+          "name": "Health GET",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/manus/hooks/health",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "manus", "hooks", "health"]
+            },
+            "description": "Health check GET - atteso: {\"status\":\"ok\"}"
+          },
+          "response": []
+        },
+        {
+          "name": "Health HEAD",
+          "request": {
+            "method": "HEAD",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/webhooks/manus/hooks/health",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "manus", "hooks", "health"]
+            },
+            "description": "Health check HEAD - atteso: HTTP/1.1 200 OK"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Admin API - Senza Auth (Negativo)",
+      "item": [
+        {
+          "name": "Crea Mapping Senza Auth",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manus_user_id\": \"u_test\",\n  \"syn_user_id\": {{test_user_id}},\n  \"email\": \"test@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/manus/mapping/create",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "manus", "mapping", "create"]
+            },
+            "description": "Test negativo - atteso: 401/403 (protezione attiva)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Admin API - Con Auth (Positivo)",
+      "item": [
+        {
+          "name": "Crea Mapping Con Auth",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "session={{session_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manus_user_id\": \"u_test\",\n  \"syn_user_id\": {{test_user_id}},\n  \"email\": \"test@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/manus/mapping/create",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "manus", "mapping", "create"]
+            },
+            "description": "Test positivo - atteso: {\"ok\":true,...}"
+          },
+          "response": []
+        },
+        {
+          "name": "Lista Mapping",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "session={{session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/manus/mapping/list",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "manus", "mapping", "list"]
+            },
+            "description": "Lista mapping - atteso: array con u_test"
+          },
+          "response": []
+        },
+        {
+          "name": "Coverage Rebuild",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "session={{session_id}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/manus/coverage/rebuild/{{test_user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "manus", "coverage", "rebuild", "{{test_user_id}}"]
+            },
+            "description": "Rebuild coverage - atteso: {\"ok\":true,\"updated\":<n>}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Webhook - Firma Sbagliata (Negativo)",
+      "item": [
+        {
+          "name": "Webhook Firma Non Valida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Manus-Event",
+                "value": "COURSE_COMPLETED"
+              },
+              {
+                "key": "X-Manus-Signature",
+                "value": "deadbeef"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": \"COURSE123\",\n  \"manus_user_id\": \"u_test\",\n  \"email\": \"test@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/manus/hooks",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "manus", "hooks"]
+            },
+            "description": "Test negativo - atteso: 401 (HMAC ok)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Webhook - Firma Corretta (Positivo)",
+      "item": [
+        {
+          "name": "Webhook Firma Valida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Manus-Event",
+                "value": "COURSE_COMPLETED"
+              },
+              {
+                "key": "X-Manus-Signature",
+                "value": "{{hmac_signature}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": \"COURSE123\",\n  \"manus_user_id\": \"u_test\",\n  \"email\": \"test@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/manus/hooks",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "manus", "hooks"]
+            },
+            "description": "Test positivo - atteso: {\"status\":\"ok\"}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Extra Tests",
+      "item": [
+        {
+          "name": "Webhook Utente Sconosciuto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Manus-Event",
+                "value": "COURSE_COMPLETED"
+              },
+              {
+                "key": "X-Manus-Signature",
+                "value": "{{hmac_signature_unknown}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course_id\": \"COURSE456\",\n  \"manus_user_id\": \"u_unknown\",\n  \"email\": \"unknown@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/webhooks/manus/hooks",
+              "host": ["{{base_url}}"],
+              "path": ["webhooks", "manus", "hooks"]
+            },
+            "description": "Test utente sconosciuto - atteso: mapping inattivo creato"
+          },
+          "response": []
+        },
+        {
+          "name": "Idempotenza Mapping",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "session={{session_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manus_user_id\": \"u_test\",\n  \"syn_user_id\": {{test_user_id}},\n  \"email\": \"test@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/manus/mapping/create",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "manus", "mapping", "create"]
+            },
+            "description": "Test idempotenza - atteso: non deve creare duplicati"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Calcola firma HMAC per webhook",
+          "if (pm.request.headers.has('X-Manus-Signature')) {",
+          "  const body = pm.request.body.raw;",
+          "  const secret = pm.collectionVariables.get('manus_webhook_secret');",
+          "  ",
+          "  if (secret && secret !== 'your_webhook_secret_here') {",
+          "    // Calcola HMAC SHA256",
+          "    const crypto = require('crypto');",
+          "    const hmac = crypto.createHmac('sha256', secret);",
+          "    hmac.update(body);",
+          "    const signature = hmac.digest('hex');",
+          "    ",
+          "    // Imposta la firma nell'header",
+          "    pm.request.headers.upsert({",
+          "      key: 'X-Manus-Signature',",
+          "      value: signature,",
+          "      disabled: false,",
+          "    });",
+          "    ",
+          "    // Log per debug",
+          "    console.log('HMAC calcolato:', signature);",
+          "  } else {",
+          "    console.log('⚠️ Imposta manus_webhook_secret nelle variabili della collezione');",
+          "  }",
+          "}"
+        ]
+      }
+    }
+  ]
+}

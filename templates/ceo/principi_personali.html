@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}🎯 Principi Personali - Mercury{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3 mb-0">
+                    🎯 Principi Personali
+                </h1>
+                <a href="{{ url_for('ceo.nuovo_principio') }}" class="btn btn-primary">
+                    ✏️ Nuovo Principio
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert -->
+    <div class="row mb-4">
+        <div class="col-12">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+
+    <!-- Principi -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        📋 I Tuoi Principi
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if principi %}
+                        <div class="row">
+                            {% for principio in principi %}
+                                <div class="col-md-6 col-lg-4 mb-4">
+                                    <div class="card h-100 border-{{ principio.colore }}">
+                                        <div class="card-header bg-{{ principio.colore }} text-white">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="card-title mb-0">{{ principio.titolo }}</h6>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <a href="{{ url_for('ceo.edit_principio', principio_id=principio.id) }}" 
+                                                       class="btn btn-outline-light btn-sm">
+                                                        ✏️
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="card-text">{{ principio.descrizione[:200] }}{% if principio.descrizione|length > 200 %}...{% endif %}</p>
+                                            
+                                            <div class="row mb-2">
+                                                <div class="col-6">
+                                                    <small class="text-muted">Categoria:</small><br>
+                                                    <span class="badge bg-{{ principio.colore }}">{{ principio.categoria or 'Generale' }}</span>
+                                                </div>
+                                                <div class="col-6">
+                                                    <small class="text-muted">Priorità:</small><br>
+                                                    <small class="text-muted">{{ principio.priority_display }}</small>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="badge bg-{{ 'success' if principio.attiva else 'secondary' }}">
+                                                    {{ '✅ Attivo' if principio.attiva else '❌ Inattivo' }}
+                                                </span>
+                                                <small class="text-muted">
+                                                    Creato: {{ principio.data_creazione.strftime('%d/%m/%Y') }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <p class="text-muted mb-3">Nessun principio personale presente.</p>
+                            <a href="{{ url_for('ceo.nuovo_principio') }}" class="btn btn-primary">
+                                ✏️ Crea Primo Principio
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

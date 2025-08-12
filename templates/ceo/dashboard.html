@@ -101,6 +101,43 @@
                         </div>
                     </div>
                 </div>
+                            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">🔔 Notifiche CEO</h5>
+                        <p class="card-text">Visualizza le notifiche automatiche per invii PDF sensibili.</p>
+                        <a href="{{ url_for('ceo_notifications.notifiche_list') }}" class="btn btn-warning">
+                            Vai alle Notifiche
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">📊 Report Mensili</h5>
+                        <p class="card-text">Gestisci i report PDF mensili automatici con invii sensibili e alert AI.</p>
+                        <a href="{{ url_for('ceo_report.report_dashboard') }}" class="btn btn-info">
+                            Vai ai Report
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">🚨 Alert Report</h5>
+                        <p class="card-text">Monitora gli alert automatici per report con 3+ invii critici.</p>
+                        <a href="{{ url_for('ceo_report_alert.alert_dashboard') }}" class="btn btn-danger">
+                            <span id="alert-count-badge" class="badge bg-light text-dark me-2">0</span>
+                            Vai agli Alert
+                        </a>
+                    </div>
+                </div>
+            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="col-md-6">
                     <div class="card">
                         <div class="card-body">
@@ -116,4 +153,26 @@
         </div>
     </div>
 </div>
+
+<script>
+// Carica il contatore degli alert non letti
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('{{ url_for("ceo_report_alert.api_alert_non_letti") }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const badge = document.getElementById('alert-count-badge');
+                badge.textContent = data.count;
+                
+                // Cambia colore del badge se ci sono alert
+                if (data.count > 0) {
+                    badge.className = 'badge bg-danger text-white me-2';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Errore caricamento contatore alert:', error);
+        });
+});
+</script>
 {% endblock %} 

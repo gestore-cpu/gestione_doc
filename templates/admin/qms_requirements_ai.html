@@ -1,0 +1,409 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Analisi Requisiti Normativi QMS - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-shield-alt"></i> 🛡️ Analisi Requisiti Normativi QMS
+                </h2>
+                <div>
+                    <button class="btn btn-outline-primary" onclick="refreshAnalysis()">
+                        <i class="fas fa-sync-alt"></i> Aggiorna Analisi
+                    </button>
+                    <button class="btn btn-outline-success" onclick="generateReport()">
+                        <i class="fas fa-file-pdf"></i> Genera Report
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Selezione Standard -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cog"></i> Configurazione Analisi
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label class="form-label">Standard Normativo</label>
+                            <select class="form-select" id="standardSelect">
+                                <option value="">Seleziona standard...</option>
+                                <option value="ISO 9001">ISO 9001 - Gestione Qualità</option>
+                                <option value="HACCP">HACCP - Sicurezza Alimentare</option>
+                                <option value="BRC">BRC - Global Standard</option>
+                                <option value="IFS">IFS - International Featured Standard</option>
+                                <option value="ISO 14001">ISO 14001 - Gestione Ambientale</option>
+                                <option value="ISO 45001">ISO 45001 - Sicurezza e Salute</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Soglia Minima Copertura (%)</label>
+                            <input type="range" class="form-range" id="coverageThreshold" min="0" max="100" value="50">
+                            <small class="text-muted">Soglia attuale: <span id="thresholdValue">50</span>%</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Priorità</label>
+                            <select class="form-select" id="priorityFilter">
+                                <option value="">Tutte le priorità</option>
+                                <option value="critica">Critica</option>
+                                <option value="alta">Alta</option>
+                                <option value="media">Media</option>
+                                <option value="bassa">Bassa</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <button class="btn btn-primary" onclick="startAnalysis()">
+                                <i class="fas fa-play"></i> Avvia Analisi AI
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="loadSampleData()">
+                                <i class="fas fa-database"></i> Carica Dati Esempio
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Statistiche Generali -->
+            <div class="row mb-4" id="statsSection" style="display: none;">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h4 id="totalRequirements">0</h4>
+                            <small>Totale Requisiti</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h4 id="completeRequirements">0</h4>
+                            <small>Completamente Coperti</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h4 id="partialRequirements">0</h4>
+                            <small>Parzialmente Coperti</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h4 id="missingRequirements">0</h4>
+                            <small>Mancanti</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabella Requisiti -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> Analisi Requisiti Normativi
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="requirementsTable">
+                            <thead>
+                                <tr>
+                                    <th>Clausola</th>
+                                    <th>Descrizione</th>
+                                    <th>Categoria</th>
+                                    <th>Priorità</th>
+                                    <th>Copertura</th>
+                                    <th>Documenti</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="requirementsTableBody">
+                                <!-- Contenuto caricato dinamicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per dettagli requisito -->
+<div class="modal fade" id="requirementModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-info-circle"></i> Dettagli Requisito
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="requirementModalContent">
+                <!-- Contenuto caricato dinamicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per mappatura documenti -->
+<div class="modal fade" id="mappingModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-link"></i> Mappatura Documenti
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="mappingModalContent">
+                <!-- Contenuto caricato dinamicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentAnalysis = null;
+
+// Gestione soglia copertura
+document.getElementById('coverageThreshold').addEventListener('input', function() {
+    document.getElementById('thresholdValue').textContent = this.value;
+});
+
+function startAnalysis() {
+    const standard = document.getElementById('standardSelect').value;
+    const threshold = document.getElementById('coverageThreshold').value;
+    const priority = document.getElementById('priorityFilter').value;
+    
+    if (!standard) {
+        alert('Seleziona uno standard normativo');
+        return;
+    }
+    
+    // Mostra loading
+    showLoading();
+    
+    // Chiamata API per analisi
+    fetch('/ai/qms/verify-requirements', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            standard_name: standard,
+            threshold: threshold,
+            priority: priority
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        currentAnalysis = data;
+        displayResults(data);
+        hideLoading();
+    })
+    .catch(error => {
+        console.error('Errore analisi:', error);
+        hideLoading();
+        alert('Errore durante l\'analisi');
+    });
+}
+
+function displayResults(data) {
+    // Mostra statistiche
+    document.getElementById('statsSection').style.display = 'block';
+    
+    // Aggiorna statistiche
+    const total = data.results.length;
+    const complete = data.results.filter(r => r.coverage_status === 'completo').length;
+    const partial = data.results.filter(r => r.coverage_status === 'parziale').length;
+    const missing = data.results.filter(r => r.coverage_status === 'mancante').length;
+    
+    document.getElementById('totalRequirements').textContent = total;
+    document.getElementById('completeRequirements').textContent = complete;
+    document.getElementById('partialRequirements').textContent = partial;
+    document.getElementById('missingRequirements').textContent = missing;
+    
+    // Popola tabella
+    const tbody = document.getElementById('requirementsTableBody');
+    tbody.innerHTML = '';
+    
+    data.results.forEach(requirement => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${requirement.clause}</strong></td>
+            <td>${requirement.description.substring(0, 100)}...</td>
+            <td><span class="badge badge-info">Normativo</span></td>
+            <td><span class="badge ${getPriorityBadgeClass(requirement.priority)}">${requirement.priority}</span></td>
+            <td>
+                <span class="badge ${getCoverageBadgeClass(requirement.coverage_status)}">
+                    ${requirement.coverage_score}% - ${requirement.coverage_status}
+                </span>
+            </td>
+            <td>
+                <span class="badge badge-secondary">${requirement.matched_documents.length} doc</span>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-info" onclick="showRequirementDetails(${requirement.requirement_id})">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-primary" onclick="showMappingModal(${requirement.requirement_id})">
+                    <i class="fas fa-link"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function getPriorityBadgeClass(priority) {
+    const classes = {
+        'critica': 'badge-danger',
+        'alta': 'badge-warning',
+        'media': 'badge-info',
+        'bassa': 'badge-secondary'
+    };
+    return classes[priority] || 'badge-secondary';
+}
+
+function getCoverageBadgeClass(status) {
+    const classes = {
+        'completo': 'badge-success',
+        'parziale': 'badge-warning',
+        'mancante': 'badge-danger'
+    };
+    return classes[status] || 'badge-secondary';
+}
+
+function showRequirementDetails(requirementId) {
+    // TODO: Implementa visualizzazione dettagli requisito
+    alert('Funzionalità in sviluppo - ID requisito: ' + requirementId);
+}
+
+function showMappingModal(requirementId) {
+    // TODO: Implementa modal mappatura documenti
+    alert('Funzionalità in sviluppo - ID requisito: ' + requirementId);
+}
+
+function refreshAnalysis() {
+    if (currentAnalysis) {
+        startAnalysis();
+    } else {
+        alert('Esegui prima un\'analisi');
+    }
+}
+
+function generateReport() {
+    if (!currentAnalysis) {
+        alert('Esegui prima un\'analisi');
+        return;
+    }
+    
+    const standard = document.getElementById('standardSelect').value;
+    
+    // Genera report PDF
+    window.open(`/ai/qms/requirements/report?standard_name=${encodeURIComponent(standard)}`, '_blank');
+}
+
+function loadSampleData() {
+    // Carica dati di esempio per test
+    document.getElementById('standardSelect').value = 'ISO 9001';
+    
+    const sampleData = {
+        standard_name: 'ISO 9001',
+        results: [
+            {
+                requirement_id: 1,
+                clause: '4.2.1',
+                description: 'L\'organizzazione deve stabilire, documentare, implementare e mantenere un sistema di gestione per la qualità',
+                coverage_score: 85,
+                coverage_status: 'completo',
+                matched_documents: [
+                    { document_id: 1, title: 'Manuale Qualità', similarity_score: 0.8, relevance: 'high' }
+                ],
+                suggestions: ['Sistema di gestione qualità ben implementato'],
+                gap_analysis: []
+            },
+            {
+                requirement_id: 2,
+                clause: '7.5.1',
+                description: 'L\'organizzazione deve pianificare e realizzare i processi di produzione e di erogazione del servizio',
+                coverage_score: 45,
+                coverage_status: 'parziale',
+                matched_documents: [
+                    { document_id: 2, title: 'Procedure Operative', similarity_score: 0.6, relevance: 'medium' }
+                ],
+                suggestions: ['Migliorare documentazione processi'],
+                gap_analysis: ['Gap parziale nella documentazione dei processi']
+            },
+            {
+                requirement_id: 3,
+                clause: '8.2.1',
+                description: 'L\'organizzazione deve monitorare le informazioni relative alla soddisfazione del cliente',
+                coverage_score: 20,
+                coverage_status: 'mancante',
+                matched_documents: [],
+                suggestions: ['Implementare sistema di monitoraggio soddisfazione cliente'],
+                gap_analysis: ['Gap sostanziale: manca sistema di monitoraggio']
+            }
+        ]
+    };
+    
+    currentAnalysis = sampleData;
+    displayResults(sampleData);
+}
+
+function showLoading() {
+    // Mostra indicatore di caricamento
+    const tbody = document.getElementById('requirementsTableBody');
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center"><i class="fas fa-spinner fa-spin"></i> Analisi in corso...</td></tr>';
+}
+
+function hideLoading() {
+    // Nasconde indicatore di caricamento
+}
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    // Setup iniziale
+    console.log('QMS Requirements AI Analysis ready');
+});
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.table th {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.form-range {
+    height: 6px;
+}
+
+.form-range::-webkit-slider-thumb {
+    background: #007bff;
+}
+
+.form-range::-moz-range-thumb {
+    background: #007bff;
+}
+</style>
+{% endblock %}

@@ -1,378 +1,313 @@
+#!/usr/bin/env python3
 """
-Test per il sistema di monitoraggio AI dei download sospetti.
-Verifica tutte le funzionalità del sistema di alert automatici.
+Script di test per il monitoraggio AI post-migrazione.
+Verifica le funzionalità di rilevamento comportamenti anomali.
 """
 
-import unittest
-from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
 import sys
 import os
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 
 # Aggiungi il path del progetto
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from services.ai_monitoring import (
-    AIMonitoringService, 
-    analizza_download_sospetti, 
-    create_ai_alert,
-    get_recent_alerts,
-    get_alert_statistics
+from services.ai_monitoring import AIMonitoringService
+from models import User, GuestUser, AttivitaAI, AlertAI, db
+from database import get_db
+
+# Configura logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
-from models import AIAlert, DownloadLog, User, Document, db
-from extensions import db as db_ext
+logger = logging.getLogger(__name__)
 
+def test_attivita_ai_creation():
+    """Testa la creazione di record AttivitaAI."""
+    print("🧪 Test creazione AttivitaAI...")
+    
+    try:
+        # Simula un utente migrato
+        user = User(
+            username='test_user',
+            email='test@example.com',
+            first_name='Test',
+            last_name='User',
+            role='user'
+        )
+        db.session.add(user)
+        db.session.commit()
+        
+        # Crea record AttivitaAI
+        attivita = AttivitaAI(
+            user_id=user.id,
+            stato_iniziale='nuovo_import',
+            note='Utente migrato da DOCS standard in data 2024-01-15',
+            created_at=datetime.utcnow() - timedelta(hours=12)  # 12 ore fa
+        )
+        db.session.add(attivita)
+        db.session.commit()
+        
+        print(f"✅ AttivitaAI creata per utente {user.email}")
+        print(f"   - Stato: {attivita.stato_iniziale}")
+        print(f"   - Giorni da import: {attivita.giorni_da_import}")
+        print(f"   - Badge class: {attivita.badge_class}")
+        print(f"   - Display text: {attivita.display_text}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Errore creazione AttivitaAI: {e}")
+        return False
 
-class TestAIMonitoring(unittest.TestCase):
-    """Test per il sistema di monitoraggio AI."""
+def test_alert_ai_creation():
+    """Testa la creazione di record AlertAI."""
+    print("\n🧪 Test creazione AlertAI...")
     
-    def setUp(self):
-        """Setup per i test."""
-        # Mock del database
-        self.db_mock = MagicMock()
-        self.session_mock = MagicMock()
-        self.db_mock.session = self.session_mock
+    try:
+        # Simula un guest migrato
+        guest = GuestUser(
+            email='guest@example.com',
+            registered_at=datetime.utcnow() - timedelta(days=1)
+        )
+        db.session.add(guest)
+        db.session.commit()
         
-        # Mock dell'AI service
-        self.ai_service_mock = MagicMock()
-        self.ai_service_mock.get_ai_response.return_value = "Analisi AI di test"
+        # Crea record AlertAI
+        alert = AlertAI(
+            guest_id=guest.id,
+            tipo_alert='download_massivo',
+            descrizione='Download massivo rilevato: 25 file scaricati nelle prime 24h post-migrazione',
+            ip_address='192.168.1.100',
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            stato='nuovo'
+        )
+        db.session.add(alert)
+        db.session.commit()
         
-        # Istanza del servizio
-        self.monitoring_service = AIMonitoringService()
-    
-    def test_init_suspicious_patterns(self):
-        """Test inizializzazione pattern sospetti."""
-        patterns = self.monitoring_service.suspicious_patterns
+        print(f"✅ AlertAI creato per guest {guest.email}")
+        print(f"   - Tipo: {alert.tipo_alert}")
+        print(f"   - Stato: {alert.stato}")
+        print(f"   - IP: {alert.ip_address}")
+        print(f"   - Display: {alert.tipo_alert_display}")
+        print(f"   - Badge class: {alert.stato_badge_class}")
         
-        self.assertIn('download_massivo', patterns)
-        self.assertIn('accesso_fuori_orario', patterns)
-        self.assertIn('ripetizione_file', patterns)
-        self.assertIn('ip_sospetto', patterns)
+        return True
         
-        # Verifica configurazioni
-        self.assertEqual(patterns['download_massivo']['threshold'], 5)
-        self.assertEqual(patterns['download_massivo']['timeframe'], 2)
-        self.assertEqual(patterns['download_massivo']['severity'], 'alta')
-    
-    @patch('services.ai_monitoring.db')
-    @patch('services.ai_monitoring.User')
-    @patch('services.ai_monitoring.DownloadLog')
-    def test_check_massive_downloads(self, mock_download_log, mock_user, mock_db):
-        """Test rilevamento download massivi."""
-        # Mock dati di test
-        mock_user_instance = MagicMock()
-        mock_user_instance.username = "testuser"
-        mock_user.query.get.return_value = mock_user_instance
-        
-        # Mock query results
-        mock_result = MagicMock()
-        mock_result.user_id = 1
-        mock_result.download_count = 6
-        mock_result.first_download = datetime.utcnow() - timedelta(minutes=1)
-        mock_result.last_download = datetime.utcnow()
-        
-        mock_db.session.query.return_value.filter.return_value.group_by.return_value.having.return_value.all.return_value = [mock_result]
-        
-        # Esegui test
-        alerts = self.monitoring_service._check_massive_downloads()
-        
-        # Verifica risultati
-        self.assertIsInstance(alerts, list)
-        if alerts:  # Se ci sono alert
-            alert = alerts[0]
-            self.assertEqual(alert['alert_type'], 'download_massivo')
-            self.assertEqual(alert['severity'], 'alta')
-            self.assertIn('testuser', alert['description'])
-    
-    @patch('services.ai_monitoring.db')
-    @patch('services.ai_monitoring.User')
-    @patch('services.ai_monitoring.DownloadLog')
-    def test_check_off_hours_access(self, mock_download_log, mock_user, mock_db):
-        """Test rilevamento accessi fuori orario."""
-        # Mock utente
-        mock_user_instance = MagicMock()
-        mock_user_instance.username = "testuser"
-        mock_user.query.get.return_value = mock_user_instance
-        
-        # Mock download fuori orario
-        mock_download = MagicMock()
-        mock_download.user_id = 1
-        mock_download.document_id = 1
-        mock_download.timestamp = datetime.utcnow().replace(hour=23)  # 23:00
-        
-        mock_db.session.query.return_value.filter.return_value.all.return_value = [mock_download]
-        
-        # Esegui test
-        alerts = self.monitoring_service._check_off_hours_access()
-        
-        # Verifica risultati
-        self.assertIsInstance(alerts, list)
-    
-    @patch('services.ai_monitoring.db')
-    @patch('services.ai_monitoring.User')
-    @patch('services.ai_monitoring.Document')
-    @patch('services.ai_monitoring.DownloadLog')
-    def test_check_file_repetition(self, mock_download_log, mock_document, mock_user, mock_db):
-        """Test rilevamento ripetizione file."""
-        # Mock utente e documento
-        mock_user_instance = MagicMock()
-        mock_user_instance.username = "testuser"
-        mock_user.query.get.return_value = mock_user_instance
-        
-        mock_document_instance = MagicMock()
-        mock_document_instance.title = "test_document.pdf"
-        mock_document.query.get.return_value = mock_document_instance
-        
-        # Mock download ripetuti
-        mock_downloads = []
-        base_time = datetime.utcnow()
-        for i in range(4):  # 4 download dello stesso file
-            mock_dl = MagicMock()
-            mock_dl.user_id = 1
-            mock_dl.document_id = 1
-            mock_dl.timestamp = base_time + timedelta(minutes=i)
-            mock_downloads.append(mock_dl)
-        
-        mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = mock_downloads
-        
-        # Esegui test
-        alerts = self.monitoring_service._check_file_repetition()
-        
-        # Verifica risultati
-        self.assertIsInstance(alerts, list)
-    
-    @patch('services.ai_monitoring.db')
-    @patch('services.ai_monitoring.User')
-    @patch('services.ai_monitoring.DocumentActivityLog')
-    def test_check_suspicious_ips(self, mock_activity_log, mock_user, mock_db):
-        """Test rilevamento IP sospetti."""
-        # Mock utente
-        mock_user_instance = MagicMock()
-        mock_user_instance.username = "testuser"
-        mock_user.query.get.return_value = mock_user_instance
-        
-        # Mock attività con IP sospetto
-        mock_activity = MagicMock()
-        mock_activity.user_id = 1
-        mock_activity.document_id = 1
-        mock_activity.ip_address = "192.168.1.100"
-        mock_activity.action = "download"
-        
-        mock_db.session.query.return_value.filter.return_value.all.return_value = [mock_activity]
-        
-        # Esegui test
-        alerts = self.monitoring_service._check_suspicious_ips()
-        
-        # Verifica risultati
-        self.assertIsInstance(alerts, list)
-    
-    @patch('services.ai_monitoring.db')
-    @patch('services.ai_monitoring.User')
-    @patch('services.ai_monitoring.Document')
-    @patch('services.ai_monitoring.DocumentActivityLog')
-    def test_check_blocked_document_attempts(self, mock_activity_log, mock_document, mock_user, mock_db):
-        """Test rilevamento tentativi su documenti bloccati."""
-        # Mock utente e documento
-        mock_user_instance = MagicMock()
-        mock_user_instance.username = "testuser"
-        mock_user.query.get.return_value = mock_user_instance
-        
-        mock_document_instance = MagicMock()
-        mock_document_instance.title = "blocked_document.pdf"
-        mock_document.query.get.return_value = mock_document_instance
-        
-        # Mock tentativo su documento bloccato
-        mock_attempt = MagicMock()
-        mock_attempt.user_id = 1
-        mock_attempt.document_id = 1
-        mock_attempt.action = "download_denied"
-        mock_attempt.note = "Documento non scaricabile"
-        
-        mock_db.session.query.return_value.filter.return_value.all.return_value = [mock_attempt]
-        
-        # Esegui test
-        alerts = self.monitoring_service._check_blocked_document_attempts()
-        
-        # Verifica risultati
-        self.assertIsInstance(alerts, list)
-    
-    @patch('services.ai_monitoring.db')
-    def test_create_ai_alert(self, mock_db):
-        """Test creazione alert AI."""
-        # Dati di test
-        alert_data = {
-            'alert_type': 'download_massivo',
-            'user_id': 1,
-            'severity': 'alta',
-            'description': 'Test alert',
-            'details': {
-                'download_count': 6,
-                'timeframe_minutes': 1.5
-            }
-        }
-        
-        # Mock AIAlert
-        mock_alert = MagicMock()
-        mock_alert.id = 1
-        mock_alert.alert_type = 'download_massivo'
-        
-        # Esegui test
-        with patch('services.ai_monitoring.AIAlert') as mock_ai_alert_class:
-            mock_ai_alert_class.return_value = mock_alert
-            
-            result = self.monitoring_service.create_ai_alert(alert_data)
-            
-            # Verifica risultati
-            self.assertIsNotNone(result)
-            self.assertEqual(result.alert_type, 'download_massivo')
-    
-    @patch('services.ai_monitoring.db')
-    def test_get_recent_alerts(self, mock_db):
-        """Test recupero alert recenti."""
-        # Mock alert
-        mock_alert = MagicMock()
-        mock_alert.id = 1
-        mock_alert.alert_type = 'download_massivo'
-        mock_alert.created_at = datetime.utcnow()
-        
-        mock_db.session.query.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_alert]
-        
-        # Esegui test
-        alerts = self.monitoring_service.get_recent_alerts(24)
-        
-        # Verifica risultati
-        self.assertIsInstance(alerts, list)
-        self.assertEqual(len(alerts), 1)
-    
-    @patch('services.ai_monitoring.db')
-    def test_get_alert_statistics(self, mock_db):
-        """Test recupero statistiche alert."""
-        # Mock statistiche
-        mock_db.session.query.return_value.group_by.return_value.all.return_value = []
-        mock_db.session.query.return_value.filter.return_value.count.return_value = 0
-        
-        # Esegui test
-        stats = self.monitoring_service.get_alert_statistics()
-        
-        # Verifica risultati
-        self.assertIsInstance(stats, dict)
-        self.assertIn('total', stats)
-        self.assertIn('resolved', stats)
-        self.assertIn('pending', stats)
-    
-    def test_analizza_download_sospetti_integration(self):
-        """Test integrazione completa analisi download sospetti."""
-        # Mock tutte le funzioni di controllo
-        with patch.object(self.monitoring_service, '_check_massive_downloads') as mock_massive:
-            with patch.object(self.monitoring_service, '_check_off_hours_access') as mock_off_hours:
-                with patch.object(self.monitoring_service, '_check_file_repetition') as mock_repetition:
-                    with patch.object(self.monitoring_service, '_check_suspicious_ips') as mock_ips:
-                        with patch.object(self.monitoring_service, '_check_blocked_document_attempts') as mock_blocked:
-                            
-                            # Configura mock
-                            mock_massive.return_value = []
-                            mock_off_hours.return_value = []
-                            mock_repetition.return_value = []
-                            mock_ips.return_value = []
-                            mock_blocked.return_value = []
-                            
-                            # Esegui test
-                            alerts = self.monitoring_service.analizza_download_sospetti()
-                            
-                            # Verifica risultati
-                            self.assertIsInstance(alerts, list)
-                            
-                            # Verifica che tutte le funzioni siano state chiamate
-                            mock_massive.assert_called_once()
-                            mock_off_hours.assert_called_once()
-                            mock_repetition.assert_called_once()
-                            mock_ips.assert_called_once()
-                            mock_blocked.assert_called_once()
-    
-    def test_resolve_alert(self):
-        """Test risoluzione alert."""
-        # Mock alert
-        mock_alert = MagicMock()
-        mock_alert.id = 1
-        mock_alert.resolved = False
-        
-        with patch('services.ai_monitoring.AIAlert') as mock_ai_alert_class:
-            mock_ai_alert_class.query.get.return_value = mock_alert
-            
-            # Esegui test
-            result = self.monitoring_service.resolve_alert(1, "admin")
-            
-            # Verifica risultati
-            self.assertTrue(result)
-            self.assertTrue(mock_alert.resolved)
-            self.assertEqual(mock_alert.resolved_by, "admin")
-    
-    def test_generate_ai_analysis(self):
-        """Test generazione analisi AI."""
-        alert_data = {
-            'alert_type': 'download_massivo',
-            'description': 'Test alert',
-            'severity': 'alta',
-            'details': {'test': 'data'}
-        }
-        
-        with patch('services.ai_monitoring.get_ai_response') as mock_ai:
-            mock_ai.return_value = "Analisi AI di test"
-            
-            # Esegui test
-            analysis = self.monitoring_service._generate_ai_analysis(alert_data)
-            
-            # Verifica risultati
-            self.assertIsInstance(analysis, str)
-            self.assertIn("Analisi AI di test", analysis)
+    except Exception as e:
+        print(f"❌ Errore creazione AlertAI: {e}")
+        return False
 
-
-class TestAIMonitoringFunctions(unittest.TestCase):
-    """Test per le funzioni pubbliche del modulo."""
+def test_monitoring_service():
+    """Testa il servizio di monitoraggio AI."""
+    print("\n🧪 Test servizio monitoraggio AI...")
     
-    def test_analizza_download_sospetti_function(self):
-        """Test funzione pubblica analizza_download_sospetti."""
-        with patch('services.ai_monitoring.ai_monitoring_service') as mock_service:
-            mock_service.analizza_download_sospetti.return_value = []
-            
-            result = analizza_download_sospetti()
-            
-            self.assertIsInstance(result, list)
-            mock_service.analizza_download_sospetti.assert_called_once()
-    
-    def test_create_ai_alert_function(self):
-        """Test funzione pubblica create_ai_alert."""
-        alert_data = {'test': 'data'}
+    try:
+        monitoring_service = AIMonitoringService(db.session)
         
-        with patch('services.ai_monitoring.ai_monitoring_service') as mock_service:
-            mock_service.create_ai_alert.return_value = MagicMock()
+        # Test con utente esistente
+        user = db.session.query(User).filter(User.email == 'test@example.com').first()
+        if user:
+            print(f"🔍 Testando controlli AI per utente: {user.email}")
             
-            result = create_ai_alert(alert_data)
+            # Test controllo download massivo
+            alert = monitoring_service.check_download_massivo(user_id=user.id)
+            if alert:
+                print(f"   ✅ Alert download massivo generato: {alert.descrizione}")
+            else:
+                print("   ℹ️ Nessun alert download massivo")
             
-            self.assertIsNotNone(result)
-            mock_service.create_ai_alert.assert_called_once_with(alert_data)
-    
-    def test_get_recent_alerts_function(self):
-        """Test funzione pubblica get_recent_alerts."""
-        with patch('services.ai_monitoring.ai_monitoring_service') as mock_service:
-            mock_service.get_recent_alerts.return_value = []
+            # Test controllo accessi falliti
+            alert = monitoring_service.check_accessi_falliti(user_id=user.id)
+            if alert:
+                print(f"   ✅ Alert accessi falliti generato: {alert.descrizione}")
+            else:
+                print("   ℹ️ Nessun alert accessi falliti")
             
-            result = get_recent_alerts(24)
+            # Test controllo IP sospetto
+            alert = monitoring_service.check_ip_sospetto(user_id=user.id, current_ip='192.168.1.100')
+            if alert:
+                print(f"   ✅ Alert IP sospetto generato: {alert.descrizione}")
+            else:
+                print("   ℹ️ Nessun alert IP sospetto")
             
-            self.assertIsInstance(result, list)
-            mock_service.get_recent_alerts.assert_called_once_with(24)
-    
-    def test_get_alert_statistics_function(self):
-        """Test funzione pubblica get_alert_statistics."""
-        with patch('services.ai_monitoring.ai_monitoring_service') as mock_service:
-            mock_service.get_alert_statistics.return_value = {}
-            
-            result = get_alert_statistics()
-            
-            self.assertIsInstance(result, dict)
-            mock_service.get_alert_statistics.assert_called_once()
+            # Test controllo comportamento anomalo
+            alert = monitoring_service.check_comportamento_anomalo(user_id=user.id)
+            if alert:
+                print(f"   ✅ Alert comportamento anomalo generato: {alert.descrizione}")
+            else:
+                print("   ℹ️ Nessun alert comportamento anomalo")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Errore test servizio monitoraggio: {e}")
+        return False
 
+def test_statistics():
+    """Testa le statistiche del monitoraggio AI."""
+    print("\n🧪 Test statistiche monitoraggio AI...")
+    
+    try:
+        # Conta record AttivitaAI
+        total_attivita = db.session.query(AttivitaAI).count()
+        nuovo_import = db.session.query(AttivitaAI).filter(
+            AttivitaAI.stato_iniziale == 'nuovo_import'
+        ).count()
+        monitorato = db.session.query(AttivitaAI).filter(
+            AttivitaAI.stato_iniziale == 'monitorato'
+        ).count()
+        stabile = db.session.query(AttivitaAI).filter(
+            AttivitaAI.stato_iniziale == 'stabile'
+        ).count()
+        
+        print(f"📊 Statistiche AttivitaAI:")
+        print(f"   - Totale: {total_attivita}")
+        print(f"   - Nuovo import: {nuovo_import}")
+        print(f"   - Monitorato: {monitorato}")
+        print(f"   - Stabile: {stabile}")
+        
+        # Conta record AlertAI
+        total_alerts = db.session.query(AlertAI).count()
+        nuovi_alerts = db.session.query(AlertAI).filter(
+            AlertAI.stato == 'nuovo'
+        ).count()
+        in_revisione = db.session.query(AlertAI).filter(
+            AlertAI.stato == 'in_revisione'
+        ).count()
+        chiusi = db.session.query(AlertAI).filter(
+            AlertAI.stato == 'chiuso'
+        ).count()
+        
+        print(f"📊 Statistiche AlertAI:")
+        print(f"   - Totale: {total_alerts}")
+        print(f"   - Nuovi: {nuovi_alerts}")
+        print(f"   - In revisione: {in_revisione}")
+        print(f"   - Chiusi: {chiusi}")
+        
+        # Alert per tipo
+        from sqlalchemy import func
+        alert_types = db.session.query(
+            AlertAI.tipo_alert,
+            func.count(AlertAI.id).label('count')
+        ).group_by(AlertAI.tipo_alert).all()
+        
+        print(f"📊 Alert per tipo:")
+        for tipo, count in alert_types:
+            print(f"   - {tipo}: {count}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Errore test statistiche: {e}")
+        return False
 
-if __name__ == '__main__':
-    # Esegui i test
-    unittest.main(verbosity=2) 
+def test_property_methods():
+    """Testa i metodi property dei modelli."""
+    print("\n🧪 Test metodi property...")
+    
+    try:
+        # Test AttivitaAI properties
+        attivita = db.session.query(AttivitaAI).first()
+        if attivita:
+            print(f"✅ AttivitaAI properties:")
+            print(f"   - is_nuovo_import: {attivita.is_nuovo_import}")
+            print(f"   - giorni_da_import: {attivita.giorni_da_import}")
+            print(f"   - badge_class: {attivita.badge_class}")
+            print(f"   - display_text: {attivita.display_text}")
+        
+        # Test AlertAI properties
+        alert = db.session.query(AlertAI).first()
+        if alert:
+            print(f"✅ AlertAI properties:")
+            print(f"   - is_nuovo: {alert.is_nuovo}")
+            print(f"   - is_in_revisione: {alert.is_in_revisione}")
+            print(f"   - is_chiuso: {alert.is_chiuso}")
+            print(f"   - stato_badge_class: {alert.stato_badge_class}")
+            print(f"   - tipo_alert_display: {alert.tipo_alert_display}")
+            print(f"   - utente_display: {alert.utente_display}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Errore test properties: {e}")
+        return False
+
+def cleanup_test_data():
+    """Pulisce i dati di test."""
+    print("\n🧹 Pulizia dati di test...")
+    
+    try:
+        # Elimina record di test
+        db.session.query(AlertAI).filter(
+            AlertAI.descrizione.like('%test%')
+        ).delete()
+        
+        db.session.query(AttivitaAI).filter(
+            AttivitaAI.note.like('%test%')
+        ).delete()
+        
+        db.session.query(User).filter(
+            User.email == 'test@example.com'
+        ).delete()
+        
+        db.session.query(GuestUser).filter(
+            GuestUser.email == 'guest@example.com'
+        ).delete()
+        
+        db.session.commit()
+        print("✅ Dati di test puliti")
+        
+    except Exception as e:
+        print(f"❌ Errore pulizia dati: {e}")
+
+def main():
+    """Funzione principale di test."""
+    print("🚀 Avvio test monitoraggio AI post-migrazione")
+    print("=" * 50)
+    
+    success_count = 0
+    total_tests = 5
+    
+    # Esegui test
+    if test_attivita_ai_creation():
+        success_count += 1
+    
+    if test_alert_ai_creation():
+        success_count += 1
+    
+    if test_monitoring_service():
+        success_count += 1
+    
+    if test_statistics():
+        success_count += 1
+    
+    if test_property_methods():
+        success_count += 1
+    
+    # Risultati
+    print("\n" + "=" * 50)
+    print(f"📊 Risultati test: {success_count}/{total_tests} superati")
+    
+    if success_count == total_tests:
+        print("✅ Tutti i test superati! Il monitoraggio AI è funzionante.")
+        return True
+    else:
+        print("❌ Alcuni test falliti. Controllare i log per dettagli.")
+        return False
+
+if __name__ == "__main__":
+    try:
+        success = main()
+        if not success:
+            sys.exit(1)
+    except KeyboardInterrupt:
+        print("\n⏹️ Test interrotto dall'utente")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n💥 Errore critico: {e}")
+        sys.exit(1)
+    finally:
+        cleanup_test_data() 

@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}Alert Detail - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h2">🚨 Alert #{{ alert.id }}</h1>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('admin.security_alerts') }}" class="btn btn-secondary">
+                        ← Torna agli Alert
+                    </a>
+                    {% if alert.status.value == 'open' %}
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#closeAlertModal">
+                        ✅ Chiudi Alert
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Dettagli Alert -->
+                <div class="col-md-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">📋 Dettagli Alert</h5>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row">
+                                <dt class="col-sm-3">ID:</dt>
+                                <dd class="col-sm-9">{{ alert.id }}</dd>
+                                
+                                <dt class="col-sm-3">Timestamp:</dt>
+                                <dd class="col-sm-9">
+                                    {{ alert.ts.strftime('%d/%m/%Y %H:%M:%S') }}
+                                    <small class="text-muted">({{ (now() - alert.ts).days }} giorni fa)</small>
+                                </dd>
+                                
+                                <dt class="col-sm-3">Regola:</dt>
+                                <dd class="col-sm-9">
+                                    <span class="badge bg-primary">{{ alert.rule_id }}</span>
+                                </dd>
+                                
+                                <dt class="col-sm-3">Severità:</dt>
+                                <dd class="col-sm-9">
+                                    {% set severity_colors = {
+                                        'low': 'success',
+                                        'medium': 'warning', 
+                                        'high': 'danger'
+                                    } %}
+                                    <span class="badge bg-{{ severity_colors.get(alert.severity.value, 'secondary') }}">
+                                        {{ alert.severity.value.title() }}
+                                    </span>
+                                </dd>
+                                
+                                <dt class="col-sm-3">Stato:</dt>
+                                <dd class="col-sm-9">
+                                    {% if alert.status.value == 'open' %}
+                                    <span class="badge bg-danger">🔴 Aperto</span>
+                                    {% else %}
+                                    <span class="badge bg-success">✅ Chiuso</span>
+                                    {% endif %}
+                                </dd>
+                                
+                                <dt class="col-sm-3">Dettagli:</dt>
+                                <dd class="col-sm-9">
+                                    <div class="alert alert-info">
+                                        {{ alert.details }}
+                                    </div>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <!-- Log Correlati -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📜 Attività Correlate (±1 ora)</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if related_logs %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Azione</th>
+                                            <th>Oggetto</th>
+                                            <th>IP</th>
+                                            <th>User Agent</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for log in related_logs %}
+                                        <tr class="{% if log.ts == alert.ts %}table-warning{% endif %}">
+                                            <td>
+                                                <small>{{ log.ts.strftime('%H:%M:%S') }}</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">{{ log.action }}</span>
+                                            </td>
+                                            <td>
+                                                {% if log.object_type and log.object_id %}
+                                                {{ log.object_type }}:{{ log.object_id }}
+                                                {% else %}
+                                                <span class="text-muted">N/A</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">{{ log.ip }}</small>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted" title="{{ log.user_agent }}">
+                                                    {{ log.user_agent[:30] }}{% if log.user_agent|length > 30 %}...{% endif %}
+                                                </small>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">Nessuna attività correlata trovata.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar Utente -->
+                <div class="col-md-4">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">👤 Informazioni Utente</h5>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row">
+                                <dt class="col-sm-4">Username:</dt>
+                                <dd class="col-sm-8">{{ alert.user.username }}</dd>
+                                
+                                <dt class="col-sm-4">Email:</dt>
+                                <dd class="col-sm-8">{{ alert.user.email }}</dd>
+                                
+                                <dt class="col-sm-4">Ruolo:</dt>
+                                <dd class="col-sm-8">
+                                    <span class="badge bg-secondary">{{ alert.user.role }}</span>
+                                </dd>
+                                
+                                <dt class="col-sm-4">Nome:</dt>
+                                <dd class="col-sm-8">
+                                    {% if alert.user.first_name and alert.user.last_name %}
+                                    {{ alert.user.first_name }} {{ alert.user.last_name }}
+                                    {% else %}
+                                    <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </dd>
+                                
+                                <dt class="col-sm-4">Aziende:</dt>
+                                <dd class="col-sm-8">
+                                    {% if alert.user.companies %}
+                                    {% for company in alert.user.companies %}
+                                    <span class="badge bg-info">{{ company.name }}</span>
+                                    {% endfor %}
+                                    {% else %}
+                                    <span class="text-muted">Nessuna</span>
+                                    {% endif %}
+                                </dd>
+                                
+                                <dt class="col-sm-4">Reparti:</dt>
+                                <dd class="col-sm-8">
+                                    {% if alert.user.departments %}
+                                    {% for dept in alert.user.departments %}
+                                    <span class="badge bg-secondary">{{ dept.name }}</span>
+                                    {% endfor %}
+                                    {% else %}
+                                    <span class="text-muted">Nessuno</span>
+                                    {% endif %}
+                                </dd>
+                            </dl>
+                            
+                            <div class="mt-3">
+                                <a href="{{ url_for('admin.user_detail', user_id=alert.user.id) }}" 
+                                   class="btn btn-outline-primary btn-sm">
+                                    📊 Vedi Profilo Completo
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    {% if alert.status.value == 'open' %}
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">⚡ Azioni Rapide</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#closeAlertModal">
+                                    ✅ Chiudi Alert
+                                </button>
+                                
+                                <a href="{{ url_for('admin.security_alerts', user_id=alert.user.id) }}" 
+                                   class="btn btn-outline-info">
+                                    🔍 Altri Alert di questo Utente
+                                </a>
+                                
+                                <a href="{{ url_for('admin.security_alerts', severity=alert.severity.value) }}" 
+                                   class="btn btn-outline-warning">
+                                    ⚠️ Alert con stessa Severità
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per chiudere alert -->
+{% if alert.status.value == 'open' %}
+<div class="modal fade" id="closeAlertModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Chiudi Alert #{{ alert.id }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin.close_alert', alert_id=alert.id) }}">
+                <div class="modal-body">
+                    <p>Sei sicuro di voler chiudere questo alert?</p>
+                    <div class="mb-3">
+                        <label for="closeNote" class="form-label">Nota di chiusura (opzionale)</label>
+                        <textarea class="form-control" id="closeNote" name="note" rows="3" 
+                                  placeholder="Descrivi come è stato risolto l'alert o le azioni intraprese..."></textarea>
+                    </div>
+                    <div class="alert alert-warning">
+                        <strong>Attenzione:</strong> Una volta chiuso, l'alert non potrà essere riaperto.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-success">
+                        ✅ Conferma Chiusura
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-focus su textarea quando si apre il modal
+    const modal = document.getElementById('closeAlertModal');
+    if (modal) {
+        modal.addEventListener('shown.bs.modal', function() {
+            document.getElementById('closeNote').focus();
+        });
+    }
+});
+</script>
+{% endblock %}

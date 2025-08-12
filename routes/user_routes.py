@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
-from models import Document, DownloadLog, Task
+from models import Document, DownloadLog, Task, AccessRequest
 from extensions import db
 from sqlalchemy import and_, func
 from datetime import datetime, timedelta
+from utils.logging import log_request_created
 
 # === Inizializza il Blueprint ===
 user_bp = Blueprint('user', __name__, url_prefix='/user')
@@ -506,3 +507,74 @@ def export_my_tasks():
     except Exception as e:
         print(f"Errore durante esportazione task personali: {e}")
         return jsonify({'success': False, 'message': 'Errore durante esportazione'})
+
+
+@user_bp.route('/request_access', methods=['POST'])
+@login_required
+def request_access():
+    """
+    Gestisce la richiesta di accesso con applicazione automatica delle policy e risk scoring.
+    """
+    try:
+        document_id = request.form.get('file_id')
+        reason = request.form.get('reason', '').strip()
+
+        # Controllo validità
+        if not document_id or not reason:
+            flash("Devi specificare un motivo per la richiesta.", "danger")
+            return redirect(request.referrer or url_for('main.home'))
+
+        # Recupero documento
+        document = Document.query.get_or_404(document_id)
+
+        # Processa richiesta con policy automatiche
+        from utils.policies import process_access_request_with_policies
+        
+        result = process_access_request_with_policies(
+            user=current_user,
+            document=document,
+            note=reason
+        )
+
+        if not result['success']:
+            flash(result['error'], "warning")
+            return redirect(request.referrer or url_for('main.home'))
+
+        # Applica risk scoring alla richiesta creata
+        if result.get('request_id'):
+            from utils.risk_scoring import apply_risk_score_to_request
+            apply_risk_score_to_request(result['request_id'])
+
+        # Gestisci risultato
+        if result['auto_decision']:
+            # Decisione automatica
+            action = result['action']
+            policy_name = result['policy_name']
+            
+            if action == 'approve':
+                flash(f"✅ Accesso approvato automaticamente tramite regola: {policy_name}", "success")
+            else:
+                flash(f"❌ Accesso negato automaticamente tramite regola: {policy_name}", "warning")
+        else:
+            # Richiesta in attesa di approvazione
+            flash("📋 Richiesta inviata con successo. In attesa di approvazione.", "info")
+
+        return redirect(request.referrer or url_for('main.home'))
+
+    except Exception as e:
+        flash(f"Errore durante la richiesta di accesso: {str(e)}", "error")
+        return redirect(request.referrer or url_for('main.home'))
+
+@user_bp.route('/my_access_requests', methods=['GET'])
+@login_required
+def my_access_requests():
+    """
+    Visualizza lo storico delle richieste di accesso dell'utente corrente.
+    """
+    # Query semplificata come richiesto
+    access_requests = AccessRequest.query \
+        .filter_by(user_id=current_user.id) \
+        .order_by(AccessRequest.created_at.desc()) \
+        .all()
+    
+    return render_template("user/my_access_requests.html", requests=access_requests)

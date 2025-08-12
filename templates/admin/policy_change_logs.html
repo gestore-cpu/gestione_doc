@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-history me-2"></i>
+            📝 Storico Modifiche Policy
+        </h2>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" onclick="showManualTuningModal()">
+                <i class="fas fa-magic me-1"></i>
+                Auto-Tuning Manuale
+            </button>
+            <a href="{{ url_for('admin.manage_policies') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>
+                Torna alle Policy
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistiche Generali -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-edit me-2"></i>
+                        Totale Modifiche
+                    </h5>
+                    <h3>{{ stats.total_changes }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-robot me-2"></i>
+                        Modifiche AI
+                    </h5>
+                    <h3>{{ stats.ai_changes }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-user me-2"></i>
+                        Modifiche Admin
+                    </h5>
+                    <h3>{{ stats.admin_changes }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-exchange-alt me-2"></i>
+                        Cambi Azione
+                    </h5>
+                    <h3>{{ stats.action_changes }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche Impatto -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Alto Impatto
+                    </h5>
+                    <h3 class="text-danger">{{ impact_stats.high_impact }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-warning">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Medio Impatto
+                    </h5>
+                    <h3 class="text-warning">{{ impact_stats.medium_impact }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Basso Impatto
+                    </h5>
+                    <h3 class="text-success">{{ impact_stats.low_impact }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-filter me-2"></i>
+                Filtri
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-2">
+                    <label for="policy_id" class="form-label">Policy</label>
+                    <select class="form-select" id="policy_id" name="policy_id">
+                        <option value="">Tutte</option>
+                        {% for policy in policies %}
+                        <option value="{{ policy.id }}" {% if filters.policy_id == policy.id %}selected{% endif %}>
+                            {{ policy.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="change_type" class="form-label">Tipo Modifica</label>
+                    <select class="form-select" id="change_type" name="change_type">
+                        <option value="">Tutte</option>
+                        <option value="action" {% if filters.change_type == 'action' %}selected{% endif %}>Cambio Azione</option>
+                        <option value="condition" {% if filters.change_type == 'condition' %}selected{% endif %}>Modifica Condizione</option>
+                        <option value="explanation" {% if filters.change_type == 'explanation' %}selected{% endif %}>Aggiornamento Spiegazione</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="changed_by" class="form-label">Modificato da</label>
+                    <select class="form-select" id="changed_by" name="changed_by">
+                        <option value="">Tutti</option>
+                        <option value="ai" {% if filters.changed_by == 'ai' %}selected{% endif %}>AI</option>
+                        <option value="admin" {% if filters.changed_by == 'admin' %}selected{% endif %}>Admin</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="date_from" class="form-label">Data da</label>
+                    <input type="date" class="form-control" id="date_from" name="date_from" 
+                           value="{{ filters.date_from }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="date_to" class="form-label">Data a</label>
+                    <input type="date" class="form-control" id="date_to" name="date_to" 
+                           value="{{ filters.date_to }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search me-1"></i>
+                            Filtra
+                        </button>
+                        <a href="{{ url_for('admin.policy_change_logs_list') }}" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i>
+                            Reset
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista Modifiche -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-list me-2"></i>
+                Modifiche Policy ({{ pagination.total }})
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if logs %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Policy</th>
+                            <th>Tipo Modifica</th>
+                            <th>Modificato da</th>
+                            <th>Impatto</th>
+                            <th>Motivo</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>
+                                <small>{{ log.get_timestamp_display() }}</small>
+                            </td>
+                            <td>
+                                <strong>#{{ log.policy_id }}</strong>
+                                {% if log.policy %}
+                                <br><small class="text-muted">{{ log.policy.name }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if log.get_change_type() == 'action_change' %}danger{% elif log.get_change_type() == 'condition_change' %}warning{% else %}info{% endif %}">
+                                    {{ log.get_change_display() }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if log.changed_by_ai %}success{% else %}primary{% endif %}">
+                                    {{ log.get_changed_by_display() }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-{% if log.get_impact_level() == 'high' %}danger{% elif log.get_impact_level() == 'medium' %}warning{% else %}success{% endif %}">
+                                    {{ log.get_impact_display() }}
+                                </span>
+                            </td>
+                            <td>
+                                <small class="text-muted">
+                                    {{ log.change_reason[:50] }}{% if log.change_reason|length > 50 %}...{% endif %}
+                                </small>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('admin.view_policy_change_log', log_id=log.id) }}" 
+                                       class="btn btn-outline-primary" title="Visualizza Dettagli">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('admin.policy_change_history', policy_id=log.policy_id) }}" 
+                                       class="btn btn-outline-info" title="Storico Policy">
+                                        <i class="fas fa-history"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginazione -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="Paginazione modifiche">
+                <ul class="pagination justify-content-center">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.policy_change_logs_list', page=pagination.prev_num, **request.args) }}">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.policy_change_logs_list', page=page_num, **request.args) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.policy_change_logs_list', page=pagination.next_num, **request.args) }}">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Nessuna modifica trovata</h5>
+                <p class="text-muted">Le modifiche alle policy verranno registrate qui automaticamente.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Auto-Tuning Manuale -->
+<div class="modal fade" id="manualTuningModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-magic me-2"></i>
+                    🤖 Auto-Tuning Manuale
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin.trigger_manual_self_tuning') }}">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle me-2"></i>Auto-Tuning Policy</h6>
+                        <p class="mb-0">
+                            L'AI analizzerà le policy attive basandosi sull'ultimo report di impatto 
+                            e applicherà ottimizzazioni automatiche per migliorare le performance.
+                        </p>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Attenzione</h6>
+                        <p class="mb-0">
+                            Questo processo può richiedere alcuni minuti e modificherà automaticamente 
+                            le policy con performance basse. Tutte le modifiche verranno registrate nel log.
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-magic me-1"></i>
+                        Avvia Auto-Tuning
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function showManualTuningModal() {
+    const modal = new bootstrap.Modal(document.getElementById('manualTuningModal'));
+    modal.show();
+}
+</script>
+{% endblock %} 

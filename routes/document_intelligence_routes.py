@@ -12,7 +12,7 @@ from datetime import datetime
 from models import db, Document, Task, User
 from services.document_intelligence import document_intelligence, auto_verifica_documento, generate_ai_access_response, suggerisci_cartella_archiviazione
 from utils.audit_logger import log_event
-from database import get_db
+from extensions import db
 
 # Blueprint per Document Intelligence
 document_intelligence_bp = Blueprint('document_intelligence', __name__, url_prefix='/docs')
@@ -451,7 +451,7 @@ def associate_task():
 from services.document_intelligence import JackSynthiaAI2
 from models import DocumentAIFlag, AIAlert, AIArchiveSuggestion, AIReply, User, Document
 from sqlalchemy.orm import Session
-from database import get_db
+from extensions import db
 
 # Inizializzazione Jack Synthia AI 2.0
 def get_jack_ai2(db: Session) -> JackSynthiaAI2:
@@ -471,7 +471,7 @@ def verify_document_content(document_id):
         JSON: Risultato della verifica AI
     """
     try:
-        db = get_db()
+        db = db()
         jack_ai2 = get_jack_ai2(db)
         
         # Recupera documento
@@ -525,7 +525,7 @@ def generate_ai_reply():
         if not request_type or not user_id:
             return jsonify({'error': 'Parametri mancanti'}), 400
         
-        db = get_db()
+        db = db()
         jack_ai2 = get_jack_ai2(db)
         
         # Recupera utente
@@ -569,7 +569,7 @@ def suggest_archive_location(document_id):
         JSON: Suggerimento di archiviazione
     """
     try:
-        db = get_db()
+        db = db()
         jack_ai2 = get_jack_ai2(db)
         
         # Recupera documento
@@ -626,7 +626,7 @@ def check_suspicious_behavior():
         if not user_id or not action:
             return jsonify({'error': 'Parametri mancanti'}), 400
         
-        db = get_db()
+        db = db()
         jack_ai2 = get_jack_ai2(db)
         
         # Recupera utente
@@ -674,7 +674,7 @@ def get_document_ai_flags(document_id):
         JSON: Lista flag AI
     """
     try:
-        db = get_db()
+        db = db()
         jack_ai2 = get_jack_ai2(db)
         
         flags = jack_ai2.get_ai_flags_for_document(document_id)
@@ -716,7 +716,7 @@ def get_ai_alerts():
     try:
         user_id = request.args.get('user_id', type=int)
         
-        db = get_db()
+        db = db()
         jack_ai2 = get_jack_ai2(db)
         
         alerts = jack_ai2.get_active_alerts(user_id)
@@ -760,7 +760,7 @@ def get_archive_suggestions(document_id):
         JSON: Lista suggerimenti archiviazione
     """
     try:
-        db = get_db()
+        db = db()
         jack_ai2 = get_jack_ai2(db)
         
         suggestions = jack_ai2.get_archive_suggestions(document_id)
@@ -802,7 +802,7 @@ def get_ai_replies():
     try:
         user_id = request.args.get('user_id', type=int)
         
-        db = get_db()
+        db = db()
         jack_ai2 = get_jack_ai2(db)
         
         replies = jack_ai2.get_ai_replies(user_id)
@@ -845,7 +845,7 @@ def resolve_ai_alert(alert_id):
         JSON: Conferma risoluzione
     """
     try:
-        db = get_db()
+        db = db()
         
         # Recupera alert
         alert = db.query(AIAlert).filter(AIAlert.id == alert_id).first()
@@ -880,7 +880,7 @@ def accept_archive_suggestion(suggestion_id):
         JSON: Conferma accettazione
     """
     try:
-        db = get_db()
+        db = db()
         
         # Recupera suggerimento
         suggestion = db.query(AIArchiveSuggestion).filter(AIArchiveSuggestion.id == suggestion_id).first()
@@ -913,7 +913,7 @@ def send_ai_reply(reply_id):
         JSON: Conferma invio
     """
     try:
-        db = get_db()
+        db = db()
         
         # Recupera risposta
         reply = db.query(AIReply).filter(AIReply.id == reply_id).first()

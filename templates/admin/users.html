@@ -1,151 +1,621 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <title>Gestione Utenti</title>
-</head>
-<body>
-    <h1>Utenti registrati</h1>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Username</th>
-          <th>Email</th>
-          <th>Ruolo</th>
-          <th>Aziende</th>
-          <th>Reparti</th>
-          <th>Azioni</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in users %}
-        <tr>
-          <td>{{ user.username }}</td>
-          <td>{{ user.email }}</td>
-          <td>{{ user.role }}</td>
-          <td>{{ user.companies|map(attribute='name')|join(', ') }}</td>
-          <td>{{ user.departments|map(attribute='name')|join(', ') }}</td>
-          <td>
-            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editUserModal{{ user.id }}">
-              ✏️ Modifica
-            </button>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% for user in users %}
-<!-- �� MODALE MODIFICA UTENTE -->
-<div class="modal fade" id="editUserModal{{ user.id }}" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <form method="POST" action="{{ url_for('admin.update_user', user_id=user.id) }}">
-      <div class="modal-content">
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title">Modifica Utente: {{ user.username }}</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+{% extends "base.html" %}
+
+{% block title %}Gestione Utenti - Mercury DOCS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-users me-2"></i>Gestione Utenti Mercury</h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">
+                    <i class="fas fa-plus me-2"></i>Nuovo Utente
+                </button>
+            </div>
         </div>
-        <div class="modal-body">
+    </div>
 
-          <!-- 🔤 Dati base -->
-          <div class="mb-3">
-            <label>Username</label>
-            <input type="text" name="username" class="form-control" value="{{ user.username }}" required>
-          </div>
-
-          <div class="mb-3">
-            <label>Email</label>
-            <input type="email" name="email" class="form-control" value="{{ user.email }}" required>
-          </div>
-
-          <div class="mb-3">
-            <label>Ruolo</label>
-            <select name="role" class="form-select role-selector" data-user-id="{{ user.id }}">
-              <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
-              <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
-              <option value="guest" {% if user.role == 'guest' %}selected{% endif %}>Guest</option>
-            </select>
-          </div>
-
-          <!-- 👤 Solo Guest -->
-          <div class="guest-section" id="guest-section-{{ user.id }}" {% if user.role != 'guest' %}style="display:none"{% endif %}>
-            <div class="mb-3">
-              <label>Data di Scadenza Accesso</label>
-              <input type="date" name="access_expiration" class="form-control" value="{{ user.access_expiration|default('', true)[:10] }}">
+    <!-- Filtri -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filtri</h5>
+                </div>
+                <div class="card-body">
+                    <form id="filterForm" class="row g-3">
+                        <div class="col-md-2">
+                            <label for="filterCompany" class="form-label">Azienda</label>
+                            <select class="form-select" id="filterCompany">
+                                <option value="">Tutte le aziende</option>
+                                <option value="Margherita Srl">Margherita Srl</option>
+                                <option value="Mercury Tech">Mercury Tech</option>
+                                <option value="DOCS Solutions">DOCS Solutions</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="filterRole" class="form-label">Ruolo</label>
+                            <select class="form-select" id="filterRole">
+                                <option value="">Tutti i ruoli</option>
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                                <option value="ceo">CEO</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="filterDepartment" class="form-label">Reparto</label>
+                            <select class="form-select" id="filterDepartment">
+                                <option value="">Tutti i reparti</option>
+                                <option value="IT">IT</option>
+                                <option value="HR">HR</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Operations">Operations</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="filterStatus" class="form-label">Stato</label>
+                            <select class="form-select" id="filterStatus">
+                                <option value="">Tutti gli stati</option>
+                                <option value="active">Attivo</option>
+                                <option value="inactive">Inattivo</option>
+                                <option value="suspended">Sospeso</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filterSearch" class="form-label">Ricerca</label>
+                            <input type="text" class="form-control" id="filterSearch" 
+                                   placeholder="Nome, email, username...">
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
-
-            <div class="form-check mb-3">
-              <input type="checkbox" class="form-check-input" name="can_download" {% if user.can_download %}checked{% endif %}>
-              <label class="form-check-label">Autorizzato al Download</label>
-            </div>
-
-            <label class="mb-2">Documenti Attualmente Visibili</label>
-            <table class="table table-sm">
-              <thead>
-                <tr>
-                  <th>📄 Nome</th>
-                  <th>Azienda</th>
-                  <th>Reparto</th>
-                  <th>Revoca</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for doc in user.documents %}
-                <tr>
-                  <td>{{ doc.title }}</td>
-                  <td>{{ doc.company.name }}</td>
-                  <td>{{ doc.department.name }}</td>
-                  <td><input type="checkbox" name="revoke_docs" value="{{ doc.id }}"></td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- 🏢 Solo User/Admin -->
-          <div class="non-guest-section" id="non-guest-section-{{ user.id }}" {% if user.role == 'guest' %}style="display:none"{% endif %}>
-            <div class="mb-3">
-              <label>Aziende associate</label>
-              <select name="company_ids" multiple class="form-select">
-                {% for company in companies %}
-                  <option value="{{ company.id }}" {% if company.id in [c.id for c in user.companies] %}selected{% endif %}>{{ company.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="mb-3">
-              <label>Reparti associati</label>
-              <select name="department_ids" multiple class="form-select">
-                {% for dept in departments %}
-                  <option value="{{ dept.id }}" {% if dept.id in [d.id for d in user.departments] %}selected{% endif %}>{{ dept.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          </div>
-
         </div>
+    </div>
 
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-success">💾 Salva</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+    <!-- Tabella Utenti -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-table me-2"></i>Utenti (<span id="userCount">0</span>)
+                    </h5>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="exportUsers()">
+                            <i class="fas fa-download me-1"></i>Export
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="refreshUsers()">
+                            <i class="fas fa-sync-alt me-1"></i>Aggiorna
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="usersTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Email</th>
+                                    <th>Ruolo</th>
+                                    <th>Azienda</th>
+                                    <th>Reparto</th>
+                                    <th>Ultimo Accesso</th>
+                                    <th>Stato</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <!-- Dati caricati dinamicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="noUsersMessage" class="text-center py-5" style="display: none;">
+                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nessun utente trovato</h5>
+                        <p class="text-muted">Prova a modificare i filtri di ricerca</p>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </form>
-  </div>
+    </div>
 </div>
-    {% endfor %}
 
-<!-- 🧠 SCRIPT JS per mostrare/nascondere sezioni -->
+<!-- Modale Creazione Utente -->
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form id="createUserForm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-user-plus me-2"></i>Nuovo Utente
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="createFirstName" class="form-label">Nome *</label>
+                            <input type="text" class="form-control" id="createFirstName" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="createLastName" class="form-label">Cognome *</label>
+                            <input type="text" class="form-control" id="createLastName" required>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="createEmail" class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="createEmail" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="createRole" class="form-label">Ruolo *</label>
+                            <select class="form-select" id="createRole" required>
+                                <option value="">Seleziona ruolo</option>
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                                <option value="ceo">CEO</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="createCompany" class="form-label">Azienda</label>
+                            <select class="form-select" id="createCompany">
+                                <option value="">Seleziona azienda</option>
+                                <option value="Margherita Srl">Margherita Srl</option>
+                                <option value="Mercury Tech">Mercury Tech</option>
+                                <option value="DOCS Solutions">DOCS Solutions</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="createDepartment" class="form-label">Reparto</label>
+                            <select class="form-select" id="createDepartment">
+                                <option value="">Seleziona reparto</option>
+                                <option value="IT">IT</option>
+                                <option value="HR">HR</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Operations">Operations</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Salva Utente
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modale Modifica Utente -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form id="editUserForm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-edit me-2"></i>Modifica Utente
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editUserId">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="editFirstName" class="form-label">Nome *</label>
+                            <input type="text" class="form-control" id="editFirstName" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editLastName" class="form-label">Cognome *</label>
+                            <input type="text" class="form-control" id="editLastName" required>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="editEmail" class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="editEmail" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editRole" class="form-label">Ruolo *</label>
+                            <select class="form-select" id="editRole" required>
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                                <option value="ceo">CEO</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="editCompany" class="form-label">Azienda</label>
+                            <select class="form-select" id="editCompany">
+                                <option value="">Seleziona azienda</option>
+                                <option value="Margherita Srl">Margherita Srl</option>
+                                <option value="Mercury Tech">Mercury Tech</option>
+                                <option value="DOCS Solutions">DOCS Solutions</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editDepartment" class="form-label">Reparto</label>
+                            <select class="form-select" id="editDepartment">
+                                <option value="">Seleziona reparto</option>
+                                <option value="IT">IT</option>
+                                <option value="HR">HR</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Operations">Operations</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Salva Modifiche
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modale Conferma Eliminazione -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Conferma Eliminazione
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Sei sicuro di voler eliminare l'utente <strong id="deleteUserName"></strong>?</p>
+                <p class="text-danger"><small>Questa azione non può essere annullata.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteUser">
+                    <i class="fas fa-trash me-2"></i>Elimina
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    <!-- Toast verranno aggiunti dinamicamente -->
+</div>
+
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('.role-selector').forEach(function(select) {
-    select.addEventListener('change', function () {
-      const userId = this.dataset.userId;
-      const role = this.value;
-      document.getElementById(`guest-section-${userId}`).style.display = (role === 'guest') ? 'block' : 'none';
-      document.getElementById(`non-guest-section-${userId}`).style.display = (role === 'guest') ? 'none' : 'block';
+// ===== MOCK DATA =====
+const mockUsers = [
+    {
+        id: 1,
+        first_name: "Mario",
+        last_name: "Rossi",
+        email: "mario.rossi@mercury.com",
+        username: "mario.rossi",
+        role: "admin",
+        company: "Mercury Tech",
+        department: "IT",
+        last_login: "2024-01-15 14:30:00",
+        status: "active",
+        created_at: "2023-06-01"
+    },
+    {
+        id: 2,
+        first_name: "Anna",
+        last_name: "Bianchi",
+        email: "anna.bianchi@docs.com",
+        username: "anna.bianchi",
+        role: "user",
+        company: "DOCS Solutions",
+        department: "HR",
+        last_login: "2024-01-14 09:15:00",
+        status: "active",
+        created_at: "2023-08-15"
+    },
+    {
+        id: 3,
+        first_name: "Giuseppe",
+        last_name: "Verdi",
+        email: "giuseppe.verdi@margherita.it",
+        username: "giuseppe.verdi",
+        role: "user",
+        company: "Margherita Srl",
+        department: "Finance",
+        last_login: "2024-01-13 16:45:00",
+        status: "inactive",
+        created_at: "2023-09-20"
+    },
+    {
+        id: 4,
+        first_name: "Laura",
+        last_name: "Neri",
+        email: "laura.neri@mercury.com",
+        username: "laura.neri",
+        role: "ceo",
+        company: "Mercury Tech",
+        department: "Operations",
+        last_login: "2024-01-15 11:20:00",
+        status: "active",
+        created_at: "2023-01-10"
+    }
+];
+
+// ===== UTILITY FUNCTIONS =====
+function showToast(message, type = 'success') {
+    const toastContainer = document.querySelector('.toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    toastContainer.appendChild(toast);
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    toast.addEventListener('hidden.bs.toast', () => {
+        toast.remove();
     });
-  });
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'Mai';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('it-IT') + ' ' + date.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'});
+}
+
+function getRoleBadge(role) {
+    const colors = {
+        'ceo': 'danger',
+        'admin': 'warning',
+        'user': 'info'
+    };
+    return `<span class="badge bg-${colors[role] || 'secondary'}">${role.toUpperCase()}</span>`;
+}
+
+function getStatusBadge(status) {
+    const colors = {
+        'active': 'success',
+        'inactive': 'danger',
+        'suspended': 'warning'
+    };
+    const labels = {
+        'active': 'Attivo',
+        'inactive': 'Inattivo',
+        'suspended': 'Sospeso'
+    };
+    return `<span class="badge bg-${colors[status] || 'secondary'}">${labels[status] || status}</span>`;
+}
+
+// ===== USER MANAGEMENT =====
+function loadUsers() {
+    // Simula chiamata API
+    setTimeout(() => {
+        renderUsers(mockUsers);
+        showToast('Utenti caricati con successo', 'success');
+    }, 500);
+}
+
+function renderUsers(users) {
+    const tbody = document.getElementById('usersTableBody');
+    const countSpan = document.getElementById('userCount');
+    const noUsersMessage = document.getElementById('noUsersMessage');
+    
+    countSpan.textContent = users.length;
+    
+    if (users.length === 0) {
+        tbody.innerHTML = '';
+        noUsersMessage.style.display = 'block';
+        return;
+    }
+    
+    noUsersMessage.style.display = 'none';
+    tbody.innerHTML = users.map(user => `
+        <tr data-user-id="${user.id}">
+            <td>
+                <strong>${user.first_name} ${user.last_name}</strong>
+                <br><small class="text-muted">@${user.username}</small>
+            </td>
+            <td>${user.email}</td>
+            <td>${getRoleBadge(user.role)}</td>
+            <td>${user.company || 'N/A'}</td>
+            <td>${user.department || 'N/A'}</td>
+            <td>${formatDate(user.last_login)}</td>
+            <td>${getStatusBadge(user.status)}</td>
+            <td>
+                <div class="btn-group" role="group">
+                    <a href="/admin/user/${user.id}" class="btn btn-sm btn-outline-info" title="Dettaglio">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    <button class="btn btn-sm btn-outline-primary" 
+                            onclick="editUser(${user.id})" title="Modifica">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning" 
+                            onclick="resetPassword(${user.id})" title="Reset Password">
+                        <i class="fas fa-key"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" 
+                            onclick="deleteUser(${user.id}, '${user.first_name} ${user.last_name}')" 
+                            title="Elimina">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterUsers() {
+    const company = document.getElementById('filterCompany').value;
+    const role = document.getElementById('filterRole').value;
+    const department = document.getElementById('filterDepartment').value;
+    const status = document.getElementById('filterStatus').value;
+    const search = document.getElementById('filterSearch').value.toLowerCase();
+    
+    let filteredUsers = mockUsers.filter(user => {
+        const matchesCompany = !company || user.company === company;
+        const matchesRole = !role || user.role === role;
+        const matchesDepartment = !department || user.department === department;
+        const matchesStatus = !status || user.status === status;
+        const matchesSearch = !search || 
+            user.first_name.toLowerCase().includes(search) ||
+            user.last_name.toLowerCase().includes(search) ||
+            user.email.toLowerCase().includes(search) ||
+            user.username.toLowerCase().includes(search);
+        
+        return matchesCompany && matchesRole && matchesDepartment && matchesStatus && matchesSearch;
+    });
+    
+    renderUsers(filteredUsers);
+}
+
+function editUser(userId) {
+    const user = mockUsers.find(u => u.id === userId);
+    if (!user) return;
+    
+    // Popola il modale
+    document.getElementById('editUserId').value = user.id;
+    document.getElementById('editFirstName').value = user.first_name;
+    document.getElementById('editLastName').value = user.last_name;
+    document.getElementById('editEmail').value = user.email;
+    document.getElementById('editRole').value = user.role;
+    document.getElementById('editCompany').value = user.company || '';
+    document.getElementById('editDepartment').value = user.department || '';
+    
+    // Mostra il modale
+    new bootstrap.Modal(document.getElementById('editUserModal')).show();
+}
+
+function deleteUser(userId, userName) {
+    document.getElementById('deleteUserName').textContent = userName;
+    document.getElementById('confirmDeleteUser').onclick = () => confirmDeleteUser(userId);
+    new bootstrap.Modal(document.getElementById('deleteUserModal')).show();
+}
+
+function confirmDeleteUser(userId) {
+    // Simula eliminazione
+    setTimeout(() => {
+        const index = mockUsers.findIndex(u => u.id === userId);
+        if (index > -1) {
+            mockUsers.splice(index, 1);
+            renderUsers(mockUsers);
+            showToast('Utente eliminato con successo', 'success');
+        }
+        bootstrap.Modal.getInstance(document.getElementById('deleteUserModal')).hide();
+    }, 500);
+}
+
+function resetPassword(userId) {
+    const user = mockUsers.find(u => u.id === userId);
+    if (!user) return;
+    
+    // Simula reset password
+    setTimeout(() => {
+        showToast(`Password reset inviata a ${user.email}`, 'info');
+    }, 500);
+}
+
+function exportUsers() {
+    // Simula export
+    setTimeout(() => {
+        showToast('Export utenti completato', 'success');
+    }, 1000);
+}
+
+function refreshUsers() {
+    showToast('Aggiornamento in corso...', 'info');
+    setTimeout(() => {
+        loadUsers();
+    }, 500);
+}
+
+// ===== EVENT LISTENERS =====
+document.addEventListener('DOMContentLoaded', function() {
+    // Carica utenti all'avvio
+    loadUsers();
+    
+    // Filtri
+    document.getElementById('filterForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        filterUsers();
+    });
+    
+    // Input ricerca in tempo reale
+    document.getElementById('filterSearch').addEventListener('input', function() {
+        filterUsers();
+    });
+    
+    // Creazione utente
+    document.getElementById('createUserForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const newUser = {
+            id: mockUsers.length + 1,
+            first_name: document.getElementById('createFirstName').value,
+            last_name: document.getElementById('createLastName').value,
+            email: document.getElementById('createEmail').value,
+            username: document.getElementById('createEmail').value.split('@')[0],
+            role: document.getElementById('createRole').value,
+            company: document.getElementById('createCompany').value,
+            department: document.getElementById('createDepartment').value,
+            last_login: null,
+            status: 'active',
+            created_at: new Date().toISOString().split('T')[0]
+        };
+        
+        // Simula creazione
+        setTimeout(() => {
+            mockUsers.push(newUser);
+            renderUsers(mockUsers);
+            showToast('Utente creato con successo', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('createUserModal')).hide();
+            document.getElementById('createUserForm').reset();
+        }, 500);
+    });
+    
+    // Modifica utente
+    document.getElementById('editUserForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const userId = parseInt(document.getElementById('editUserId').value);
+        const user = mockUsers.find(u => u.id === userId);
+        
+        if (user) {
+            user.first_name = document.getElementById('editFirstName').value;
+            user.last_name = document.getElementById('editLastName').value;
+            user.email = document.getElementById('editEmail').value;
+            user.role = document.getElementById('editRole').value;
+            user.company = document.getElementById('editCompany').value;
+            user.department = document.getElementById('editDepartment').value;
+            
+            // Simula aggiornamento
+            setTimeout(() => {
+                renderUsers(mockUsers);
+                showToast('Utente aggiornato con successo', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+            }, 500);
+        }
+    });
 });
 </script>
-</body>
-</html>
+{% endblock %}

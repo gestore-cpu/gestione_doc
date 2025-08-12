@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}✏️ Nuova Entrata Diario - Mercury{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('ceo.diario_ceo') }}">📝 Diario CEO</a></li>
+                    <li class="breadcrumb-item active">Nuova Entrata</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0">✏️ Nuova Entrata Diario</h1>
+        </div>
+    </div>
+
+    <!-- Alert -->
+    <div class="row mb-4">
+        <div class="col-12">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">📝 Compila la tua entrata diario</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <!-- Data e Titolo -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="data" class="form-label">📅 Data *</label>
+                                <input type="date" class="form-control" id="data" name="data" required 
+                                       value="{{ request.form.data or today }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="titolo" class="form-label">📝 Titolo *</label>
+                                <input type="text" class="form-control" id="titolo" name="titolo" required
+                                       placeholder="Es: Giornata produttiva di leadership"
+                                       value="{{ request.form.titolo }}">
+                            </div>
+                        </div>
+
+                        <!-- Metriche -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="umore" class="form-label">😊 Umore (1-10)</label>
+                                <input type="range" class="form-range" id="umore" name="umore" 
+                                       min="1" max="10" value="{{ request.form.umore or 5 }}"
+                                       oninput="umoreValue.textContent = this.value">
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">😔 1</small>
+                                    <span id="umoreValue" class="fw-bold">5</span>
+                                    <small class="text-muted">😊 10</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="energia" class="form-label">⚡ Energia (1-10)</label>
+                                <input type="range" class="form-range" id="energia" name="energia" 
+                                       min="1" max="10" value="{{ request.form.energia or 5 }}"
+                                       oninput="energiaValue.textContent = this.value">
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">🔋 1</small>
+                                    <span id="energiaValue" class="fw-bold">5</span>
+                                    <small class="text-muted">⚡ 10</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Contenuto Principale -->
+                        <div class="mb-3">
+                            <label for="contenuto" class="form-label">📝 Riflessioni del Giorno</label>
+                            <textarea class="form-control" id="contenuto" name="contenuto" rows="4"
+                                      placeholder="Racconta la tua giornata, le riflessioni, le emozioni...">{{ request.form.contenuto }}</textarea>
+                            <div class="form-text">Descrivi liberamente la tua giornata e le tue riflessioni.</div>
+                        </div>
+
+                        <!-- Sezioni Specifiche -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="gratitudine" class="form-label">🙏 Gratitudine</label>
+                                <textarea class="form-control" id="gratitudine" name="gratitudine" rows="3"
+                                          placeholder="Per cosa sei grato oggi?">{{ request.form.gratitudine }}</textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="sfide" class="form-label">🎯 Sfide</label>
+                                <textarea class="form-control" id="sfide" name="sfide" rows="3"
+                                          placeholder="Quali sfide hai affrontato?">{{ request.form.sfide }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="obiettivi" class="form-label">🎯 Obiettivi per Domani</label>
+                                <textarea class="form-control" id="obiettivi" name="obiettivi" rows="3"
+                                          placeholder="Cosa vuoi realizzare domani?">{{ request.form.obiettivi }}</textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="riflessioni" class="form-label">💭 Riflessioni Personali</label>
+                                <textarea class="form-control" id="riflessioni" name="riflessioni" rows="3"
+                                          placeholder="Pensieri profondi, intuizioni...">{{ request.form.riflessioni }}</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Pulsanti -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('ceo.diario_ceo') }}" class="btn btn-outline-secondary">
+                                ← Annulla
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                💾 Salva Entrata
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar con Suggerimenti -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">💡 Suggerimenti</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6>📝 Per il Contenuto</h6>
+                        <ul class="list-unstyled small">
+                            <li>• Descrivi le emozioni provate</li>
+                            <li>• Racconta le interazioni significative</li>
+                            <li>• Rifletti sui risultati ottenuti</li>
+                            <li>• Condividi le lezioni apprese</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <h6>🙏 Per la Gratitudine</h6>
+                        <ul class="list-unstyled small">
+                            <li>• Persone che ti hanno aiutato</li>
+                            <li>• Successi, anche piccoli</li>
+                            <li>• Momenti di gioia</li>
+                            <li>• Opportunità ricevute</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <h6>🎯 Per gli Obiettivi</h6>
+                        <ul class="list-unstyled small">
+                            <li>• Sii specifico e misurabile</li>
+                            <li>• Concentrati su 2-3 priorità</li>
+                            <li>• Considera il tempo disponibile</li>
+                            <li>• Allinea con i tuoi principi</li>
+                        </ul>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <small>
+                            <strong>💡 Tip:</strong> Dopo aver salvato, potrai utilizzare l'AI per analizzare 
+                            il contenuto e collegarlo ai tuoi principi personali!
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Imposta la data di oggi se non specificata
+document.addEventListener('DOMContentLoaded', function() {
+    if (!document.getElementById('data').value) {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('data').value = today;
+    }
+});
+
+// Aggiorna i valori iniziali
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('umoreValue').textContent = document.getElementById('umore').value;
+    document.getElementById('energiaValue').textContent = document.getElementById('energia').value;
+});
+</script>
+{% endblock %}

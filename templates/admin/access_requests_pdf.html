@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Audit Richieste Accesso</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            font-size: 12px;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 24px;
+        }
+        .header p {
+            margin: 5px 0;
+            color: #7f8c8d;
+        }
+        .info-section {
+            margin-bottom: 30px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .info-item strong {
+            color: #2c3e50;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        .stat-card h3 {
+            margin: 0;
+            font-size: 24px;
+            color: #495057;
+        }
+        .stat-card p {
+            margin: 5px 0 0 0;
+            font-size: 11px;
+            color: #6c757d;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            font-size: 10px;
+        }
+        th {
+            background-color: #343a40;
+            color: white;
+            padding: 8px;
+            text-align: left;
+            font-weight: bold;
+        }
+        td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .status-badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: bold;
+            color: white;
+        }
+        .status-pending { background-color: #ffc107; color: #212529; }
+        .status-approved { background-color: #28a745; }
+        .status-denied { background-color: #dc3545; }
+        .status-expired { background-color: #6c757d; }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+            font-size: 10px;
+            color: #6c757d;
+        }
+        .summary {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .summary h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+        .filters-section {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .filters-section h4 {
+            margin-top: 0;
+            color: #1976d2;
+            font-size: 14px;
+        }
+        .filter-item {
+            margin: 5px 0;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Report Audit Richieste Accesso</h1>
+        <p>Generato il {{ generated_at.strftime('%d/%m/%Y alle %H:%M') }} da {{ admin_user.username }}</p>
+        <p>Sistema di Gestione Documenti - DOCS</p>
+    </div>
+
+    <div class="info-section">
+        <div class="info-grid">
+            <div class="info-item">
+                <strong>Data Generazione:</strong><br>
+                {{ generated_at.strftime('%d/%m/%Y %H:%M:%S') }}
+            </div>
+            <div class="info-item">
+                <strong>Generato da:</strong><br>
+                {{ admin_user.username }} ({{ admin_user.email }})
+            </div>
+            <div class="info-item">
+                <strong>Totale Richieste:</strong><br>
+                {{ stats.total }} record
+            </div>
+            <div class="info-item">
+                <strong>Periodo Analizzato:</strong><br>
+                {% if filters.from_date and filters.to_date %}
+                    Dal {{ filters.from_date }} al {{ filters.to_date }}
+                {% elif filters.from_date %}
+                    Dal {{ filters.from_date }}
+                {% elif filters.to_date %}
+                    Fino al {{ filters.to_date }}
+                {% else %}
+                    Tutto il periodo
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if filters and filters|length > 0 %}
+    <div class="filters-section">
+        <h4>🔍 Filtri Applicati</h4>
+        {% if filters.status and filters.status != 'all' %}
+        <div class="filter-item"><strong>Stato:</strong> {{ filters.status }}</div>
+        {% endif %}
+        {% if filters.file_id %}
+        <div class="filter-item"><strong>ID File:</strong> {{ filters.file_id }}</div>
+        {% endif %}
+        {% if filters.requested_by %}
+        <div class="filter-item"><strong>Richiedente ID:</strong> {{ filters.requested_by }}</div>
+        {% endif %}
+        {% if filters.owner_id %}
+        <div class="filter-item"><strong>Proprietario ID:</strong> {{ filters.owner_id }}</div>
+        {% endif %}
+        {% if filters.from_date %}
+        <div class="filter-item"><strong>Data da:</strong> {{ filters.from_date }}</div>
+        {% endif %}
+        {% if filters.to_date %}
+        <div class="filter-item"><strong>Data a:</strong> {{ filters.to_date }}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>{{ stats.pending }}</h3>
+            <p>In Attesa</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ stats.approved }}</h3>
+            <p>Approvate</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ stats.denied }}</h3>
+            <p>Negate</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ stats.expired }}</h3>
+            <p>Scadute</p>
+        </div>
+    </div>
+
+    {% if avg_approval_time %}
+    <div class="summary">
+        <h3>📊 Statistiche Approvazioni</h3>
+        <p><strong>Tempo medio di approvazione:</strong> {{ "%.1f"|format(avg_approval_time) }} ore</p>
+        <p><strong>Richieste approvate analizzate:</strong> {{ approved_requests|length }}</p>
+    </div>
+    {% endif %}
+
+    {% if requests %}
+    <h3>📋 Dettaglio Richieste</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>File</th>
+                <th>Richiedente</th>
+                <th>Stato</th>
+                <th>Data Richiesta</th>
+                <th>Data Decisione</th>
+                <th>Scadenza</th>
+                <th>Approvatore</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for request in requests %}
+            <tr>
+                <td>{{ request.id }}</td>
+                <td>
+                    <strong>{{ request.file.title or request.file.original_filename }}</strong><br>
+                    <small>ID: {{ request.file_id }}</small>
+                </td>
+                <td>
+                    <strong>{{ request.requested_by_user.username }}</strong><br>
+                    <small>{{ request.requested_by_user.email }}</small>
+                </td>
+                <td>
+                    <span class="status-badge status-{{ request.status.value }}">
+                        {{ request.status_display }}
+                    </span>
+                </td>
+                <td>{{ request.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>
+                    {% if request.decided_at %}
+                        {{ request.decided_at.strftime('%d/%m/%Y %H:%M') }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if request.expires_at %}
+                        {{ request.expires_at.strftime('%d/%m/%Y %H:%M') }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if request.approver %}
+                        {{ request.approver.username }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="summary">
+        <h3>📝 Nessuna Richiesta Trovata</h3>
+        <p>Non ci sono richieste di accesso che corrispondono ai filtri applicati.</p>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p><strong>Report generato automaticamente dal sistema DOCS</strong></p>
+        <p>Questo documento è valido solo se generato da un amministratore autorizzato.</p>
+        <p>Per verifiche o chiarimenti, contattare l'amministratore del sistema.</p>
+        <p>© {{ generated_at.year }} Sistema di Gestione Documenti - DOCS</p>
+    </div>
+</body>
+</html>

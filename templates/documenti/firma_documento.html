@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🖋️ Firma Documento - {{ document.title }}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .signature-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        .signature-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .document-info {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .pdf-viewer {
+            width: 100%;
+            height: 600px;
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .signature-actions {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .btn-signature {
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        .btn-signature:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+        .btn-firma {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border: none;
+            color: white;
+        }
+        .btn-rifiuta {
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            border: none;
+            color: white;
+        }
+        .info-badge {
+            background: #e9ecef;
+            color: #495057;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin: 5px;
+            display: inline-block;
+        }
+        .alert-signature {
+            border-radius: 15px;
+            border: none;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .commento-textarea {
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+        .commento-textarea:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .signature-status {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header con informazioni documento -->
+        <div class="document-info">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h2><i class="fas fa-file-pdf text-danger"></i> {{ document.title }}</h2>
+                    <p class="text-muted mb-2">
+                        <i class="fas fa-user"></i> Caricato da: {{ document.uploader_email }}<br>
+                        <i class="fas fa-calendar"></i> Data: {{ document.created_at.strftime('%d/%m/%Y %H:%M') }}<br>
+                        <i class="fas fa-building"></i> Azienda: {{ document.company.name if document.company else 'N/A' }}
+                    </p>
+                    <div class="mt-2">
+                        {% if document.description %}
+                            <span class="info-badge">
+                                <i class="fas fa-info-circle"></i> {{ document.description[:50] }}{% if document.description|length > 50 %}...{% endif %}
+                            </span>
+                        {% endif %}
+                        {% if document.visibility == 'pubblico' %}
+                            <span class="info-badge bg-success text-white">
+                                <i class="fas fa-globe"></i> Pubblico
+                            </span>
+                        {% else %}
+                            <span class="info-badge bg-warning text-dark">
+                                <i class="fas fa-lock"></i> Privato
+                            </span>
+                        {% endif %}
+                        {% if document.is_signed %}
+                            <span class="info-badge bg-primary text-white">
+                                <i class="fas fa-signature"></i> Firmato
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="{{ url_for('docs.dashboard_docs') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stato firma esistente -->
+        {% if firma_esistente %}
+        <div class="signature-status">
+            <h4><i class="fas fa-info-circle"></i> Stato Firma</h4>
+            <p class="mb-0">
+                <strong>Hai già {{ firma_esistente.stato_display.lower() }} questo documento</strong><br>
+                <small>Data: {{ firma_esistente.timestamp_formatted }}</small>
+                {% if firma_esistente.commento %}
+                    <br><small>Commento: {{ firma_esistente.commento }}</small>
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+
+        <!-- Container firma -->
+        <div class="signature-container">
+            <div class="signature-header">
+                <h3><i class="fas fa-signature"></i> Firma Digitale Documento</h3>
+                <p class="mb-0">Conferma la presa visione e l'accettazione del documento</p>
+            </div>
+            
+            <!-- PDF Viewer -->
+            <div class="p-4">
+                <div class="pdf-viewer-container">
+                    <embed 
+                        src="{{ url_for('static', filename='uploads/' + document.filename) }}"
+                        type="application/pdf"
+                        class="pdf-viewer"
+                        title="{{ document.title }}">
+                </div>
+            </div>
+            
+            <!-- Azioni di firma -->
+            {% if not firma_esistente %}
+            <div class="signature-actions">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h5><i class="fas fa-comment"></i> Commento (opzionale)</h5>
+                        <form method="POST" action="{{ url_for('docs.firma_documento_action', id=document.id) }}" id="firmaForm">
+                            <div class="mb-3">
+                                <textarea 
+                                    name="commento" 
+                                    class="form-control commento-textarea" 
+                                    rows="3" 
+                                    placeholder="Inserisci un commento opzionale alla firma..."></textarea>
+                            </div>
+                            
+                            <div class="d-flex justify-content-center">
+                                <button type="submit" name="action" value="firma" class="btn btn-signature btn-firma">
+                                    <i class="fas fa-check"></i> ✅ Firma Documento
+                                </button>
+                                <button type="submit" name="action" value="rifiuta" class="btn btn-signature btn-rifiuta">
+                                    <i class="fas fa-times"></i> ❌ Rifiuta Firma
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle"></i> Informazioni Firma</h6>
+                            <ul class="mb-0">
+                                <li>La firma è tracciata con IP e timestamp</li>
+                                <li>Non è possibile modificare una firma già effettuata</li>
+                                <li>Il rifiuto viene registrato per audit</li>
+                                <li>La firma è valida per compliance ISO/HACCP</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="signature-actions">
+                <div class="text-center">
+                    <div class="alert alert-warning">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Firma Già Effettuata</h5>
+                        <p class="mb-0">Hai già {{ firma_esistente.stato_display.lower() }} questo documento. Non è possibile modificare una firma già effettuata.</p>
+                    </div>
+                    <a href="{{ url_for('docs.dashboard_docs') }}" class="btn btn-primary">
+                        <i class="fas fa-arrow-left"></i> Torna alla Dashboard
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Footer con informazioni legali -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h6><i class="fas fa-gavel"></i> Informazioni Legali</h6>
+                        <p class="mb-2">
+                            <small class="text-muted">
+                                La firma digitale ha valore legale ai fini della conformità normativa (ISO 9001, HACCP, GDPR, ecc.). 
+                                Ogni firma viene tracciata con timestamp, IP address e user agent per garantire l'integrità del processo.
+                            </small>
+                        </p>
+                        <p class="mb-0">
+                            <small class="text-muted">
+                                <strong>Utente:</strong> {{ current_user.user_display }} | 
+                                <strong>Data/Ora:</strong> {{ datetime.now().strftime('%d/%m/%Y %H:%M:%S') }} | 
+                                <strong>IP:</strong> {{ request.remote_addr }}
+                            </small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Conferma prima di firmare o rifiutare
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('firmaForm');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const action = e.submitter.value;
+                    let message = '';
+                    
+                    if (action === 'firma') {
+                        message = 'Sei sicuro di voler firmare questo documento? La firma sarà tracciata e non potrà essere modificata.';
+                    } else if (action === 'rifiuta') {
+                        message = 'Sei sicuro di voler rifiutare la firma? Il rifiuto sarà registrato per audit.';
+                    }
+                    
+                    if (message && !confirm(message)) {
+                        e.preventDefault();
+                    }
+                });
+            }
+            
+            // Animazioni per i pulsanti
+            const buttons = document.querySelectorAll('.btn-signature');
+            buttons.forEach(button => {
+                button.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-3px)';
+                });
+                button.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                });
+            });
+        });
+    </script>
+</body>
+</html>

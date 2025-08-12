@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-magic me-2"></i>
+                        🤖 Regole AI Generate
+                    </h2>
+                    <p class="text-muted mb-0">Regole generate automaticamente basate sull'analisi dello storico richieste</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" onclick="activateAllRules()">
+                        <i class="fas fa-check me-1"></i>
+                        Attiva Tutte
+                    </button>
+                    <a href="{{ url_for('admin.manage_ai_policies') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Torna alla Gestione
+                    </a>
+                </div>
+            </div>
+
+            <!-- Analisi AI -->
+            {% if analysis %}
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Analisi Pattern AI
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="analysis-content" style="white-space: pre-line; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.6; background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #17a2b8;">
+                        {{ analysis }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Regole Generate -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-robot me-2"></i>
+                        Regole AI Proposte
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if policies %}
+                        <div class="row">
+                            {% for policy in policies %}
+                            <div class="col-md-6 mb-4">
+                                <div class="card border-{{ 'success' if policy.action == 'approve' else 'danger' }} h-100">
+                                    <div class="card-header bg-{{ 'success' if policy.action == 'approve' else 'danger' }} text-white">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">
+                                                <i class="fas fa-{{ 'check' if policy.action == 'approve' else 'times' }} me-2"></i>
+                                                {{ policy.name }}
+                                            </h6>
+                                            <span class="badge bg-light text-dark">{{ policy.priority }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="card-text">{{ policy.description }}</p>
+                                        
+                                        <div class="mb-3">
+                                            <strong>Condizione:</strong>
+                                            <code class="d-block mt-1 p-2 bg-light rounded">{{ policy.condition }}</code>
+                                        </div>
+                                        
+                                        <div class="row mb-3">
+                                            <div class="col-6">
+                                                <small class="text-muted">Azione:</small>
+                                                <div>
+                                                    <span class="badge bg-{{ 'success' if policy.action == 'approve' else 'danger' }}">
+                                                        <i class="fas fa-{{ 'check' if policy.action == 'approve' else 'times' }} me-1"></i>
+                                                        {{ policy.action.upper() }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Confidenza:</small>
+                                                <div>
+                                                    <div class="progress" style="height: 20px;">
+                                                        <div class="progress-bar bg-{{ 'success' if policy.confidence > 80 else 'warning' if policy.confidence > 60 else 'danger' }}" 
+                                                             style="width: {{ policy.confidence }}%">
+                                                            {{ policy.confidence }}%
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <strong>Spiegazione:</strong>
+                                            <p class="text-muted small">{{ policy.explanation }}</p>
+                                        </div>
+                                        
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-sm btn-success" onclick="activateRule({{ loop.index0 }})">
+                                                <i class="fas fa-play me-1"></i>
+                                                Attiva
+                                            </button>
+                                            <button class="btn btn-sm btn-info" onclick="viewDetails({{ loop.index0 }})">
+                                                <i class="fas fa-eye me-1"></i>
+                                                Dettagli
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-info-circle text-muted fa-3x mb-3"></i>
+                            <h5 class="text-muted">Nessuna Regola Generata</h5>
+                            <p class="text-muted">Non sono stati identificati pattern sufficienti per generare regole automatiche.</p>
+                            <button class="btn btn-primary" onclick="regenerateRules()">
+                                <i class="fas fa-sync-alt me-1"></i>
+                                Rigenera Regole
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Statistiche Regole -->
+            {% if policies %}
+            <div class="row mt-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ policies|length }}</h4>
+                            <small>Regole Generate</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ policies|selectattr('action', 'equalto', 'approve')|list|length }}</h4>
+                            <small>Regole Approva</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ policies|selectattr('action', 'equalto', 'deny')|list|length }}</h4>
+                            <small>Regole Nega</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ "%.1f"|format(policies|map(attribute='confidence')|list|sum / policies|length) }}%</h4>
+                            <small>Confidenza Media</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Modal Dettagli Regola -->
+            <div class="modal fade" id="ruleDetailsModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Dettagli Regola
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="rule-details-content">
+                                <!-- I dettagli della regola verranno inseriti qui -->
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+                            <button type="button" class="btn btn-success" onclick="activateSelectedRule()">
+                                <i class="fas fa-play me-1"></i>
+                                Attiva Regola
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPolicyIndex = null;
+const policies = {{ policies|tojson if policies else '[]' }};
+
+function activateRule(index) {
+    if (confirm('Attivare questa regola AI?')) {
+        const policy = policies[index];
+        
+        fetch('/admin/access_requests/ai_policies/activate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                policy: policy
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Regola attivata con successo!');
+                location.reload();
+            } else {
+                alert('Errore: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Errore durante l\'attivazione della regola');
+        });
+    }
+}
+
+function activateAllRules() {
+    if (confirm('Attivare tutte le regole generate?')) {
+        let activatedCount = 0;
+        let errorCount = 0;
+        
+        policies.forEach((policy, index) => {
+            fetch('/admin/access_requests/ai_policies/activate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    policy: policy
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    activatedCount++;
+                } else {
+                    errorCount++;
+                }
+                
+                if (activatedCount + errorCount === policies.length) {
+                    alert(`Attivazione completata: ${activatedCount} regole attivate, ${errorCount} errori`);
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                errorCount++;
+                if (activatedCount + errorCount === policies.length) {
+                    alert(`Attivazione completata: ${activatedCount} regole attivate, ${errorCount} errori`);
+                    location.reload();
+                }
+            });
+        });
+    }
+}
+
+function viewDetails(index) {
+    currentPolicyIndex = index;
+    const policy = policies[index];
+    
+    const modal = document.getElementById('ruleDetailsModal');
+    const content = document.getElementById('rule-details-content');
+    
+    content.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Informazioni Regola</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Nome:</strong> ${policy.name}</li>
+                    <li><strong>Azione:</strong> 
+                        <span class="badge bg-${policy.action === 'approve' ? 'success' : 'danger'}">
+                            ${policy.action.toUpperCase()}
+                        </span>
+                    </li>
+                    <li><strong>Priorità:</strong> ${policy.priority}</li>
+                    <li><strong>Confidenza:</strong> ${policy.confidence}%</li>
+                    <li><strong>Tipo Condizione:</strong> ${policy.condition_type}</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Condizione JSON</h6>
+                <pre class="bg-light p-2 rounded"><code>${policy.condition}</code></pre>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6>Descrizione</h6>
+                <p>${policy.description}</p>
+                
+                <h6>Spiegazione Pattern</h6>
+                <p class="text-muted">${policy.explanation}</p>
+            </div>
+        </div>
+    `;
+    
+    new bootstrap.Modal(modal).show();
+}
+
+function activateSelectedRule() {
+    if (currentPolicyIndex !== null) {
+        activateRule(currentPolicyIndex);
+    }
+}
+
+function regenerateRules() {
+    if (confirm('Rigenerare le regole AI?')) {
+        fetch('/admin/access_requests/ai_policies/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Errore: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Errore durante la rigenerazione delle regole');
+        });
+    }
+}
+
+// Auto-refresh ogni 5 minuti per aggiornamenti
+setTimeout(() => {
+    if (confirm('Aggiornare le regole AI con i dati più recenti?')) {
+        location.reload();
+    }
+}, 300000);
+</script>
+
+<style>
+.analysis-content {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.progress {
+    border-radius: 10px;
+}
+
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %} 

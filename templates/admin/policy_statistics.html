@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        📊 Statistiche Policy AI
+                    </h2>
+                    <p class="text-muted mb-0">Metriche e performance delle regole automatiche</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('admin.manage_ai_policies') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Torna alla Gestione
+                    </a>
+                    <button class="btn btn-outline-success" onclick="exportStats()">
+                        <i class="fas fa-download me-1"></i>
+                        Esporta Report
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistiche Generali -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ stats.total_policies }}</h4>
+                            <small>Regole Totali</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ stats.active_policies }}</h4>
+                            <small>Regole Attive</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ stats.pending_policies }}</h4>
+                            <small>Regole in Attesa</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h4 class="mb-1">{{ "%.1f"|format((stats.active_policies / stats.total_policies * 100) if stats.total_policies > 0 else 0) }}%</h4>
+                            <small>Tasso Attivazione</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Decisioni Automatiche (Ultimi 30 giorni) -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-robot me-2"></i>
+                        Decisioni Automatiche - Ultimi 30 Giorni
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 class="text-success">{{ stats.auto_approved_30d }}</h3>
+                                <p class="text-muted">Auto-Approva</p>
+                                <div class="progress">
+                                    <div class="progress-bar bg-success" 
+                                         style="width: {{ (stats.auto_approved_30d / stats.auto_total_30d * 100) if stats.auto_total_30d > 0 else 0 }}%">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 class="text-danger">{{ stats.auto_denied_30d }}</h3>
+                                <p class="text-muted">Auto-Nega</p>
+                                <div class="progress">
+                                    <div class="progress-bar bg-danger" 
+                                         style="width: {{ (stats.auto_denied_30d / stats.auto_total_30d * 100) if stats.auto_total_30d > 0 else 0 }}%">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 class="text-primary">{{ stats.auto_total_30d }}</h3>
+                                <p class="text-muted">Totale Decisioni</p>
+                                <div class="progress">
+                                    <div class="progress-bar bg-primary" style="width: 100%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grafico Performance -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-chart-pie me-2"></i>
+                                Distribuzione Decisioni
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="decisionsChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-chart-line me-2"></i>
+                                Trend Attivazione Policy
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="activationChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metriche Dettagliate -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-tachometer-alt me-2"></i>
+                                Metriche Performance
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="text-center">
+                                        <h5 class="text-success">
+                                            {{ "%.1f"|format((stats.auto_approved_30d / stats.auto_total_30d * 100) if stats.auto_total_30d > 0 else 0) }}%
+                                        </h5>
+                                        <small class="text-muted">Tasso Approvazione</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="text-center">
+                                        <h5 class="text-danger">
+                                            {{ "%.1f"|format((stats.auto_denied_30d / stats.auto_total_30d * 100) if stats.auto_total_30d > 0 else 0) }}%
+                                        </h5>
+                                        <small class="text-muted">Tasso Negazione</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="text-center">
+                                        <h5 class="text-info">{{ stats.auto_total_30d / 30 if stats.auto_total_30d > 0 else 0 }}</h5>
+                                        <small class="text-muted">Decisioni/Giorno</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="text-center">
+                                        <h5 class="text-warning">{{ stats.active_policies }}</h5>
+                                        <small class="text-muted">Policy Attive</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-lightbulb me-2"></i>
+                                Insight e Raccomandazioni
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-info-circle me-2"></i>Analisi Performance</h6>
+                                <ul class="mb-0">
+                                    {% if stats.auto_total_30d > 0 %}
+                                        <li><strong>{{ stats.auto_total_30d }}</strong> decisioni automatiche negli ultimi 30 giorni</li>
+                                        <li><strong>{{ "%.1f"|format((stats.auto_approved_30d / stats.auto_total_30d * 100) if stats.auto_total_30d > 0 else 0) }}%</strong> di approvazioni automatiche</li>
+                                        <li><strong>{{ "%.1f"|format((stats.auto_denied_30d / stats.auto_total_30d * 100) if stats.auto_total_30d > 0 else 0) }}%</strong> di negazioni automatiche</li>
+                                    {% else %}
+                                        <li>Nessuna decisione automatica negli ultimi 30 giorni</li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            
+                            {% if stats.active_policies > 0 %}
+                                <div class="alert alert-success">
+                                    <h6><i class="fas fa-check-circle me-2"></i>Raccomandazioni</h6>
+                                    <ul class="mb-0">
+                                        <li>Monitorare l'efficacia delle policy attive</li>
+                                        <li>Considerare l'attivazione di policy in attesa</li>
+                                        <li>Rivedere le policy con basso tasso di applicazione</li>
+                                    </ul>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    <h6><i class="fas fa-exclamation-triangle me-2"></i>Attenzione</h6>
+                                    <p class="mb-0">Nessuna policy attiva. Considerare l'attivazione di regole automatiche per migliorare l'efficienza.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Grafico distribuzione decisioni
+const decisionsCtx = document.getElementById('decisionsChart').getContext('2d');
+const decisionsChart = new Chart(decisionsCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Auto-Approva', 'Auto-Nega'],
+        datasets: [{
+            data: [{{ stats.auto_approved_30d }}, {{ stats.auto_denied_30d }}],
+            backgroundColor: ['#28a745', '#dc3545'],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Grafico trend attivazione (simulato)
+const activationCtx = document.getElementById('activationChart').getContext('2d');
+const activationChart = new Chart(activationCtx, {
+    type: 'line',
+    data: {
+        labels: ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu'],
+        datasets: [{
+            label: 'Policy Attive',
+            data: [0, 2, 3, 5, 4, {{ stats.active_policies }}],
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+function exportStats() {
+    // Simula esportazione report
+    alert('Funzionalità di esportazione report in sviluppo');
+}
+
+// Auto-refresh ogni 5 minuti
+setTimeout(() => {
+    if (confirm('Aggiornare le statistiche con i dati più recenti?')) {
+        location.reload();
+    }
+}, 300000);
+</script>
+
+<style>
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.progress {
+    height: 8px;
+    border-radius: 4px;
+}
+
+.alert {
+    border-left: 4px solid;
+}
+</style>
+{% endblock %} 

@@ -1,0 +1,240 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0"><i class="fas fa-brain"></i> 🧠 Analisi AI Documentale</h2>
+                </div>
+                <div class="card-body">
+                    <!-- Filtro date -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <label for="start_date" class="form-label">📅 Data Inizio</label>
+                            <input type="date" id="start_date" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="end_date" class="form-label">📅 Data Fine</label>
+                            <input type="date" id="end_date" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-primary btn-lg w-100" onclick="analizzaAI()">
+                                <i class="fas fa-magic"></i> 💡 Analizza con AI
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-outline-secondary w-100" onclick="resetFiltri()">
+                                <i class="fas fa-undo"></i> Reset Filtri
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Spinner -->
+                    <div id="spinner" class="text-center" style="display:none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Caricamento...</span>
+                        </div>
+                        <p class="mt-2 text-muted">🤖 Analisi AI in corso...</p>
+                    </div>
+
+                    <!-- Risultati -->
+                    <div id="risultati_ai" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function analizzaAI() {
+    const startDate = document.getElementById('start_date').value;
+    const endDate = document.getElementById('end_date').value;
+    const risultatiDiv = document.getElementById('risultati_ai');
+    const spinner = document.getElementById('spinner');
+
+    // Validazione date
+    if (startDate && endDate && startDate > endDate) {
+        alert('❌ La data di inizio non può essere successiva alla data di fine!');
+        return;
+    }
+
+    risultatiDiv.innerHTML = "";
+    spinner.style.display = "block";
+
+    let url = `/ai/analisi-docs`;
+    const params = [];
+    if (startDate) params.push(`start_date=${startDate}`);
+    if (endDate) params.push(`end_date=${endDate}`);
+    if (params.length) url += `?${params.join("&")}`;
+
+    console.log('🔍 Avvio analisi AI:', url);
+
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Errore HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            spinner.style.display = "none";
+            console.log('✅ Risultati analisi AI ricevuti:', data);
+
+            risultatiDiv.innerHTML = `
+                <div class="row">
+                    <div class="col-12">
+                        <h4 class="text-success mb-3">
+                            <i class="fas fa-chart-line"></i> 📊 Risultati Analisi AI
+                        </h4>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- File obbligatori non scaricati -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-warning">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="mb-0"><i class="fas fa-exclamation-triangle"></i> 📂 File obbligatori non scaricati</h6>
+                            </div>
+                            <div class="card-body">
+                                ${data.obbligatori_non_scaricati && data.obbligatori_non_scaricati.length ? 
+                                    '<ul class="list-unstyled">' + 
+                                    data.obbligatori_non_scaricati.map(n => `<li><i class="fas fa-file-alt text-warning"></i> ${n}</li>`).join('') + 
+                                    '</ul>' : 
+                                    '<p class="text-success mb-0"><i class="fas fa-check-circle"></i> Tutti i file obbligatori sono stati scaricati ✅</p>'
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Utenti che scaricano ma non firmano -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-danger">
+                            <div class="card-header bg-danger text-white">
+                                <h6 class="mb-0"><i class="fas fa-user-times"></i> 🙈 Utenti che scaricano ma non firmano</h6>
+                            </div>
+                            <div class="card-body">
+                                ${data.utenti_non_firmato && data.utenti_non_firmato.length ? 
+                                    '<ul class="list-unstyled">' + 
+                                    data.utenti_non_firmato.map(u => `<li><i class="fas fa-user text-danger"></i> ${u.nome} (ID: ${u.id})</li>`).join('') + 
+                                    '</ul>' : 
+                                    '<p class="text-success mb-0"><i class="fas fa-check-circle"></i> Tutti i documenti sono stati firmati ✅</p>'
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Download fuori orario -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-info">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0"><i class="fas fa-moon"></i> 🌙 Download fuori orario</h6>
+                            </div>
+                            <div class="card-body">
+                                ${data.download_fuori_orario && data.download_fuori_orario.length ? 
+                                    '<ul class="list-unstyled">' + 
+                                    data.download_fuori_orario.map(d => `<li><i class="fas fa-clock text-info"></i> File ID: ${d.file_id} alle ${new Date(d.orario).toLocaleString('it-IT')}</li>`).join('') + 
+                                    '</ul>' : 
+                                    '<p class="text-success mb-0"><i class="fas fa-check-circle"></i> Nessun download sospetto rilevato ✅</p>'
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reparti inattivi -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-secondary">
+                            <div class="card-header bg-secondary text-white">
+                                <h6 class="mb-0"><i class="fas fa-chart-line-down"></i> 📉 Reparti inattivi</h6>
+                            </div>
+                            <div class="card-body">
+                                ${data.reparti_inattivi && data.reparti_inattivi.length ? 
+                                    '<ul class="list-unstyled">' + 
+                                    data.reparti_inattivi.map(r => `<li><i class="fas fa-building text-secondary"></i> ${r}</li>`).join('') + 
+                                    '</ul>' : 
+                                    '<p class="text-success mb-0"><i class="fas fa-check-circle"></i> Tutti i reparti sono attivi ✅</p>'
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top file scaricati -->
+                    <div class="col-12 mb-3">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="fas fa-fire"></i> 🔥 Top 5 file più scaricati</h6>
+                            </div>
+                            <div class="card-body">
+                                ${data.top_downloads && data.top_downloads.length ? 
+                                    '<div class="row">' + 
+                                    data.top_downloads.map((f, index) => `
+                                        <div class="col-md-6 col-lg-4 mb-2">
+                                            <div class="d-flex align-items-center">
+                                                <span class="badge bg-primary me-2">#${index + 1}</span>
+                                                <div>
+                                                    <strong>${f.nome}</strong><br>
+                                                    <small class="text-muted">${f.totale} download</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).join('') + 
+                                    '</div>' : 
+                                    '<p class="text-muted mb-0"><i class="fas fa-info-circle"></i> Nessun file scaricato nel periodo selezionato</p>'
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Riepilogo -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-info-circle"></i> 📋 Riepilogo Analisi</h6>
+                            <ul class="mb-0">
+                                <li><strong>File obbligatori non scaricati:</strong> ${data.obbligatori_non_scaricati ? data.obbligatori_non_scaricati.length : 0}</li>
+                                <li><strong>Utenti che non firmano:</strong> ${data.utenti_non_firmato ? data.utenti_non_firmato.length : 0}</li>
+                                <li><strong>Download fuori orario:</strong> ${data.download_fuori_orario ? data.download_fuori_orario.length : 0}</li>
+                                <li><strong>Reparti inattivi:</strong> ${data.reparti_inattivi ? data.reparti_inattivi.length : 0}</li>
+                                <li><strong>File più scaricati:</strong> ${data.top_downloads ? data.top_downloads.length : 0}</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+        })
+        .catch(err => {
+            spinner.style.display = "none";
+            risultatiDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-triangle"></i> ❌ Errore durante l'analisi AI</h6>
+                    <p class="mb-0">Si è verificato un errore durante l'elaborazione. Riprova più tardi.</p>
+                    <small class="text-muted">Dettagli: ${err.message}</small>
+                </div>
+            `;
+            console.error("❌ Errore fetch:", err);
+        });
+}
+
+function resetFiltri() {
+    document.getElementById('start_date').value = '';
+    document.getElementById('end_date').value = '';
+    document.getElementById('risultati_ai').innerHTML = '';
+}
+
+// Inizializzazione: imposta date di default (ultimi 30 giorni)
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
+    
+    document.getElementById('end_date').value = today.toISOString().split('T')[0];
+    document.getElementById('start_date').value = thirtyDaysAgo.toISOString().split('T')[0];
+});
+</script>
+{% endblock %}

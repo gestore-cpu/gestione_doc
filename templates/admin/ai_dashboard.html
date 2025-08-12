@@ -1,0 +1,524 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Dashboard AI Analytics - Mercury DOCS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">
+                <i class="fas fa-brain text-primary"></i>
+                Dashboard AI Analytics
+            </h1>
+            <p class="text-muted mb-0">Analisi avanzata utenti e guest con insight AI</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary btn-sm" onclick="refreshData()">
+                <i class="fas fa-sync-alt"></i> Aggiorna
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="exportDashboard()">
+                <i class="fas fa-download"></i> Esporta
+            </button>
+        </div>
+    </div>
+
+    <!-- Sezione 1: Statistiche Utenti -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users"></i>
+                        📊 Statistiche Utenti
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- KPI Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ total_users }}</h3>
+                                    <small>Totale Utenti</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ active_users }}</h3>
+                                    <small>Utenti Attivi</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ inactive_users }}</h3>
+                                    <small>Utenti Disattivati</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ inactive_30_days }}</h3>
+                                    <small>Inattivi >30 giorni</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grafici -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-chart-bar"></i> Accessi Ultimi 7 Giorni</h6>
+                            <canvas id="accessChart" height="200"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-chart-pie"></i> Utenti per Ruolo</h6>
+                            <canvas id="roleChart" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sezione 2: Statistiche Guest -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-friends"></i>
+                        📂 Statistiche Guest
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- KPI Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ total_guests }}</h3>
+                                    <small>Totale Guest Attivi</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ expired_guests }}</h3>
+                                    <small>Guest Scaduti</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-secondary text-white">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0">{{ last_access_avg.strftime('%d/%m') if last_access_avg else 'N/A' }}</h3>
+                                    <small>Ultimo Accesso Medio</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grafici e Tabelle -->
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h6><i class="fas fa-chart-line"></i> Scadenze Guest Prossimi 30 Giorni</h6>
+                            <canvas id="expirationChart" height="200"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <h6><i class="fas fa-trophy"></i> Top 5 Guest per Download</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Email</th>
+                                            <th>Download</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for guest in top_guests_downloads %}
+                                        <tr>
+                                            <td>{{ guest.email[:20] }}...</td>
+                                            <td><span class="badge bg-primary">{{ guest.download_count }}</span></td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="2" class="text-muted">Nessun download registrato</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sezione 3: Insight AI -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-robot"></i>
+                        🧠 Insight AI
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Suggerimenti AI -->
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-lightbulb"></i> Suggerimenti AI</h6>
+                            <div class="suggestions-container">
+                                {% for suggestion in ai_suggestions %}
+                                <div class="alert alert-{{ suggestion.type }} alert-dismissible fade show" role="alert">
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">{{ suggestion.icon }}</span>
+                                        <div>
+                                            <strong>{{ suggestion.title }}</strong><br>
+                                            <small>{{ suggestion.message }}</small><br>
+                                            <small class="text-muted">{{ suggestion.action }}</small>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    Nessun suggerimento AI disponibile al momento.
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Grafico Radar Anomalie -->
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-radar"></i> Intensità Anomalie per Tipo</h6>
+                            <canvas id="anomalyChart" height="200"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Alert Recenti -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6><i class="fas fa-exclamation-triangle"></i> Comportamenti Sospetti Recenti</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Tipo</th>
+                                            <th>Utente</th>
+                                            <th>Descrizione</th>
+                                            <th>Livello</th>
+                                            <th>Stato</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for alert in recent_alerts %}
+                                        <tr>
+                                            <td>{{ alert.created_at.strftime('%d/%m %H:%M') }}</td>
+                                            <td>
+                                                <span class="badge bg-secondary">{{ alert.tipo_alert_display }}</span>
+                                            </td>
+                                            <td>{{ alert.utente_display }}</td>
+                                            <td>{{ alert.descrizione[:50] }}...</td>
+                                            <td>
+                                                <span class="badge {{ alert.livello_badge_class }}">
+                                                    {{ alert.livello_display }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="badge {{ alert.stato_badge_class }}">
+                                                    {{ alert.stato }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="6" class="text-muted text-center">
+                                                Nessun comportamento sospetto rilevato
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sezione Ultimi Invii PDF -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-envelope"></i> 📨 Ultimi Invii PDF
+                    </h5>
+                    <a href="{{ url_for('admin.invii_pdf') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-list"></i> Visualizza Tutti
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Utente/Guest</th>
+                                    <th>Inviato a</th>
+                                    <th>Da</th>
+                                    <th>Data/Ora</th>
+                                    <th>Stato</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for invio in ultimi_invii_pdf %}
+                                <tr>
+                                    <td>
+                                        <span class="badge badge-{{ 'info' if invio.tipo == 'user' else 'warning' }}">
+                                            {{ invio.tipo_display }}
+                                        </span>
+                                        {{ invio.nome_utente_guest }}
+                                    </td>
+                                    <td>{{ invio.inviato_a }}</td>
+                                    <td>{{ invio.inviato_da }}</td>
+                                    <td>{{ invio.timestamp_formatted }}</td>
+                                    <td>
+                                        <span class="badge {{ invio.esito_badge_class }}">
+                                            {{ invio.esito_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                onclick="mostraDettagliInvio({{ invio.id }})"
+                                                title="Dettagli Email">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">
+                                        <i class="fas fa-inbox"></i> Nessun invio PDF registrato
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per dettagli invio PDF -->
+<div class="modal fade" id="dettagliInvioModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-envelope"></i> Dettagli Invio PDF
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="dettagliInvioContent">
+                <!-- Contenuto caricato via AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function mostraDettagliInvio(invioId) {
+    // TODO: Implementa chiamata AJAX per caricare dettagli
+    alert('Funzionalità in sviluppo - ID invio: ' + invioId);
+}
+</script>
+
+<!-- Scripts per i grafici -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Grafico accessi ultimi 7 giorni
+const accessCtx = document.getElementById('accessChart').getContext('2d');
+new Chart(accessCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ access_dates | tojson }},
+        datasets: [{
+            label: 'Accessi',
+            data: {{ access_counts | tojson }},
+            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Grafico torta utenti per ruolo
+const roleCtx = document.getElementById('roleChart').getContext('2d');
+new Chart(roleCtx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ role_labels | tojson }},
+        datasets: [{
+            data: {{ role_values | tojson }},
+            backgroundColor: [
+                'rgba(255, 99, 132, 0.8)',
+                'rgba(54, 162, 235, 0.8)',
+                'rgba(255, 205, 86, 0.8)',
+                'rgba(75, 192, 192, 0.8)'
+            ],
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Grafico scadenze guest
+const expirationCtx = document.getElementById('expirationChart').getContext('2d');
+new Chart(expirationCtx, {
+    type: 'line',
+    data: {
+        labels: {{ expiration_dates | tojson }},
+        datasets: [{
+            label: 'Scadenze',
+            data: {{ expiration_counts | tojson }},
+            borderColor: 'rgba(255, 159, 64, 1)',
+            backgroundColor: 'rgba(255, 159, 64, 0.2)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Grafico radar anomalie
+const anomalyCtx = document.getElementById('anomalyChart').getContext('2d');
+new Chart(anomalyCtx, {
+    type: 'radar',
+    data: {
+        labels: {{ anomaly_types | tojson }},
+        datasets: [{
+            label: 'Intensità Anomalie',
+            data: {{ anomaly_intensities | tojson }},
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            borderWidth: 2,
+            pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgba(255, 99, 132, 1)'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            r: {
+                beginAtZero: true,
+                max: Math.max(...{{ anomaly_intensities | tojson }}) + 2
+            }
+        }
+    }
+});
+
+// Funzioni utility
+function refreshData() {
+    location.reload();
+}
+
+function exportDashboard() {
+    // Implementa esportazione dashboard
+    alert('Funzionalità di esportazione in sviluppo');
+}
+
+// Auto-refresh ogni 5 minuti
+setInterval(function() {
+    // Aggiorna solo i dati dinamici senza ricaricare la pagina
+    console.log('Aggiornamento automatico dashboard...');
+}, 300000);
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-header {
+    border-bottom: none;
+    font-weight: 600;
+}
+
+.suggestions-container .alert {
+    margin-bottom: 0.5rem;
+    border: none;
+}
+
+.table th {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+canvas {
+    max-height: 300px;
+}
+</style>
+{% endblock %}
